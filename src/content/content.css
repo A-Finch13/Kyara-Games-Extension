@@ -36,6 +36,11 @@
   color: #fff;
 }
 
+.kyx-badge[data-kind="single"] {
+  background: #f5c518;
+  color: #1a1400;
+}
+
 /* "Masquer les complets" toggle, inside the site's album toolbar */
 .kyx-toggle {
   margin-left: auto;

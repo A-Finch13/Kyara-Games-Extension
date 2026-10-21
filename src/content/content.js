@@ -135,12 +135,13 @@
     return false;
   }
 
-  // Where each badge is wanted: the market only inside the trade composer; duplicates on Collection and in trades.
+  // Where each badge is wanted: the market only inside the trade composer; duplicates on Collection and in trades,
+  // and in trades also the cards held only once, so giving away a last copy is never a surprise.
   function badgeScope(img) {
     const trade = inComposer(img);
     const path = location.pathname;
-    if (path.startsWith('/marche') && !trade) return { missing: false, dupes: false };
-    return { missing: settings.badgeMissing, dupes: settings.badgeDupes && (trade || path === '/collection') };
+    if (path.startsWith('/marche') && !trade) return { missing: false, dupes: false, single: false };
+    return { missing: settings.badgeMissing, dupes: settings.badgeDupes && (trade || path === '/collection'), single: settings.badgeDupes && trade };
   }
 
   const MIN_SIZE = 48; // avatars and tiny chips stay clean
@@ -163,6 +164,9 @@
       } else if (q > 1 && scope.dupes) {
         kind = 'dupe';
         text = `×${q}`;
+      } else if (q === 1 && scope.single) {
+        kind = 'single';
+        text = 'Unique';
       }
     }
     if (!kind) return void badge?.remove();

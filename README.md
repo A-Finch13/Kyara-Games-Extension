@@ -8,6 +8,7 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | --- | --- |
 | Masquer les albums déjà complétés | Page **Collection** du site (bouton en bas à gauche pour les réafficher) et onglet **Albums** de la popup |
 | Badge « Manquante » sur toute carte que tu n'as pas | Partout sur le site : boutique/marché, échanges, profils, wiki… |
+| Savoir si la carte que tu donnes est en double | Badge **×N** (doublon) ou **Unique** (ton seul exemplaire) sur tes cartes dans les fenêtres d'échange, confirmation comprise |
 | Voir les doublons du joueur avec qui tu échanges | Onglet **Échange** de la popup, avec la liste de tes amis |
 | Filtrer ses cartes sur ses doublons | Puce **Ses doublons** dans la fenêtre « Proposer un échange », onglet **Cartes de …** |
 | Afficher les cartes manquantes de la collection | Puce **Manquantes** à côté des raretés sur la page Collection, et onglet **Manquantes** de la popup |
