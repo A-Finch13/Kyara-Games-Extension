@@ -155,3 +155,136 @@ a.slot:hover .kyx-ghost {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Buy order row under each missing card, like the site's "≈ price · Vendre" row of owned cards */
+.kyx-order {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.kyx-order-med {
+  overflow: hidden;
+  color: var(--fg2, #a9a4b0);
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kyx-order button {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg, #fff);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kyx-order .kyx-order-open {
+  margin-left: auto;
+}
+
+.kyx-order button:hover:not(:disabled) {
+  border-color: var(--acc, #f5c518);
+  color: var(--acc2, #ffd84a);
+}
+
+.kyx-order button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.kyx-order-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 12px;
+  background: #111015;
+}
+
+.kyx-order-facts,
+.kyx-order-msg {
+  margin: 0;
+  color: var(--fg2, #a9a4b0);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.kyx-order-msg:empty {
+  display: none;
+}
+
+.kyx-order-msg[data-kind="ok"] {
+  color: #3fbf7f;
+}
+
+.kyx-order-msg[data-kind="err"] {
+  color: #ff4d2e;
+}
+
+.kyx-order-msg a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.kyx-order-fields {
+  display: flex;
+  gap: 6px;
+}
+
+.kyx-order-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--fg2, #a9a4b0);
+  font-size: 11px;
+}
+
+.kyx-order-fields label:first-child {
+  flex: 1;
+}
+
+.kyx-order-fields label:last-child {
+  width: 52px;
+}
+
+.kyx-order-fields input {
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 8px;
+  background: #0b0a0e;
+  color: var(--fg, #fff);
+  font: 600 13px var(--mono, monospace);
+}
+
+.kyx-order-btns {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.kyx-order .kyx-order-go:not(:disabled) {
+  border-color: var(--acc, #f5c518);
+  background: var(--acc, #f5c518);
+  color: var(--bg, #0b0a0e);
+}
+
+.kyx-order .kyx-order-go:hover:not(:disabled) {
+  color: var(--bg, #0b0a0e);
+  background: var(--acc2, #ffd84a);
+}

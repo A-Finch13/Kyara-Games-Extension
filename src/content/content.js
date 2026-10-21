@@ -298,10 +298,17 @@
   // The site draws a card you don't own as a dashed box with a "?": show the card itself, greyed out,
   // with its name above the site's number and rarity. Everything goes inside the site's box, so it leaves with it.
   function scanMissing() {
+    // A card just bought leaves its "?" box: its buy order row goes too.
+    document.querySelectorAll('.kyx-order').forEach((row) => {
+      if (!row.parentElement?.querySelector(':scope > a.slot > .miss')) row.remove();
+    });
     if (location.pathname !== '/collection') return;
+    const ids = [];
     for (const miss of document.querySelectorAll('a.slot > .miss')) {
       const id = Number(miss.parentElement.getAttribute('href')?.match(/\/wiki\/(\d+)/)?.[1]);
       if (!id) continue;
+      ids.push(id);
+      orderRow(miss.parentElement, id);
       const name = catalog?.get(id)?.n ?? '';
       if (miss.dataset.kyxGhost === `${id}|${name}`) continue;
       miss.dataset.kyxGhost = `${id}|${name}`;
@@ -324,6 +331,170 @@
       label.textContent = name;
       label.title = name;
     }
+    loadPrices(ids);
+  }
+
+  // ---------- buy order under each missing card ----------
+
+  // Like the "≈ price · Vendre" row of owned cards: the fair price and a button opening a small buy order form,
+  // the same one as on the card's wiki page (lowest price of the rarity or fair-play bound, 1 to 10 copies).
+  const MIN_PRICE = { C: 1, U: 1, R: 3, E: 10, L: 40, M: 150 };
+  const ORDER_ERRORS = {
+    chakra: 'Pas assez de chakra.',
+    invalid_price: 'Prix invalide.',
+    too_many_orders: 'Tu as atteint le nombre maximum d’ordres d’achat.',
+    market_locked: 'Le marché ne t’est pas encore ouvert.',
+    rate_limited: 'Trop d’actions d’un coup, patiente quelques secondes.',
+    pass_required: 'Le site demande une vérification : place cet ordre depuis la fiche de la carte.',
+    no_token: 'Connecte-toi sur le site.',
+    network: 'Serveur injoignable.'
+  };
+
+  // Same request as the site's own: session, device and anti-bot pass it keeps in localStorage, sent from the page.
+  async function siteApi(path, { method = 'GET', body } = {}) {
+    const headers = { accept: 'application/json' };
+    try {
+      const token = localStorage.getItem('kyara_token');
+      const device = localStorage.getItem('kyara_device');
+      const pass = JSON.parse(localStorage.getItem('kyara_pass') ?? 'null');
+      if (token) headers.authorization = `Bearer ${token}`;
+      if (device) headers['x-device-id'] = device;
+      if (pass?.pass && pass.expiresAt > Date.now()) headers['x-pass'] = pass.pass;
+    } catch {}
+    if (!headers.authorization) throw Object.assign(new Error('no_token'), { code: 'no_token' });
+    if (body !== undefined) headers['content-type'] = 'application/json';
+    let res;
+    try {
+      // Firefox: content.fetch sends the request as the page itself, like Chrome's fetch does here.
+      const init = { method, headers, body: body === undefined ? undefined : JSON.stringify(body) };
+      const url = `${location.origin}/api${path}`;
+      res = await (typeof content !== 'undefined' && content?.fetch ? content.fetch(url, init) : fetch(url, init));
+    } catch {
+      throw Object.assign(new Error('network'), { code: 'network' });
+    }
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      const code = data?.error ?? `http_${res.status}`;
+      throw Object.assign(new Error(code), { code });
+    }
+    return data;
+  }
+
+  function orderRow(slot, id) {
+    const cell = slot.parentElement;
+    if (!cell) return;
+    let row = cell.querySelector(':scope > .kyx-order');
+    if (!row) {
+      row = document.createElement('div');
+      row.className = 'kyx-order';
+      row.innerHTML = '<span class="kyx-order-med"></span><button type="button" class="kyx-order-open">Ordre d’achat</button>';
+      row.querySelector('.kyx-order-open').addEventListener('click', () => toggleOrderForm(row));
+      slot.after(row);
+    }
+    row.dataset.id = id;
+    const price = prices.get(id);
+    const text = price != null ? `≈ ${chakra(price)}` : '';
+    const med = row.querySelector('.kyx-order-med');
+    if (med.textContent !== text) med.textContent = text;
+  }
+
+  function toggleOrderForm(row) {
+    if (!alive()) return shutdown();
+    let form = row.querySelector('.kyx-order-form');
+    if (form) return void form.remove();
+    document.querySelectorAll('.kyx-order-form').forEach((f) => f.remove()); // one form open at a time
+    const id = Number(row.dataset.id);
+    const card = catalog?.get(id);
+    form = document.createElement('form');
+    form.className = 'kyx-order-form';
+    form.innerHTML = `
+      <p class="kyx-order-facts">Chargement…</p>
+      <div class="kyx-order-fields">
+        <label>Prix (◆)<input name="price" type="number" step="1" inputmode="numeric" required /></label>
+        <label>Qté<input name="qty" type="number" min="1" max="10" step="1" value="1" inputmode="numeric" required /></label>
+      </div>
+      <p class="kyx-order-msg" role="status"></p>
+      <div class="kyx-order-btns">
+        <button type="button" class="kyx-order-cancel">Annuler</button>
+        <button type="submit" class="kyx-order-go" disabled>Placer</button>
+      </div>`;
+    row.appendChild(form);
+    const $ = (s) => form.querySelector(s);
+    const price = $('[name="price"]');
+    const qty = $('[name="qty"]');
+    const go = $('.kyx-order-go');
+    const msg = (text, kind = '') => {
+      $('.kyx-order-msg').textContent = text;
+      $('.kyx-order-msg').dataset.kind = kind;
+    };
+    let min = MIN_PRICE[card?.r] ?? 1;
+    const update = () => {
+      const p = Number(price.value);
+      const q = Number(qty.value);
+      const ok = Number.isInteger(p) && p >= min && Number.isInteger(q) && q >= 1 && q <= 10;
+      go.disabled = !ok || form.dataset.busy === '1';
+      go.textContent = ok ? `Placer · ${chakra(p * q)}` : 'Placer';
+    };
+    price.addEventListener('input', update);
+    qty.addEventListener('input', update);
+    $('.kyx-order-cancel').addEventListener('click', () => form.remove());
+
+    Promise.allSettled([
+      siteApi(`/fair-play/bounds/${id}`),
+      siteApi(`/market/buy-orders?characterId=${id}`),
+      siteApi(`/market/prices/${id}`),
+      siteApi(`/market/listings?characterId=${id}&type=fixed&sort=price_asc&pageSize=1`)
+    ]).then(([bounds, book, stats, listings]) => {
+      if (!form.isConnected) return;
+      const val = (r) => (r.status === 'fulfilled' ? r.value : null);
+      min = Math.max(min, Number(val(bounds)?.min) || 0);
+      const best = (Array.isArray(val(book)) ? val(book) : val(book)?.items ?? [])[0]?.price ?? null;
+      const median = val(stats)?.median7d ?? val(stats)?.median30d ?? null;
+      const lowest = val(listings)?.items?.[0]?.price ?? null;
+      const facts = [`Min ${chakra(min)}`];
+      if (lowest != null) facts.push(`en vente dès ${chakra(lowest)}`);
+      if (median != null) facts.push(`médiane 7 j ${chakra(median)}`);
+      if (best != null) facts.push(`meilleur ordre ${chakra(best)}`);
+      $('.kyx-order-facts').textContent = facts.join(' · ');
+      price.min = String(min);
+      if (!price.value) price.value = String(Math.max(min, Math.round(best ?? median ?? min)));
+      update();
+      if (val(bounds) == null && bounds.reason?.code === 'no_token') msg(ORDER_ERRORS.no_token, 'err');
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (go.disabled) return;
+      form.dataset.busy = '1';
+      update();
+      msg('Envoi…');
+      try {
+        const res = await siteApi('/market/buy-orders', { method: 'POST', body: { characterId: id, price: Number(price.value), qty: Number(qty.value) } });
+        if (res?.user) send({ type: 'me', user: res.user });
+        const filled = res?.order?.filled ?? 0;
+        if (filled > 0) send({ type: 'collection-stale' });
+        msg(
+          filled > 0
+            ? `Achetée tout de suite (${filled}) ✔`
+            : `Ordre placé ✔ ${chakra(Number(price.value) * Number(qty.value))} bloqués jusqu’à exécution ou annulation (30 j max).`,
+          'ok'
+        );
+        price.disabled = qty.disabled = true;
+        go.hidden = true;
+        $('.kyx-order-cancel').textContent = 'Fermer';
+      } catch (err) {
+        const code = err?.code ?? String(err);
+        msg(ORDER_ERRORS[code] ?? `Échec (${code}).`, 'err');
+        if (code === 'pass_required') {
+          const link = document.createElement('a');
+          link.href = `/wiki/${id}`;
+          link.textContent = ' Ouvrir la fiche';
+          $('.kyx-order-msg').appendChild(link);
+        }
+        delete form.dataset.busy;
+        update();
+      }
+    });
   }
 
   // ---------- series and price under each card of the trade confirmation ----------
@@ -338,14 +509,18 @@
     const wanted = ids.filter((id) => !prices.has(id) && !pricing.has(id));
     if (!wanted.length) return;
     wanted.forEach((id) => pricing.add(id));
-    send({ type: 'prices', ids: wanted }).then((res) => {
-      for (const id of wanted) {
-        pricing.delete(id);
-        const v = Number(res?.[id]);
-        prices.set(id, res && !res.error && Number.isFinite(v) ? v : null);
-      }
-      scanConfirm();
-    });
+    for (let i = 0; i < wanted.length; i += 200) {
+      const batch = wanted.slice(i, i + 200); // the background asks for 200 at most
+      send({ type: 'prices', ids: batch }).then((res) => {
+        for (const id of batch) {
+          pricing.delete(id);
+          const v = Number(res?.[id]);
+          prices.set(id, res && !res.error && Number.isFinite(v) ? v : null);
+        }
+        scanConfirm();
+        scanMissing();
+      });
+    }
   }
 
   function line(side, cls, text, title) {
@@ -557,7 +732,7 @@
     stopped = true;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-missing, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name').forEach((el) => el.remove());
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-missing, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order').forEach((el) => el.remove());
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched], [data-kyx-ghost]').forEach((el) => {
       delete el.dataset.kyxHidden;
       delete el.dataset.kyxPos;

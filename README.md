@@ -9,6 +9,7 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Masquer les albums déjà complétés | Page **Collection** du site (bouton en bas à gauche pour les réafficher) et onglet **Albums** de la popup |
 | Masquer les séries de moins de 4 personnages | Bouton à côté de « Masquer les complets » sur la page **Collection**, et case dans l'onglet **Albums** de la popup |
 | Voir les cartes manquantes au lieu d'un « ? » | Page **Collection** : la carte s'affiche en gris, avec son nom, son numéro et sa rareté en dessous |
+| Placer un ordre d'achat sur une carte manquante | Page **Collection** : bouton **Ordre d'achat** sous chaque carte grise, avec son prix estimé ; prix et quantité réglables, minimum, prix en vente et médiane affichés |
 | Badge « Manquante » sur toute carte que tu n'as pas | Partout sur le site : boutique/marché, échanges, profils, wiki… |
 | Savoir si la carte que tu donnes est en double | Badge **×N** (doublon) ou **Unique** (ton seul exemplaire) sur tes cartes dans les fenêtres d'échange, confirmation comprise |
 | Voir la série et le prix des cartes à la confirmation d'un échange | Sous la rareté, dans la fenêtre « Confirmer l'échange » (nom complet de la série au survol), avec l'écart de valeur entre les deux côtés et s'il est équilibré selon la règle du site |
@@ -71,7 +72,7 @@ Fabrique d'abord les paquets : `python build.py` (crée le dossier `dist/`).
 - `src/background.js` : vérifications périodiques, notifications, badge.
 - `src/lib/kyara.js` : accès à l'API Kyara et calculs de collection.
 - `src/content/inject.js` : relaie au content script les réponses API du site.
-- `src/content/content.js` : badges, albums masqués, cartes manquantes grisées, filtre « Ses doublons » sur le site.
+- `src/content/content.js` : badges, albums masqués, cartes manquantes grisées et ordres d'achat, filtre « Ses doublons » sur le site.
 - `src/popup/` : la fenêtre de l'extension.
 
 Extension non officielle, non affiliée à Kyara. Si le site change sa structure, certains éléments (masquage des albums) peuvent nécessiter une mise à jour.
