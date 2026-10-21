@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Kyara Games</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand"><b>キ</b><div><h1>Kyara Games</h1><small id="who">Non connecté</small></div></div>
+      <div class="packs" id="packs" title="Boosters gratuits"></div>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="albums" aria-selected="true">Albums</button>
+      <button role="tab" data-tab="missing">Manquantes</button>
+      <button role="tab" data-tab="trade">Échange</button>
+      <button role="tab" data-tab="settings">Réglages</button>
+    </nav>
+
+    <main>
+      <div id="notice" class="notice" hidden></div>
+
+      <section data-panel="albums">
+        <div class="tools">
+          <input id="album-q" type="search" placeholder="Rechercher un album…" />
+          <select id="album-sort">
+            <option value="close">Plus proches de finir</option>
+            <option value="pct">Plus avancés</option>
+            <option value="az">A → Z</option>
+          </select>
+        </div>
+        <label class="switch"><input type="checkbox" data-setting="hideComplete" /> Masquer les albums complets</label>
+        <p class="summary" id="album-summary"></p>
+        <ul class="albums" id="albums"></ul>
+      </section>
+
+      <section data-panel="missing" hidden>
+        <div class="tools">
+          <input id="missing-q" type="search" placeholder="Perso ou univers…" />
+          <select id="missing-r"><option value="">Toutes raretés</option></select>
+        </div>
+        <select id="missing-s" class="full"><option value="">Tous les albums</option></select>
+        <p class="summary" id="missing-summary"></p>
+        <div class="grid" id="missing"></div>
+      </section>
+
+      <section data-panel="trade" hidden>
+        <p class="hint">Ouvre un échange sur kyara.games : le joueur est repris ici automatiquement. Tu peux aussi choisir un ami.</p>
+        <div class="tools">
+          <select id="partner-pick" class="full"><option value="">Choisir un joueur…</option></select>
+        </div>
+        <div id="trade"></div>
+      </section>
+
+      <section data-panel="settings" hidden>
+        <h2>Sur le site</h2>
+        <label class="switch"><input type="checkbox" data-setting="hideComplete" /> Masquer les albums complets</label>
+        <label class="switch"><input type="checkbox" data-setting="badgeMissing" /> Badge « Manquante » sur les cartes (hors marché, sauf pendant un échange)</label>
+        <label class="switch"><input type="checkbox" data-setting="badgeDupes" /> Badge « ×N » sur mes doublons (Collection et échanges)</label>
+        <h2>Notifications</h2>
+        <label class="switch"><input type="checkbox" data-setting="notifyBoosters" /> Boosters gratuits pleins</label>
+        <label class="switch"><input type="checkbox" data-setting="notifyWish" /> Mes envies mises en vente au marché</label>
+        <label class="switch"><input type="checkbox" data-setting="notifyTrades" /> Échanges (propositions, réponses, messages)</label>
+        <label class="switch"><input type="checkbox" data-setting="notifyMarket" /> Transactions (ventes, achats, enchères)</label>
+        <label class="switch"><input type="checkbox" data-setting="notifyFriends" /> Amis</label>
+        <label class="switch"><input type="checkbox" data-setting="notifyOther" /> Autres (équipe, cadeaux, parrainage…)</label>
+        <label class="row">Vérifier toutes les
+          <select data-setting="pollMinutes">
+            <option value="1">1 min</option>
+            <option value="2">2 min</option>
+            <option value="5">5 min</option>
+            <option value="10">10 min</option>
+          </select>
+        </label>
+        <div class="actions">
+          <button id="test">Tester une notification</button>
+          <button id="refresh">Actualiser les données</button>
+        </div>
+        <p class="hint">La connexion est reprise automatiquement de ton onglet kyara.games. Rien n’est envoyé ailleurs que sur kyara.games.</p>
+      </section>
+    </main>
+
+    <footer><a href="#" id="open-site">Ouvrir kyara.games ↗</a></footer>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "Kyara Games",
+  "short_name": "Kyara Games",
+  "version": "1.0.0",
+  "description": "Compagnon pour kyara.games : albums complets masqués, cartes manquantes, doublons pendant les échanges et notifications.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Kyara Games",
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "alarms",
+    "notifications",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://kyara.games/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://kyara.games/*"
+      ],
+      "js": [
+        "src/content/inject.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://kyara.games/*"
+      ],
+      "js": [
+        "src/content/content.js"
+      ],
+      "css": [
+        "src/content/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
