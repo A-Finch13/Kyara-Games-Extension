@@ -1,4 +1,4 @@
-// Kyara Games on kyara.games: card badges, completed and small albums hidden, missing cards greyed out, "Manquantes" chip on Collection and the "Ses doublons" filter in the trade composer.
+// Kyara Games on kyara.games: card badges, completed and small albums hidden, missing cards greyed out with a buy order, "Bloquer sauf doublons", "Manquantes" chip on Collection and the "Ses doublons" filter in the trade composer.
 (() => {
   const DEFAULTS = {
     hideComplete: true,
@@ -61,6 +61,7 @@
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     const picked = {};
+    if ('smartLock' in changes) smartLock = new Set(changes.smartLock.newValue ?? []);
     for (const k of ['settings', 'collection', 'catalog', 'partner']) if (k in changes) picked[k] = changes[k].newValue;
     if (!Object.keys(picked).length) return;
     applyStorage(picked);
@@ -90,7 +91,10 @@
     const { kind, path, body } = e.data;
     if (kind === 'write') return void send({ type: 'collection-stale' });
     let m;
-    if (path === '/me/collection') send({ type: 'collection', items: body });
+    if (path === '/me/collection') {
+      send({ type: 'collection', items: body });
+      keepSmartLocks(body);
+    }
     else if (path === '/me') send({ type: 'me', user: body });
     else if (path === '/me/bootstrap' && body?.me) send({ type: 'me', user: body.me });
     else if ((m = path.match(/^\/trades\/available\/([^/]+)$/))) {
@@ -164,7 +168,7 @@
   function tag(img) {
     const m = CARD_SRC.exec(img.getAttribute('src') || '');
     const host = img.parentElement;
-    if (!host || img.classList.contains('kyx-ghost')) return; // greyed out missing card: no badge needed
+    if (!host || img.classList.contains('kyx-ghost') || img.closest('.kyx-modal')) return; // our own pictures: no badge
     let badge = host.querySelector(':scope > .kyx-badge');
     const id = m ? Number(m[1]) : null;
     let kind = null;
@@ -264,7 +268,7 @@
     const done = index ? [...index.values()].filter((s) => s.owned >= s.total).length : hidden;
     const small = index ? [...index.values()].filter((s) => s.total < SMALL).length : 0;
     const s = (n) => (n > 1 ? 's' : '');
-    toggleButton(tools, views, 'hideComplete', settings.hideComplete ? `✔ ${done} complet${s(done)} masqué${s(done)}` : 'Masquer les complets');
+    toggleButton(tools, views, 'hideComplete', settings.hideComplete ? `✔ ${done} série${s(done)} complète${s(done)} masquée${s(done)}` : 'Masquer les séries complètes');
     toggleButton(
       tools,
       views,
@@ -339,6 +343,7 @@
   // Like the "≈ price · Vendre" row of owned cards: the fair price and a button opening a small buy order form,
   // the same one as on the card's wiki page (lowest price of the rarity or fair-play bound, 1 to 10 copies).
   const MIN_PRICE = { C: 1, U: 1, R: 3, E: 10, L: 40, M: 150 };
+  const RARITY_LABEL = { C: 'Commune', U: 'Peu commune', R: 'Rare', E: 'Épique', L: 'Légendaire', M: 'Mythique' };
   const ORDER_ERRORS = {
     chakra: 'Pas assez de chakra.',
     invalid_price: 'Prix invalide.',
@@ -398,16 +403,20 @@
     if (med.textContent !== text) med.textContent = text;
   }
 
+  // The form opens in a pop-up over the page, with the card, like the site's own dialogs.
   function toggleOrderForm(row) {
     if (!alive()) return shutdown();
-    let form = row.querySelector('.kyx-order-form');
-    if (form) return void form.remove();
-    document.querySelectorAll('.kyx-order-form').forEach((f) => f.remove()); // one form open at a time
+    document.querySelector('.kyx-modal-back')?.remove();
     const id = Number(row.dataset.id);
     const card = catalog?.get(id);
-    form = document.createElement('form');
-    form.className = 'kyx-order-form';
-    form.innerHTML = `
+    const back = document.createElement('div');
+    back.className = 'kyx-modal-back';
+    back.innerHTML = `
+      <form class="kyx-modal kyx-order-form" role="dialog" aria-modal="true" aria-label="Ordre d’achat">
+      <div class="kyx-modal-head">
+        <img src="/cards/sm/${id}.webp" alt="" referrerpolicy="no-referrer" />
+        <div><small>Ordre d’achat</small><b class="kyx-modal-name"></b><span class="kyx-modal-sub"></span></div>
+      </div>
       <p class="kyx-order-facts">Chargement…</p>
       <div class="kyx-order-fields">
         <label>Prix (◆)<input name="price" type="number" step="1" inputmode="numeric" required /></label>
@@ -417,9 +426,20 @@
       <div class="kyx-order-btns">
         <button type="button" class="kyx-order-cancel">Annuler</button>
         <button type="submit" class="kyx-order-go" disabled>Placer</button>
-      </div>`;
-    row.appendChild(form);
+      </div>
+      </form>`;
+    document.body.appendChild(back);
+    const form = back.firstElementChild;
     const $ = (s) => form.querySelector(s);
+    $('.kyx-modal-name').textContent = card?.n ?? `Carte n° ${id}`;
+    $('.kyx-modal-sub').textContent = [card?.s, RARITY_LABEL[card?.r]].filter(Boolean).join(' · ');
+    const onKey = (e) => e.key === 'Escape' && close();
+    const close = () => {
+      back.remove();
+      document.removeEventListener('keydown', onKey, true);
+    };
+    document.addEventListener('keydown', onKey, true);
+    back.addEventListener('click', (e) => e.target === back && close());
     const price = $('[name="price"]');
     const qty = $('[name="qty"]');
     const go = $('.kyx-order-go');
@@ -437,7 +457,7 @@
     };
     price.addEventListener('input', update);
     qty.addEventListener('input', update);
-    $('.kyx-order-cancel').addEventListener('click', () => form.remove());
+    $('.kyx-order-cancel').addEventListener('click', close);
 
     Promise.allSettled([
       siteApi(`/fair-play/bounds/${id}`),
@@ -459,6 +479,8 @@
       price.min = String(min);
       if (!price.value) price.value = String(Math.max(min, Math.round(best ?? median ?? min)));
       update();
+      price.focus();
+      price.select();
       if (val(bounds) == null && bounds.reason?.code === 'no_token') msg(ORDER_ERRORS.no_token, 'err');
     });
 
@@ -495,6 +517,129 @@
         update();
       }
     });
+  }
+
+  // ---------- "Bloquer sauf doublons" in the album bar ----------
+
+  // The site locks a card with all its copies, so the duplicates of a locked album can't be sold.
+  // This mode locks only the cards held once and leaves the others free: their duplicates can go to the market
+  // (the site never sells a last copy), and a card is locked again as soon as a single copy is left.
+  let smartLock = new Set(); // series names
+  let pinning = false;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const collectionItems = (body) => (Array.isArray(body) ? body : Array.isArray(body?.items) ? body.items : []);
+
+  // [id, pinned] changes so that, in this series, exactly the cards held once are locked.
+  function lockPlan(series, items) {
+    const ids = new Set([...(catalog?.values() ?? [])].filter((c) => norm(c.s) === norm(series)).map((c) => c.id));
+    const changes = [];
+    for (const x of items) {
+      const id = x.characterId ?? x.id;
+      if (!ids.has(id) || !(x.qty > 0)) continue;
+      const want = x.qty === 1;
+      if (!!x.pinned !== want) changes.push([id, want]);
+    }
+    return changes;
+  }
+
+  async function applyPins(changes) {
+    for (const [id, pinned] of changes) {
+      await siteApi(`/me/collection/${id}/pin`, { method: 'POST', body: { pinned } });
+      await wait(150);
+    }
+  }
+
+  // Each time the site reloads the collection: lock the cards that went down to one copy, free the new duplicates.
+  async function keepSmartLocks(body) {
+    if (pinning || !smartLock.size || !catalog) return;
+    const items = collectionItems(body);
+    const changes = [...smartLock].flatMap((series) => lockPlan(series, items));
+    if (!changes.length) return;
+    pinning = true;
+    try {
+      await applyPins(changes);
+    } catch {
+    } finally {
+      pinning = false;
+    }
+  }
+
+  async function setSmart(series, on) {
+    if (on) smartLock.add(series);
+    else smartLock.delete(series);
+    if (!alive()) return shutdown();
+    await chrome.storage.local.set({ smartLock: [...smartLock] });
+  }
+
+  function barMsg(bar, text, err = false) {
+    let el = bar.querySelector(':scope > .kyx-smart-msg');
+    if (!el) {
+      el = document.createElement('span');
+      el.className = 'kyx-smart-msg';
+      bar.appendChild(el);
+    }
+    el.textContent = text;
+    el.dataset.kind = err ? 'err' : 'ok';
+  }
+
+  async function smartClick(bar, btn) {
+    if (!alive()) return shutdown();
+    const series = bar.querySelector(':scope > b')?.textContent.trim();
+    if (!series) return;
+    if (smartLock.has(series)) {
+      await setSmart(series, false);
+      scanAlbumBar();
+      return barMsg(bar, 'Mode arrêté : les verrous restent tels quels. « Bloquer l’album » verrouille tout.');
+    }
+    if (!catalog) return barMsg(bar, 'Catalogue pas encore chargé, réessaie dans un instant.', true);
+    btn.disabled = true;
+    btn.textContent = 'Verrouillage…';
+    pinning = true;
+    try {
+      const changes = lockPlan(series, collectionItems(await siteApi('/me/collection?lean=1')));
+      await setSmart(series, true);
+      await applyPins(changes);
+      location.reload(); // the site keeps its own copy of the locks: show the new ones
+    } catch (e) {
+      const code = e?.code ?? String(e);
+      barMsg(bar, ORDER_ERRORS[code] ?? `Échec (${code}).`, true);
+      btn.disabled = false;
+      scanAlbumBar();
+    } finally {
+      pinning = false;
+    }
+  }
+
+  function scanAlbumBar() {
+    const bar = location.pathname === '/collection' ? document.querySelector('.album-bar') : null;
+    const series = bar?.querySelector(':scope > b')?.textContent.trim();
+    if (!series) return;
+    const siteBtn = [...bar.querySelectorAll(':scope > button:not(.kyx-smart)')].find((b) => /loquer l.album/i.test(b.textContent));
+    // The site's own "Bloquer / Débloquer l'album" takes over: this mode stops for the series.
+    if (siteBtn && !siteBtn.dataset.kyxWatched) {
+      siteBtn.dataset.kyxWatched = '1';
+      siteBtn.addEventListener('click', () => {
+        const name = bar.querySelector(':scope > b')?.textContent.trim();
+        if (name && smartLock.has(name)) setSmart(name, false).then(scanAlbumBar);
+      });
+    }
+    let btn = bar.querySelector(':scope > .kyx-smart');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `kyx-smart ${siteBtn?.className ?? 'btn btn-ghost btn-sm'}`;
+      btn.addEventListener('click', () => smartClick(bar, btn));
+      (siteBtn ?? bar.querySelector(':scope > span') ?? bar.lastElementChild).after(btn);
+    }
+    if (btn.disabled) return;
+    const on = smartLock.has(series);
+    const label = on ? '✔ Doublons libres' : '🔒 Bloquer sauf doublons';
+    if (btn.textContent !== label) btn.textContent = label;
+    btn.setAttribute('aria-pressed', String(on));
+    btn.title = on
+      ? 'Les cartes en un seul exemplaire sont verrouillées, les doublons restent vendables. Clique pour arrêter ce mode.'
+      : 'Verrouille les cartes que tu as en un seul exemplaire et laisse les doublons vendables au marché.';
   }
 
   // ---------- series and price under each card of the trade confirmation ----------
@@ -713,6 +858,7 @@
     scanComposer();
     scanCollectionChips();
     scanMissing();
+    scanAlbumBar();
     scanConfirm();
   }
 
@@ -723,6 +869,7 @@
     scanComposer();
     scanCollectionChips();
     scanMissing();
+    scanAlbumBar();
     scanConfirm();
   }
 
@@ -732,7 +879,7 @@
     stopped = true;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-missing, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order').forEach((el) => el.remove());
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-missing, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg').forEach((el) => el.remove());
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched], [data-kyx-ghost]').forEach((el) => {
       delete el.dataset.kyxHidden;
       delete el.dataset.kyxPos;
@@ -753,7 +900,9 @@
   }, 1000);
 
   (async () => {
-    applyStorage(await chrome.storage.local.get(['settings', 'collection', 'catalog', 'partner']));
+    const stored = await chrome.storage.local.get(['settings', 'collection', 'catalog', 'partner', 'smartLock']);
+    applyStorage(stored);
+    smartLock = new Set(stored.smartLock ?? []);
     if (partner && Date.now() - (partner.at ?? 0) > 30 * 60e3) partner = null;
     document.querySelectorAll('#kyx-root').forEach((el) => el.remove()); // left by older versions
     syncAuth();

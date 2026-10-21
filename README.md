@@ -9,7 +9,8 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Masquer les albums déjà complétés | Page **Collection** du site (bouton en bas à gauche pour les réafficher) et onglet **Albums** de la popup |
 | Masquer les séries de moins de 4 personnages | Bouton à côté de « Masquer les complets » sur la page **Collection**, et case dans l'onglet **Albums** de la popup |
 | Voir les cartes manquantes au lieu d'un « ? » | Page **Collection** : la carte s'affiche en gris, avec son nom, son numéro et sa rareté en dessous |
-| Placer un ordre d'achat sur une carte manquante | Page **Collection** : bouton **Ordre d'achat** sous chaque carte grise, avec son prix estimé ; prix et quantité réglables, minimum, prix en vente et médiane affichés |
+| Placer un ordre d'achat sur une carte manquante | Page **Collection** : bouton **Ordre d'achat** sous chaque carte grise, avec son prix estimé ; il ouvre une fenêtre avec prix et quantité réglables, minimum, prix en vente et médiane |
+| Verrouiller un album sans bloquer ses doublons | Bouton **Bloquer sauf doublons** à côté de « Bloquer l'album » (page **Collection**, un univers choisi) : seules les cartes en un exemplaire sont verrouillées, les doublons restent vendables ; une carte est reverrouillée dès qu'il n'en reste qu'une |
 | Badge « Manquante » sur toute carte que tu n'as pas | Partout sur le site : boutique/marché, échanges, profils, wiki… |
 | Savoir si la carte que tu donnes est en double | Badge **×N** (doublon) ou **Unique** (ton seul exemplaire) sur tes cartes dans les fenêtres d'échange, confirmation comprise |
 | Voir la série et le prix des cartes à la confirmation d'un échange | Sous la rareté, dans la fenêtre « Confirmer l'échange » (nom complet de la série au survol), avec l'écart de valeur entre les deux côtés et s'il est équilibré selon la règle du site |
