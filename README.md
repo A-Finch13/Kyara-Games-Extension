@@ -11,7 +11,7 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Savoir si la carte que tu donnes est en double | Badge **×N** (doublon) ou **Unique** (ton seul exemplaire) sur tes cartes dans les fenêtres d'échange, confirmation comprise |
 | Voir la série et le prix des cartes à la confirmation d'un échange | Sous la rareté, dans la fenêtre « Confirmer l'échange » (nom complet de la série au survol), avec l'écart de valeur entre les deux côtés et s'il est équilibré selon la règle du site |
 | Voir les doublons du joueur avec qui tu échanges | Onglet **Échange** de la popup, avec la liste de tes amis |
-| Filtrer ses cartes sur ses doublons | Puce **Ses doublons** dans la fenêtre « Proposer un échange », onglet **Cartes de …** |
+| Filtrer ses cartes sur ses doublons | Puce **Ses doublons**, active d'office, dans chaque fenêtre « Proposer un échange » (profil, offres du marché, comptoir), onglet **Cartes de …** ; la désactiver est retenu |
 | Afficher les cartes manquantes de la collection | Puce **Manquantes** à côté des raretés sur la page Collection, et onglet **Manquantes** de la popup |
 | Notifications | Boosters gratuits pleins, envies mises en vente au marché, échanges, ventes/achats/enchères, amis, messages de l'équipe |
 

@@ -3,7 +3,8 @@
   const DEFAULTS = {
     hideComplete: true,
     badgeMissing: true,
-    badgeDupes: true
+    badgeDupes: true,
+    theirDupes: true
   };
   const CARD_SRC = /\/cards\/[a-z0-9]+\/(\d+)\.webp/i;
 
@@ -370,7 +371,7 @@
   // ---------- "Ses doublons" filter in the trade composer ----------
 
   // The site only offers "Je l'ai" / "Il me manque" on the partner's tab: this chip keeps the cards they hold twice or more.
-  let theirDupes = false;
+  // On by default in every trade composer (profile, market offer, comptoir); turning it off is remembered.
   let composerMore = 0;
 
   // Their spare copies when they share their collection, else the copies the trade API lets us ask for (the last one included).
@@ -385,27 +386,32 @@
   }
 
   function scanComposer() {
-    const shelf = document.querySelector('[role="dialog"] .shelf');
+    // The trade composer is a form; the market's "Proposer une carte" dialog has the same shelf but is not.
+    const shelf = document.querySelector('[role="dialog"] form .shelf');
     const chips = shelf?.querySelector('.filters .chips');
     if (!chips) {
-      theirDupes = false;
       composerMore = 0;
       return;
     }
     const tabs = shelf.querySelectorAll('.tabs [role="tab"]');
     const theirs = tabs[1]?.getAttribute('aria-selected') === 'true';
-    const active = theirs && theirDupes;
+    const active = theirs && settings.theirDupes;
     let btn = chips.querySelector(':scope > .kyx-only');
     if (!btn) {
       btn = document.createElement('button');
       btn.type = 'button';
       // The site's own chip classes, so it looks like its neighbours.
-      btn.className = 'kyx-only only svelte-adlc8v';
+      const scope = [...(chips.querySelector('.only')?.classList ?? [])].find((c) => c.startsWith('svelte-')) ?? 'svelte-adlc8v';
+      btn.className = `kyx-only only ${scope}`;
       btn.textContent = 'Ses doublons';
       btn.addEventListener('click', () => {
-        theirDupes = !theirDupes;
+        if (!alive()) return shutdown();
         composerMore = 0;
+        settings = { ...settings, theirDupes: !settings.theirDupes };
         scanComposer();
+        chrome.storage.local.get('settings').then(({ settings: s }) =>
+          chrome.storage.local.set({ settings: { ...s, theirDupes: settings.theirDupes } })
+        );
       });
       // Right after the site's own chips, before "Toutes" and the rarity letters.
       const all = [...chips.children].find((el) => el.tagName === 'BUTTON' && !el.classList.contains('only'));
