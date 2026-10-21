@@ -41,6 +41,22 @@
   color: #1a1400;
 }
 
+/* Trade confirmation: the card block starts with its "Tu donnes" / "Tu reçois" label, keep the badge on the picture */
+.cf-s > .kyx-badge {
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+/* Series under the rarity in the trade confirmation */
+.kyx-series {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* "Masquer les complets" toggle, inside the site's album toolbar */
 .kyx-toggle {
   margin-left: auto;

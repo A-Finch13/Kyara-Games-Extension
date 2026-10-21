@@ -254,6 +254,31 @@
     btn.setAttribute('aria-pressed', String(settings.hideComplete));
   }
 
+  // ---------- series under each card of the trade confirmation ----------
+
+  // "Confirmer l'échange" only shows name and rarity: add the series, cut short when it is long (full name on hover).
+  function scanConfirm() {
+    if (!catalog) return;
+    for (const side of document.querySelectorAll('[role="dialog"] .cf-s')) {
+      const m = CARD_SRC.exec(side.querySelector('img')?.getAttribute('src') || '');
+      const name = m ? catalog.get(Number(m[1]))?.s : null;
+      let el = side.querySelector(':scope > .kyx-series');
+      if (!name) {
+        el?.remove();
+        continue;
+      }
+      if (!el) {
+        el = document.createElement('span');
+        el.className = 'kyx-series mut small';
+        side.appendChild(el);
+      }
+      if (el.textContent !== name) {
+        el.textContent = name;
+        el.title = name;
+      }
+    }
+  }
+
   // ---------- "Manquantes" chip on the Collection page ----------
 
   // The site's card filter (all / owned / missing / dupes…) sits in a select: this chip, next to the rarity chips, drives it.
@@ -381,6 +406,7 @@
     scanAlbums();
     scanComposer();
     scanCollectionChips();
+    scanConfirm();
   }
 
   function refreshAll() {
@@ -389,6 +415,7 @@
     scanAlbums();
     scanComposer();
     scanCollectionChips();
+    scanConfirm();
   }
 
   let stopped = false;
@@ -397,7 +424,7 @@
     stopped = true;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-missing').forEach((el) => el.remove());
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-missing, .kyx-series').forEach((el) => el.remove());
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched]').forEach((el) => {
       delete el.dataset.kyxHidden;
       delete el.dataset.kyxPos;
