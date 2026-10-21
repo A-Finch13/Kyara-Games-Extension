@@ -1,6 +1,7 @@
-import { ORIGIN, api, getSettings, loadCatalog, loadCollection, slimCollection, slimMe } from './lib/kyara.js';
+import { ORIGIN, api, checkUpdate, getSettings, loadCatalog, loadCollection, slimCollection, slimMe } from './lib/kyara.js';
 
 const ALARM = 'kyara-poll';
+const UPDATE_ALARM = 'kyara-update';
 const ICON = chrome.runtime.getURL('icons/icon128.png');
 const MAX_SEEN = 400;
 
@@ -28,14 +29,43 @@ const CATEGORY = {
 async function schedule() {
   const { pollMinutes } = await getSettings();
   await chrome.alarms.create(ALARM, { periodInMinutes: Math.max(1, Number(pollMinutes) || 1) });
+  if (!(await chrome.alarms.get(UPDATE_ALARM))) await chrome.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: 6 * 60 });
+}
+
+// A new release on GitHub: one notification per version, and a banner in the popup until it is installed.
+async function lookForUpdate() {
+  // The popup asks too each time it opens: GitHub is asked at most every 15 minutes.
+  const { updateCheckedAt } = await chrome.storage.local.get('updateCheckedAt');
+  if (Date.now() - (updateCheckedAt ?? 0) < 15 * 60e3) return;
+  await chrome.storage.local.set({ updateCheckedAt: Date.now() });
+  try {
+    const update = await checkUpdate();
+    if (!update) return;
+    const { updateNotified } = await chrome.storage.local.get('updateNotified');
+    if (updateNotified === update.version) return;
+    await chrome.storage.local.set({ updateNotified: update.version });
+    notify('update', {
+      title: `Kyara Games ${update.version} est disponible`,
+      message: 'Clique pour télécharger la nouvelle version sur GitHub.',
+      href: update.url
+    });
+  } catch {}
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
+  await chrome.storage.local.remove(['update', 'updateCheckedAt']); // just installed or updated: the banner is stale
   await schedule();
   loadCatalog().catch(() => {});
+  lookForUpdate();
 });
-chrome.runtime.onStartup.addListener(schedule);
-chrome.alarms.onAlarm.addListener((a) => a.name === ALARM && poll());
+chrome.runtime.onStartup.addListener(() => {
+  schedule();
+  lookForUpdate();
+});
+chrome.alarms.onAlarm.addListener((a) => {
+  if (a.name === ALARM) poll();
+  if (a.name === UPDATE_ALARM) lookForUpdate();
+});
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
@@ -160,6 +190,7 @@ chrome.notifications.onClicked.addListener(async (nid) => {
 
 async function openSite(href) {
   const url = new URL(href, ORIGIN).href;
+  if (!url.startsWith(`${ORIGIN}/`)) return void (await chrome.tabs.create({ url })); // GitHub release page
   const [tab] = await chrome.tabs.query({ url: `${ORIGIN}/*` });
   if (tab) {
     await chrome.tabs.update(tab.id, { url, active: true });
@@ -230,6 +261,9 @@ async function handle(msg) {
     case 'prices':
       // The site's fair price of each card, as shown in its trade composer: { [id]: chakra }.
       return (await api(`/fair-play/prices?ids=${msg.ids.slice(0, 200).join(',')}`)) ?? {};
+    case 'check-update':
+      await lookForUpdate();
+      return { ok: true };
     case 'ensure-data':
       await Promise.allSettled([loadCatalog(), loadCollection()]);
       return { ok: true };

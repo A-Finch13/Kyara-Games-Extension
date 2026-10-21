@@ -112,6 +112,24 @@ main {
   padding: 12px 14px;
 }
 
+/* New version published on GitHub */
+.update {
+  display: block;
+  padding: 8px 14px;
+  background: var(--ok);
+  color: #08130d;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.update[hidden] {
+  display: none;
+}
+
+.update:hover {
+  text-decoration: underline;
+}
+
 .notice {
   background: #2a1a17;
   border: 1px solid #5a2b22;

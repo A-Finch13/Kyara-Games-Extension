@@ -270,11 +270,28 @@ async function loadData(force = false) {
   }
 }
 
+// ---------- new version ----------
+
+function renderUpdate(update) {
+  const el = $('#update');
+  el.hidden = !update;
+  if (!update) return;
+  el.textContent = `⬆ Kyara Games ${update.version} est disponible : télécharger la mise à jour`;
+  el.href = update.url;
+}
+
+$('#update').addEventListener('click', (e) => {
+  e.preventDefault();
+  chrome.tabs.create({ url: $('#update').href });
+});
+
 (async () => {
   settings = await getSettings();
   $('#missing-r').innerHTML += RARITIES.map((r) => `<option value="${r}">${RARITY[r].label}</option>`).join('');
   bindSettings();
   await loadData();
   loadPartners();
+  renderUpdate((await chrome.storage.local.get('update')).update);
+  chrome.runtime.sendMessage({ type: 'check-update' }).then(async () => renderUpdate((await chrome.storage.local.get('update')).update)).catch(() => {});
   setInterval(async () => renderMe((await chrome.storage.local.get('me')).me), 1000);
 })();

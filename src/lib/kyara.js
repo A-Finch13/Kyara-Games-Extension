@@ -1,6 +1,7 @@
 // Shared helpers for the background worker and the popup: Kyara API access, cached data and collection maths.
 
 export const ORIGIN = 'https://kyara.games';
+export const REPO = 'A-Finch13/Kyara-Games-Extension';
 
 export const RARITIES = ['M', 'L', 'E', 'R', 'U', 'C'];
 export const RARITY = {
@@ -153,3 +154,29 @@ export const asList = (x, ...keys) => {
   for (const k of keys) if (Array.isArray(x?.[k])) return x[k];
   return [];
 };
+
+// ---------- new versions published on GitHub ----------
+
+const newer = (a, b) => {
+  const pa = String(a).replace(/^v/, '').split('.').map(Number);
+  const pb = String(b).replace(/^v/, '').split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+  }
+  return false;
+};
+
+// Stores { version, url } when the latest GitHub release is newer than the installed extension, else nothing.
+export async function checkUpdate() {
+  const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { accept: 'application/vnd.github+json' } });
+  if (!res.ok) throw new ApiError(res.status, `github_${res.status}`);
+  const rel = await res.json();
+  const version = String(rel.tag_name ?? '').replace(/^v/, '');
+  if (version && newer(version, chrome.runtime.getManifest().version)) {
+    const update = { version, url: rel.html_url ?? `https://github.com/${REPO}/releases/latest` };
+    await chrome.storage.local.set({ update });
+    return update;
+  }
+  await chrome.storage.local.remove('update');
+  return null;
+}

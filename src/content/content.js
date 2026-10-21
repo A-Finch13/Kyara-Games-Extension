@@ -136,9 +136,23 @@
     return false;
   }
 
+  // "Mes échanges": a card on the "Tu donnes" side of a trade still waiting for an answer (status pill .st-pending).
+  function givenInPendingTrade(img) {
+    const item = img.closest('li.trade');
+    if (!item?.querySelector('.st-pending')) return false;
+    for (let el = img.parentElement; el && el !== item; el = el.parentElement) {
+      const text = el.textContent;
+      const give = text.includes('Tu donnes');
+      const get = text.includes('Tu reçois');
+      if (give || get) return give && !get;
+    }
+    return false;
+  }
+
   // Where each badge is wanted: the market only inside the trade composer; duplicates on Collection and in trades,
   // and in trades also the cards held only once, so giving away a last copy is never a surprise.
   function badgeScope(img) {
+    if (givenInPendingTrade(img)) return { missing: false, dupes: settings.badgeDupes, single: settings.badgeDupes };
     const trade = inComposer(img);
     const path = location.pathname;
     if (path.startsWith('/marche') && !trade) return { missing: false, dupes: false, single: false };
