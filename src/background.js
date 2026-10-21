@@ -227,6 +227,9 @@ async function handle(msg) {
     case 'refresh':
       await Promise.allSettled([loadCatalog(), loadCollection(true), poll()]);
       return { ok: true };
+    case 'prices':
+      // The site's fair price of each card, as shown in its trade composer: { [id]: chakra }.
+      return (await api(`/fair-play/prices?ids=${msg.ids.slice(0, 200).join(',')}`)) ?? {};
     case 'ensure-data':
       await Promise.allSettled([loadCatalog(), loadCollection()]);
       return { ok: true };

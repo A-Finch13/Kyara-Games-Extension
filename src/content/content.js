@@ -254,29 +254,83 @@
     btn.setAttribute('aria-pressed', String(settings.hideComplete));
   }
 
-  // ---------- series under each card of the trade confirmation ----------
+  // ---------- series and price under each card of the trade confirmation ----------
 
-  // "Confirmer l'échange" only shows name and rarity: add the series, cut short when it is long (full name on hover).
-  function scanConfirm() {
-    if (!catalog) return;
-    for (const side of document.querySelectorAll('[role="dialog"] .cf-s')) {
-      const m = CARD_SRC.exec(side.querySelector('img')?.getAttribute('src') || '');
-      const name = m ? catalog.get(Number(m[1]))?.s : null;
-      let el = side.querySelector(':scope > .kyx-series');
-      if (!name) {
-        el?.remove();
-        continue;
+  // "Confirmer l'échange" only shows name and rarity: add the series (cut short, full name on hover),
+  // the site's fair price of each card and the gap between both sides.
+  const prices = new Map(); // id -> fair price in chakra, null when unknown
+  const pricing = new Set();
+  const chakra = (n) => `${Math.round(n).toLocaleString('fr-FR')} ◆`;
+
+  function loadPrices(ids) {
+    const wanted = ids.filter((id) => !prices.has(id) && !pricing.has(id));
+    if (!wanted.length) return;
+    wanted.forEach((id) => pricing.add(id));
+    send({ type: 'prices', ids: wanted }).then((res) => {
+      for (const id of wanted) {
+        pricing.delete(id);
+        const v = Number(res?.[id]);
+        prices.set(id, res && !res.error && Number.isFinite(v) ? v : null);
       }
-      if (!el) {
-        el = document.createElement('span');
-        el.className = 'kyx-series mut small';
-        side.appendChild(el);
-      }
-      if (el.textContent !== name) {
-        el.textContent = name;
-        el.title = name;
-      }
+      scanConfirm();
+    });
+  }
+
+  function line(side, cls, text, title) {
+    let el = side.querySelector(`:scope > .${cls}`);
+    if (text == null) return void el?.remove();
+    if (!el) {
+      el = document.createElement('span');
+      el.className = `${cls} mut small`;
+      side.appendChild(el);
     }
+    if (el.textContent !== text) el.textContent = text;
+    if (title && el.title !== title) el.title = title;
+  }
+
+  function scanConfirm() {
+    const sides = [...document.querySelectorAll('[role="dialog"] .cf-s')];
+    if (!sides.length) return;
+    const ids = [];
+    let give = 0;
+    let get = 0;
+    let known = true;
+    for (const side of sides) {
+      const m = CARD_SRC.exec(side.querySelector('img')?.getAttribute('src') || '');
+      const id = m ? Number(m[1]) : null;
+      if (id) ids.push(id);
+      const series = id ? catalog?.get(id)?.s : null;
+      line(side, 'kyx-series', series, series);
+      const price = id ? prices.get(id) : null;
+      line(side, 'kyx-price', price != null ? chakra(price) : null);
+      if (price == null) known = false;
+      else if (/donnes/i.test(side.querySelector('.sk')?.textContent ?? '')) give += price;
+      else get += price;
+    }
+    loadPrices(ids);
+    balance(sides[0].parentElement, known && sides.length > 1 ? { give, get } : null);
+  }
+
+  // Same rule as the site: balanced while one side is worth at most twice the other (or the gap is under 100).
+  function balance(host, sum) {
+    let el = host?.parentElement?.querySelector(':scope > .kyx-balance');
+    if (!sum) return void el?.remove();
+    if (!el) {
+      el = document.createElement('p');
+      el.className = 'kyx-balance';
+      host.after(el);
+    }
+    const gap = sum.get - sum.give;
+    const hi = Math.max(sum.give, sum.get);
+    const lo = Math.min(sum.give, sum.get);
+    const fair = hi - lo < 100 || hi <= 2 * lo;
+    const kind = fair ? 'fair' : gap > 0 ? 'win' : 'loss';
+    const text =
+      gap === 0
+        ? 'Même valeur des deux côtés · échange équilibré'
+        : `${gap > 0 ? '+' : '−'}${chakra(Math.abs(gap))} ${gap > 0 ? 'en ta faveur' : 'en sa faveur'} · ${fair ? 'échange équilibré' : 'déséquilibré'}`;
+    if (el.textContent !== text) el.textContent = text;
+    el.dataset.kind = kind;
   }
 
   // ---------- "Manquantes" chip on the Collection page ----------
@@ -424,7 +478,7 @@
     stopped = true;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-missing, .kyx-series').forEach((el) => el.remove());
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-missing, .kyx-series, .kyx-price, .kyx-balance').forEach((el) => el.remove());
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched]').forEach((el) => {
       delete el.dataset.kyxHidden;
       delete el.dataset.kyxPos;
