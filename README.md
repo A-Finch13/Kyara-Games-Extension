@@ -17,7 +17,7 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Filtrer ses cartes sur ses doublons | Puce **Ses doublons**, active d'office, dans chaque fenêtre « Proposer un échange » (profil, offres du marché, comptoir), onglet **Cartes de …** ; la désactiver est retenu |
 | Afficher les cartes manquantes de la collection | Puce **Manquantes** à côté des raretés sur la page Collection, et onglet **Manquantes** de la popup |
 | Savoir si les cartes que tu donnes dans un échange en cours sont en double | Badge **×N** ou **Unique** côté « Tu donnes » des échanges en attente, onglet **Échanges** du Marché |
-| Être prévenu d'une nouvelle version | Notification et bandeau vert dans la popup quand une nouvelle release sort sur GitHub (vérifié toutes les 15 min) |
+| Être prévenu d'une nouvelle version | Notification et bandeau vert dans la popup quand une nouvelle release sort sur GitHub (vérifié toutes les 15 min), avec un bouton **Mettre à jour** qui installe la nouvelle version (voir plus bas) |
 | Notifications | Boosters gratuits pleins, envies mises en vente au marché, échanges, ventes/achats/enchères, amis, messages de l'équipe |
 
 Le badge de l'icône affiche le nombre de boosters gratuits (vert quand c'est plein, `!` si tu n'es pas connecté).
@@ -49,6 +49,16 @@ Fabrique d'abord les paquets : `python build.py` (crée le dossier `dist/`).
 
 (Firefox Developer Edition et Nightly acceptent aussi le `.xpi` non signé si `xpinstall.signatures.required` est mis à `false` dans `about:config`.)
 
+## Mises à jour en un clic
+
+Un navigateur ne laisse jamais une extension réécrire ses propres fichiers. Pour que le bouton **Mettre à jour** de la popup installe la nouvelle version tout seul, lance **une seule fois** `installer-mises-a-jour.bat` (dans le dossier de l'extension, Windows). Il installe un petit assistant dans `%LOCALAPPDATA%\KyaraGamesUpdater` et le déclare à Brave, Chrome, Edge, Vivaldi, Opera et Firefox.
+
+Au clic sur **Mettre à jour**, l'assistant télécharge la release GitHub et remplace les fichiers du dossier (ou fait `git pull` si le dossier est un clone git), puis l'extension redémarre. Recharge ensuite l'onglet kyara.games.
+
+- Si tu déplaces le dossier de l'extension, relance `installer-mises-a-jour.bat`.
+- Pour retirer l'assistant : `installer-mises-a-jour.bat -Uninstall`.
+- Sans l'assistant, le bouton propose de télécharger la mise à jour.
+
 ## Fabriquer les paquets
 
 `python build.py` génère dans `dist/` :
@@ -74,5 +84,6 @@ Fabrique d'abord les paquets : `python build.py` (crée le dossier `dist/`).
 - `src/content/inject.js` : relaie au content script les réponses API du site.
 - `src/content/content.js` : badges, albums masqués, cartes manquantes grisées et ordres d'achat, filtre « Ses doublons » sur le site.
 - `src/popup/` : la fenêtre de l'extension.
+- `updater/` et `installer-mises-a-jour.bat` : l'assistant de mise à jour (Windows).
 
 Extension non officielle, non affiliée à Kyara. Si le site change sa structure, certains éléments (masquage des albums) peuvent nécessiter une mise à jour.

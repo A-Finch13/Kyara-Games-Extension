@@ -167,14 +167,20 @@ const newer = (a, b) => {
   return false;
 };
 
-// Stores { version, url } when the latest GitHub release is newer than the installed extension, else nothing.
+// Stores { version, url, zip, xpi } when the latest GitHub release is newer than the installed extension, else nothing.
 export async function checkUpdate() {
   const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { accept: 'application/vnd.github+json' } });
   if (!res.ok) throw new ApiError(res.status, `github_${res.status}`);
   const rel = await res.json();
   const version = String(rel.tag_name ?? '').replace(/^v/, '');
   if (version && newer(version, chrome.runtime.getManifest().version)) {
-    const update = { version, url: rel.html_url ?? `https://github.com/${REPO}/releases/latest` };
+    const asset = (name) => rel.assets?.find((a) => a.name === name)?.browser_download_url ?? null;
+    const update = {
+      version,
+      url: rel.html_url ?? `https://github.com/${REPO}/releases/latest`,
+      zip: asset('kyara-games-chromium.zip'),
+      xpi: asset('kyara-games-firefox.xpi')
+    };
     await chrome.storage.local.set({ update });
     return update;
   }

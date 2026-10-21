@@ -46,10 +46,29 @@ async function lookForUpdate() {
     await chrome.storage.local.set({ updateNotified: update.version });
     notify('update', {
       title: `Kyara Games ${update.version} est disponible`,
-      message: 'Clique pour télécharger la nouvelle version sur GitHub.',
+      message: 'Ouvre la popup Kyara Games et clique sur « Mettre à jour ».',
       href: update.url
     });
   } catch {}
+}
+
+// A browser never lets an extension rewrite itself: the small updater installed on the computer
+// (installer-mises-a-jour.bat) replaces the files, then the extension reloads on its new version.
+const UPDATER = 'com.kyara_games.updater';
+const FIREFOX = navigator.userAgent.includes('Firefox');
+
+async function installUpdate() {
+  const update = (await chrome.storage.local.get('update')).update ?? (await checkUpdate().catch(() => null));
+  if (!update) return { error: 'no_update' };
+  let res;
+  try {
+    res = await chrome.runtime.sendNativeMessage(UPDATER, { action: 'update', version: update.version, url: FIREFOX ? update.xpi : update.zip });
+  } catch {
+    return { error: 'no_updater', update };
+  }
+  if (!res?.ok) return { error: res?.error ?? 'failed', detail: res?.detail, update };
+  setTimeout(() => chrome.runtime.reload(), 800);
+  return { ok: true, version: res.version };
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -261,6 +280,8 @@ async function handle(msg) {
     case 'prices':
       // The site's fair price of each card, as shown in its trade composer: { [id]: chakra }.
       return (await api(`/fair-play/prices?ids=${msg.ids.slice(0, 200).join(',')}`)) ?? {};
+    case 'install-update':
+      return installUpdate();
     case 'check-update':
       await lookForUpdate();
       return { ok: true };

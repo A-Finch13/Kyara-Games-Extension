@@ -272,17 +272,57 @@ async function loadData(force = false) {
 
 // ---------- new version ----------
 
+const FIREFOX = navigator.userAgent.includes('Firefox');
+let shownUpdate = null;
+
 function renderUpdate(update) {
-  const el = $('#update');
-  el.hidden = !update;
-  if (!update) return;
-  el.textContent = `⬆ Kyara Games ${update.version} est disponible : télécharger la mise à jour`;
-  el.href = update.url;
+  $('#update').hidden = !update;
+  if (!update || update.version === shownUpdate?.version) return;
+  shownUpdate = update;
+  $('#update-text').textContent = `⬆ Kyara Games ${update.version} est disponible`;
+  $('#update-go').disabled = false;
+  $('#update-go').textContent = 'Mettre à jour';
+  $('#update-help').hidden = true;
 }
 
-$('#update').addEventListener('click', (e) => {
+function updateHelp(html) {
+  $('#update-help').innerHTML = html;
+  $('#update-help').hidden = false;
+}
+
+// The updater installed on the computer replaces the files, then the extension reloads itself (the popup closes).
+$('#update-go').addEventListener('click', async () => {
+  const btn = $('#update-go');
+  btn.disabled = true;
+  btn.textContent = 'Mise à jour…';
+  const res = await chrome.runtime.sendMessage({ type: 'install-update' }).catch(() => null);
+  if (res?.ok) {
+    btn.textContent = 'Installée ✔';
+    updateHelp(`Version ${esc(res.version)} installée, l’extension redémarre. Recharge ensuite l’onglet kyara.games.`);
+    return;
+  }
+  btn.disabled = false;
+  btn.textContent = 'Réessayer';
+  const update = res?.update ?? shownUpdate;
+  const file = (FIREFOX ? update?.xpi : update?.zip) ?? update?.url ?? '';
+  const download = `<a href="#" data-open="${esc(file)}">télécharger la mise à jour</a>`;
+  if (res?.error === 'no_updater' || res?.error === 'unknown_extension') {
+    updateHelp(
+      FIREFOX
+        ? `Firefox installe lui-même un module signé : ${download}. Pour un module chargé depuis un dossier, lance une fois <b>installer-mises-a-jour.bat</b> dans ce dossier.`
+        : `Première fois : lance <b>installer-mises-a-jour.bat</b> dans le dossier de l’extension (une seule fois), puis réessaie. Sinon, ${download}.`
+    );
+  } else {
+    const detail = res?.detail ? ` (${esc(String(res.detail).slice(0, 200))})` : '';
+    updateHelp(`La mise à jour a échoué : ${esc(res?.error ?? 'pas de réponse')}${detail}. Tu peux ${download}.`);
+  }
+});
+
+$('#update-help').addEventListener('click', (e) => {
+  const link = e.target.closest('[data-open]');
+  if (!link) return;
   e.preventDefault();
-  chrome.tabs.create({ url: $('#update').href });
+  if (link.dataset.open) chrome.tabs.create({ url: link.dataset.open });
 });
 
 (async () => {

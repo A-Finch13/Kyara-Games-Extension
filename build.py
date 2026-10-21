@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 DIST = ROOT / 'dist'
-SHARED = ['src', 'icons', 'README.md']
+SHARED = ['src', 'icons', 'updater', 'installer-mises-a-jour.bat', 'README.md']
 
 
 def files():

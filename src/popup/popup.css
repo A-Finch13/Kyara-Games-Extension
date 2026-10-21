@@ -114,20 +114,54 @@ main {
 
 /* New version published on GitHub */
 .update {
-  display: block;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
   padding: 8px 14px;
   background: var(--ok);
   color: #08130d;
   font-weight: 700;
-  text-decoration: none;
 }
 
 .update[hidden] {
   display: none;
 }
 
-.update:hover {
-  text-decoration: underline;
+.update > span {
+  flex: 1;
+}
+
+.update button {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #08130d;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.update button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.update-help {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.update-help[hidden] {
+  display: none;
+}
+
+.update-help a {
+  color: inherit;
 }
 
 .notice {
