@@ -60,7 +60,7 @@ function renderAlbums() {
   const done = stats.filter((s) => s.complete).length;
   $('#album-summary').textContent = `${done} / ${stats.length} albums complets · ${coll.size ? [...coll.values()].filter((v) => v.qty > 0).length.toLocaleString('fr-FR') : 0} / ${catalog.length.toLocaleString('fr-FR')} cartes`;
   const list = stats
-    .filter((s) => !(settings.hideComplete && s.complete) && (!q || norm(s.name).includes(q)))
+    .filter((s) => !(settings.hideComplete && s.complete) && !(settings.hideSmall && s.total < 4) && (!q || norm(s.name).includes(q)))
     .sort(
       sort === 'az' ? (a, b) => a.name.localeCompare(b.name)
         : sort === 'pct' ? (a, b) => b.pct - a.pct || a.name.localeCompare(b.name)
@@ -191,7 +191,7 @@ function bindSettings() {
       const value = input.type === 'checkbox' ? input.checked : Number(input.value);
       settings = await setSettings({ [key]: value });
       document.querySelectorAll(`[data-setting="${key}"]`).forEach((other) => other !== input && other.type === 'checkbox' && (other.checked = value));
-      if (key === 'hideComplete') renderAlbums();
+      if (key === 'hideComplete' || key === 'hideSmall') renderAlbums();
     });
   });
 }

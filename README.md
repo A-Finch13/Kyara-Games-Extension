@@ -7,6 +7,8 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Fonction | Où |
 | --- | --- |
 | Masquer les albums déjà complétés | Page **Collection** du site (bouton en bas à gauche pour les réafficher) et onglet **Albums** de la popup |
+| Masquer les séries de moins de 4 personnages | Bouton à côté de « Masquer les complets » sur la page **Collection**, et case dans l'onglet **Albums** de la popup |
+| Voir les cartes manquantes au lieu d'un « ? » | Page **Collection** : la carte s'affiche en gris, avec son nom, son numéro et sa rareté en dessous |
 | Badge « Manquante » sur toute carte que tu n'as pas | Partout sur le site : boutique/marché, échanges, profils, wiki… |
 | Savoir si la carte que tu donnes est en double | Badge **×N** (doublon) ou **Unique** (ton seul exemplaire) sur tes cartes dans les fenêtres d'échange, confirmation comprise |
 | Voir la série et le prix des cartes à la confirmation d'un échange | Sous la rareté, dans la fenêtre « Confirmer l'échange » (nom complet de la série au survol), avec l'écart de valeur entre les deux côtés et s'il est équilibré selon la règle du site |
@@ -14,7 +16,7 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Filtrer ses cartes sur ses doublons | Puce **Ses doublons**, active d'office, dans chaque fenêtre « Proposer un échange » (profil, offres du marché, comptoir), onglet **Cartes de …** ; la désactiver est retenu |
 | Afficher les cartes manquantes de la collection | Puce **Manquantes** à côté des raretés sur la page Collection, et onglet **Manquantes** de la popup |
 | Savoir si les cartes que tu donnes dans un échange en cours sont en double | Badge **×N** ou **Unique** côté « Tu donnes » des échanges en attente, onglet **Échanges** du Marché |
-| Être prévenu d'une nouvelle version | Notification et bandeau vert dans la popup quand une nouvelle release sort sur GitHub (vérifié toutes les 6 h) |
+| Être prévenu d'une nouvelle version | Notification et bandeau vert dans la popup quand une nouvelle release sort sur GitHub (vérifié toutes les 15 min) |
 | Notifications | Boosters gratuits pleins, envies mises en vente au marché, échanges, ventes/achats/enchères, amis, messages de l'équipe |
 
 Le badge de l'icône affiche le nombre de boosters gratuits (vert quand c'est plein, `!` si tu n'es pas connecté).
@@ -69,7 +71,7 @@ Fabrique d'abord les paquets : `python build.py` (crée le dossier `dist/`).
 - `src/background.js` : vérifications périodiques, notifications, badge.
 - `src/lib/kyara.js` : accès à l'API Kyara et calculs de collection.
 - `src/content/inject.js` : relaie au content script les réponses API du site.
-- `src/content/content.js` : badges, albums masqués, filtre « Ses doublons » sur le site.
+- `src/content/content.js` : badges, albums masqués, cartes manquantes grisées, filtre « Ses doublons » sur le site.
 - `src/popup/` : la fenêtre de l'extension.
 
 Extension non officielle, non affiliée à Kyara. Si le site change sa structure, certains éléments (masquage des albums) peuvent nécessiter une mise à jour.

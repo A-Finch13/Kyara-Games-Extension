@@ -108,3 +108,50 @@
   border-color: #3fbf7f;
   color: #08130d;
 }
+
+/* Two toggles side by side: only the first one pushes the group to the right */
+.kyx-toggle + .kyx-toggle {
+  margin-left: 0;
+}
+
+/* Missing cards on Collection: the card itself, greyed out, instead of the site's "?" box; name, number and rarity below */
+.miss[data-kyx-ghost] {
+  aspect-ratio: auto;
+  justify-content: flex-start;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.miss[data-kyx-ghost] > .q {
+  display: none;
+}
+
+.kyx-ghost {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  margin-bottom: 4px;
+  border-radius: 14px;
+  object-fit: cover;
+  background: #111015;
+  filter: grayscale(1) brightness(0.55);
+  opacity: 0.8;
+  transition: filter 0.18s, opacity 0.18s;
+}
+
+a.slot:hover .kyx-ghost {
+  filter: grayscale(1) brightness(0.8);
+  opacity: 1;
+}
+
+.kyx-ghost-name {
+  max-width: 100%;
+  overflow: hidden;
+  color: #c9c4d0;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

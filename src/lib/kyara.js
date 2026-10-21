@@ -15,6 +15,7 @@ export const RARITY = {
 
 export const DEFAULT_SETTINGS = {
   hideComplete: true,
+  hideSmall: false,
   badgeMissing: true,
   badgeDupes: true,
   theirDupes: true,

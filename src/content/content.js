@@ -1,7 +1,8 @@
-// Kyara Games on kyara.games: card badges, completed albums hidden "Manquantes" chip on Collection and the "Ses doublons" filter in the trade composer.
+// Kyara Games on kyara.games: card badges, completed and small albums hidden, missing cards greyed out, "Manquantes" chip on Collection and the "Ses doublons" filter in the trade composer.
 (() => {
   const DEFAULTS = {
     hideComplete: true,
+    hideSmall: false,
     badgeMissing: true,
     badgeDupes: true,
     theirDupes: true
@@ -163,7 +164,7 @@
   function tag(img) {
     const m = CARD_SRC.exec(img.getAttribute('src') || '');
     const host = img.parentElement;
-    if (!host) return;
+    if (!host || img.classList.contains('kyx-ghost')) return; // greyed out missing card: no badge needed
     let badge = host.querySelector(':scope > .kyx-badge');
     const id = m ? Number(m[1]) : null;
     let kind = null;
@@ -204,14 +205,24 @@
 
   // ---------- completed albums ----------
 
+  const albumCount = (li) => (li.querySelector('.a-meta')?.textContent ?? '').replace(/[\s  ]/g, '').match(/(\d+)\/(\d+)/);
+
   function albumComplete(li) {
-    const meta = li.querySelector('.a-meta')?.textContent ?? '';
-    const m = meta.replace(/[\s  ]/g, '').match(/(\d+)\/(\d+)/);
+    const m = albumCount(li);
     if (m) return Number(m[1]) >= Number(m[2]);
     const bar = li.querySelector('.bar > span');
     if (bar && /^100(\.0+)?%$/.test(bar.style.width)) return true;
     const s = seriesIndex()?.get(norm(li.querySelector('.a-name')?.textContent));
     return s ? s.owned >= s.total : false;
+  }
+
+  // Series with fewer than 4 characters in the whole catalog.
+  const SMALL = 4;
+  function albumSmall(li) {
+    const m = albumCount(li);
+    if (m) return Number(m[2]) < SMALL;
+    const s = seriesIndex()?.get(norm(li.querySelector('.a-name')?.textContent));
+    return s ? s.total < SMALL : false;
   }
 
   const PAGE = 60; // the site renders albums 60 at a time behind an "Afficher plus" button
@@ -220,12 +231,13 @@
   function scanAlbums() {
     const list = location.pathname === '/collection' ? document.querySelector('ul.albums') : null;
     if (!list) return;
+    const filtering = settings.hideComplete || settings.hideSmall;
     let hidden = 0;
     let visible = 0;
     for (const li of list.children) {
-      const hide = settings.hideComplete && albumComplete(li);
-      if (hide) {
-        hidden++;
+      const done = settings.hideComplete && albumComplete(li);
+      if (done) hidden++;
+      if (done || (settings.hideSmall && albumSmall(li))) {
         if (li.dataset.kyxHidden !== '1') li.dataset.kyxHidden = '1';
       } else {
         visible++;
@@ -235,7 +247,7 @@
     albumToggle(list, hidden);
     // Hidden albums still use up the site's page: load the next ones until a full page of unfinished albums shows.
     const more = list.nextElementSibling?.matches('button') ? list.nextElementSibling : list.nextElementSibling?.querySelector('button');
-    if (settings.hideComplete && visible < PAGE && more && autoMore < 40) {
+    if (filtering && visible < PAGE && more && autoMore < 40) {
       autoMore++;
       more.click();
     } else if (!more || visible >= PAGE) {
@@ -243,30 +255,75 @@
     }
   }
 
-  // Toggle placed in the site's own toolbar, left of the "Trier" group.
+  // Toggles placed in the site's own toolbar, left of the "Trier" group.
   function albumToggle(list, hidden) {
     const tools = list.parentElement?.querySelector('.al-tools');
     const views = tools?.querySelector('.views');
     if (!views) return;
-    let btn = tools.querySelector(':scope > .kyx-toggle');
+    const index = seriesIndex();
+    const done = index ? [...index.values()].filter((s) => s.owned >= s.total).length : hidden;
+    const small = index ? [...index.values()].filter((s) => s.total < SMALL).length : 0;
+    const s = (n) => (n > 1 ? 's' : '');
+    toggleButton(tools, views, 'hideComplete', settings.hideComplete ? `✔ ${done} complet${s(done)} masqué${s(done)}` : 'Masquer les complets');
+    toggleButton(
+      tools,
+      views,
+      'hideSmall',
+      settings.hideSmall ? `✔ ${small} série${s(small)} de moins de ${SMALL} persos masquée${s(small)}` : `Masquer les séries de moins de ${SMALL} persos`
+    );
+  }
+
+  function toggleButton(tools, views, key, label) {
+    let btn = tools.querySelector(`:scope > .kyx-toggle[data-key="${key}"]`);
     if (!btn) {
       btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'kyx-toggle';
+      btn.dataset.key = key;
       btn.addEventListener('click', () => {
         if (!alive()) return shutdown();
         autoMore = 0;
         chrome.storage.local.get('settings').then(({ settings: s }) =>
-          chrome.storage.local.set({ settings: { ...s, hideComplete: !settings.hideComplete } })
+          chrome.storage.local.set({ settings: { ...s, [key]: !settings[key] } })
         );
       });
       tools.insertBefore(btn, views);
     }
-    const index = seriesIndex();
-    const done = index ? [...index.values()].filter((s) => s.owned >= s.total).length : hidden;
-    const label = settings.hideComplete ? `✔ ${done} complet${done > 1 ? 's' : ''} masqué${done > 1 ? 's' : ''}` : 'Masquer les complets';
     if (btn.textContent !== label) btn.textContent = label;
-    btn.setAttribute('aria-pressed', String(settings.hideComplete));
+    btn.setAttribute('aria-pressed', String(settings[key]));
+  }
+
+  // ---------- missing cards of the Collection grid ----------
+
+  // The site draws a card you don't own as a dashed box with a "?": show the card itself, greyed out,
+  // with its name above the site's number and rarity. Everything goes inside the site's box, so it leaves with it.
+  function scanMissing() {
+    if (location.pathname !== '/collection') return;
+    for (const miss of document.querySelectorAll('a.slot > .miss')) {
+      const id = Number(miss.parentElement.getAttribute('href')?.match(/\/wiki\/(\d+)/)?.[1]);
+      if (!id) continue;
+      const name = catalog?.get(id)?.n ?? '';
+      if (miss.dataset.kyxGhost === `${id}|${name}`) continue;
+      miss.dataset.kyxGhost = `${id}|${name}`;
+      let img = miss.querySelector(':scope > .kyx-ghost');
+      if (!img) {
+        img = document.createElement('img');
+        img.className = 'kyx-ghost';
+        img.alt = '';
+        img.loading = 'lazy';
+        img.referrerPolicy = 'no-referrer';
+        miss.prepend(img);
+      }
+      img.src = `/cards/sm/${id}.webp`;
+      let label = miss.querySelector(':scope > .kyx-ghost-name');
+      if (!label) {
+        label = document.createElement('span');
+        label.className = 'kyx-ghost-name';
+        img.after(label);
+      }
+      label.textContent = name;
+      label.title = name;
+    }
   }
 
   // ---------- series and price under each card of the trade confirmation ----------
@@ -480,6 +537,7 @@
     scanAlbums();
     scanComposer();
     scanCollectionChips();
+    scanMissing();
     scanConfirm();
   }
 
@@ -489,6 +547,7 @@
     scanAlbums();
     scanComposer();
     scanCollectionChips();
+    scanMissing();
     scanConfirm();
   }
 
@@ -498,11 +557,12 @@
     stopped = true;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-missing, .kyx-series, .kyx-price, .kyx-balance').forEach((el) => el.remove());
-    document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched]').forEach((el) => {
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-missing, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name').forEach((el) => el.remove());
+    document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched], [data-kyx-ghost]').forEach((el) => {
       delete el.dataset.kyxHidden;
       delete el.dataset.kyxPos;
       delete el.dataset.kyxWatched;
+      delete el.dataset.kyxGhost;
     });
   }
 

@@ -29,14 +29,14 @@ const CATEGORY = {
 async function schedule() {
   const { pollMinutes } = await getSettings();
   await chrome.alarms.create(ALARM, { periodInMinutes: Math.max(1, Number(pollMinutes) || 1) });
-  if (!(await chrome.alarms.get(UPDATE_ALARM))) await chrome.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: 6 * 60 });
+  if ((await chrome.alarms.get(UPDATE_ALARM))?.periodInMinutes !== 15) await chrome.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: 15 });
 }
 
 // A new release on GitHub: one notification per version, and a banner in the popup until it is installed.
 async function lookForUpdate() {
-  // The popup asks too each time it opens: GitHub is asked at most every 15 minutes.
+  // The popup asks too each time it opens: GitHub is asked at most every 10 minutes.
   const { updateCheckedAt } = await chrome.storage.local.get('updateCheckedAt');
-  if (Date.now() - (updateCheckedAt ?? 0) < 15 * 60e3) return;
+  if (Date.now() - (updateCheckedAt ?? 0) < 10 * 60e3) return;
   await chrome.storage.local.set({ updateCheckedAt: Date.now() });
   try {
     const update = await checkUpdate();
