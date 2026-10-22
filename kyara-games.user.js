@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyara Games
 // @namespace    https://github.com/A-Finch13/Kyara-Games-Extension
-// @version      1.6.3
+// @version      1.7.0
 // @description  Compagnon non officiel pour kyara.games : cartes manquantes en gris avec ordre d'achat, albums complets masqués, doublons pendant les échanges, booster le plus rentable, classement entre amis.
 // @author       A-Finch13
 // @license      MIT
@@ -46,12 +46,11 @@
 'use strict';
 if (window.__kyaraGamesUserscript) return;
 window.__kyaraGamesUserscript = true;
-const KYX_VERSION = '1.6.3';
+const KYX_VERSION = '1.7.0';
 
 // ---------- 1. src/userscript/shim.js : stockage et messages, à la place des fonctions d'extension ----------
-// Userscript version: the few extension APIs the page code uses, rebuilt on top of the page itself.
-// Storage lives in the site's localStorage under "kyx:" (kept in memory when it is full);
-// messages to the background worker are answered by handle() in bridge.js, in the same page.
+// Userscript: the extension APIs used by the page code, rebuilt in the page.
+// Storage in the site's localStorage under "kyx:" (in memory when full); messages answered by handle() (bridge.js).
 const KYX_OWNER = 'userscript';
 
 const chrome = (() => {
@@ -145,7 +144,7 @@ const chrome = (() => {
 })();
 
 // ---------- 2. src/lib/kyara.js : API de kyara.games, catalogue et collection ----------
-// Shared helpers for the background worker and the popup: Kyara API access, cached data and collection maths.
+// Shared helpers of the background worker, the popup and the userscript: Kyara API, cached data, settings.
 
 const ORIGIN = 'https://kyara.games';
 const REPO = 'A-Finch13/Kyara-Games-Extension';
@@ -175,24 +174,163 @@ const DEFAULT_SETTINGS = {
   notifyFriends: true,
   notifyOther: true,
   notifyUpdated: true,
-  pollMinutes: 1
+  pollMinutes: 0.25
 };
 
 const CATALOG_TTL = 24 * 3600e3;
 const COLLECTION_TTL = 2 * 60e3;
 
+// Picture of a card.
 const cardImg = (id, size = 'sm') => `${ORIGIN}/cards/${size}/${id}.webp`;
+// Lower case without accents, to compare names.
 const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
+// Settings with their defaults.
 async function getSettings() {
   const { settings } = await chrome.storage.local.get('settings');
   return { ...DEFAULT_SETTINGS, ...settings };
 }
 
+// Saves some settings.
 async function setSettings(patch) {
   const settings = { ...(await getSettings()), ...patch };
   await chrome.storage.local.set({ settings });
   return settings;
+}
+
+// ---------- moving the settings to another device ----------
+
+// Short code of letters and digits holding what lives only on this device: settings as bits, each series as
+// its number in the sorted list of the catalog's series, numbers stored as gaps. About 35 characters for 14 series.
+const SYNC_FLAGS = [
+  'hideComplete', 'hideSmall', 'badgeMissing', 'badgeDupes', 'theirDupes', 'lockLastListed', 'cardToWiki',
+  'notifyBoosters', 'notifyTrades', 'notifyMarket', 'notifyWish', 'notifyFriends', 'notifyOther', 'notifyUpdated'
+];
+const SYNC_POLL = [0.25, 1, 2, 5, 10];
+const SYNC_VERSION = 1;
+// Crockford's base 32: no I, L, O or U, so nothing to mix up when typing it on a phone.
+const B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+// Series names of the catalog, sorted.
+const seriesList = (catalog) => [...new Set(catalog.map((c) => c.s))].sort();
+
+class Bits {
+  constructor(text = '') {
+    this.bits = [];
+    this.pos = 0;
+    for (const ch of text) {
+      const v = B32.indexOf(ch);
+      for (let i = 4; i >= 0; i--) this.bits.push((v >> i) & 1);
+    }
+  }
+  put(value, width) {
+    for (let i = width - 1; i >= 0; i--) this.bits.push(Math.floor(value / 2 ** i) % 2);
+  }
+  take(width) {
+    if (this.pos + width > this.bits.length) throw new ApiError(0, 'bad_code');
+    let v = 0;
+    for (let i = 0; i < width; i++) v = v * 2 + this.bits[this.pos++];
+    return v;
+  }
+  // A sorted list of numbers as gaps, each gap in Rice coding (k low bits, the rest in unary).
+  putList(numbers, width) {
+    const sorted = [...new Set(numbers)].sort((a, b) => a - b);
+    this.put(sorted.length, 8);
+    if (!sorted.length) return;
+    const gaps = sorted.map((n, i) => n - (i ? sorted[i - 1] + 1 : 0));
+    const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    const k = Math.min(width, Math.max(0, Math.floor(Math.log2(mean + 1))));
+    this.put(k, 4);
+    for (const g of gaps) {
+      const q = Math.floor(g / 2 ** k);
+      for (let i = 0; i < q; i++) this.bits.push(1);
+      this.bits.push(0);
+      this.put(g % 2 ** k, k);
+    }
+  }
+  takeList() {
+    const count = this.take(8);
+    if (!count) return [];
+    const k = this.take(4);
+    const out = [];
+    let last = -1;
+    for (let i = 0; i < count; i++) {
+      let q = 0;
+      while (this.take(1)) if (++q > 4096) throw new ApiError(0, 'bad_code');
+      last += q * 2 ** k + this.take(k) + 1;
+      out.push(last);
+    }
+    return out;
+  }
+  // 8 bits that change with any bit before: a code typed wrong or cut short is refused.
+  check(upto = this.bits.length) {
+    let h = 0x5a;
+    for (let i = 0; i < upto; i++) h = (h * 33 + this.bits[i] + 1) % 251;
+    return h;
+  }
+  text() {
+    while (this.bits.length % 5) this.bits.push(0);
+    let out = '';
+    for (let i = 0; i < this.bits.length; i += 5) out += B32[this.bits.slice(i, i + 5).reduce((v, b) => v * 2 + b, 0)];
+    return out.match(/.{1,4}/g).join('-');
+  }
+}
+
+// A few bits of the series list, so that a code made with another version of the catalog is noticed.
+const catalogCheck = (list) => list.reduce((h, name) => (h * 31 + name.length + name.charCodeAt(0)) % 256, list.length % 256);
+
+// A code to type or paste on another device (extension or script): settings, favourite series, "Bloquer sauf doublons" albums.
+async function exportCode() {
+  const list = seriesList(await loadCatalog());
+  const index = new Map(list.map((name, i) => [name, i]));
+  const width = Math.max(1, Math.ceil(Math.log2(list.length + 1)));
+  const { settings: saved, favSeries = [], smartLock = [], marketFav } = await chrome.storage.local.get(['settings', 'favSeries', 'smartLock', 'marketFav']);
+  const settings = { ...DEFAULT_SETTINGS, ...saved };
+  const bits = new Bits();
+  bits.put(SYNC_VERSION, 4);
+  bits.put(catalogCheck(list), 8);
+  for (const key of SYNC_FLAGS) bits.put(settings[key] ? 1 : 0, 1);
+  bits.put(marketFav ? 1 : 0, 1);
+  bits.put(Math.max(0, SYNC_POLL.indexOf(Number(settings.pollMinutes))), 3);
+  bits.putList(favSeries.filter((n) => index.has(n)).map((n) => index.get(n)), width);
+  bits.putList(smartLock.filter((n) => index.has(n)).map((n) => index.get(n)), width);
+  bits.put(bits.check(), 8);
+  return bits.text();
+}
+
+// Replaces this device's settings and favourites by the ones of the code. Returns what was brought in.
+async function importCode(code) {
+  const text = String(code).toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
+  if (!text || [...text].some((ch) => !B32.includes(ch))) throw new ApiError(0, 'bad_code');
+  const read = (list) => {
+    const bits = new Bits(text);
+    if (bits.take(4) !== SYNC_VERSION) throw new ApiError(0, 'bad_code');
+    const catalogBits = bits.take(8);
+    const flags = Object.fromEntries(SYNC_FLAGS.map((key) => [key, !!bits.take(1)]));
+    const marketFav = !!bits.take(1);
+    flags.pollMinutes = SYNC_POLL[bits.take(3)] ?? 0.25;
+    const names = (numbers) => numbers.map((i) => list[i]).filter(Boolean);
+    const fav = bits.takeList();
+    const locked = bits.takeList();
+    if (bits.take(8) !== bits.check(bits.pos - 8)) throw new ApiError(0, 'bad_code');
+    if (catalogBits !== catalogCheck(list)) throw new ApiError(0, 'other_catalog');
+    return { flags, marketFav, favSeries: names(fav), smartLock: names(locked) };
+  };
+  let data;
+  try {
+    data = read(seriesList(await loadCatalog()));
+  } catch (e) {
+    if (e?.code !== 'other_catalog') throw e;
+    data = read(seriesList(await loadCatalog(true)));
+  }
+  const { settings } = await chrome.storage.local.get('settings');
+  await chrome.storage.local.set({
+    settings: { ...settings, ...data.flags },
+    favSeries: data.favSeries,
+    smartLock: data.smartLock,
+    marketFav: data.marketFav
+  });
+  return { favs: data.favSeries.length, locks: data.smartLock.length };
 }
 
 class ApiError extends Error {
@@ -256,6 +394,7 @@ function slimCollection(items) {
     .map((x) => [x.characterId ?? x.id, x.qty ?? 0, x.listable ?? Math.max(0, (x.qty ?? 0) - 1)]);
 }
 
+// The user's collection, cached 2 minutes.
 async function loadCollection(force = false) {
   const { collection } = await chrome.storage.local.get('collection');
   if (!force && collection?.items && Date.now() - collection.at < COLLECTION_TTL) return collection.items;
@@ -269,8 +408,10 @@ async function loadCollection(force = false) {
   }
 }
 
+// Collection as a Map id -> { qty, listable }.
 const collectionMap = (items) => new Map(items.map(([id, qty, listable]) => [id, { qty, listable }]));
 
+// Progress of each series.
 function seriesStats(catalog, coll) {
   const by = new Map();
   for (const c of catalog) {
@@ -283,8 +424,10 @@ function seriesStats(catalog, coll) {
   return [...by.values()].map((s) => ({ ...s, complete: s.owned >= s.total, pct: s.total ? s.owned / s.total : 0 }));
 }
 
+// The user out of a /me or /me/bootstrap answer.
 const unwrapUser = (u) => (u && u.me && typeof u.me === 'object' ? u.me : u);
 
+// What is kept of the user: pseudo, free boosters, chakra.
 function slimMe(u) {
   u = unwrapUser(u);
   if (!u || typeof u !== 'object') return null;
@@ -300,6 +443,7 @@ function slimMe(u) {
   };
 }
 
+// The list inside an answer, whatever its shape.
 const asList = (x, ...keys) => {
   if (Array.isArray(x)) return x;
   for (const k of keys) if (Array.isArray(x?.[k])) return x[k];
@@ -308,6 +452,7 @@ const asList = (x, ...keys) => {
 
 // ---------- new versions published on GitHub ----------
 
+// True when version a is newer than version b.
 const newer = (a, b) => {
   const pa = String(a).replace(/^v/, '').split('.').map(Number);
   const pb = String(b).replace(/^v/, '').split('.').map(Number);
@@ -317,7 +462,7 @@ const newer = (a, b) => {
   return false;
 };
 
-// Stores { version, url, zip, xpi } when the latest GitHub release is newer than the installed extension, else nothing.
+// Stores { version, url, zip, xpi } when the latest GitHub release is newer than this version, else nothing.
 async function checkUpdate() {
   const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { accept: 'application/vnd.github+json' } });
   if (!res.ok) throw new ApiError(res.status, `github_${res.status}`);
@@ -339,11 +484,10 @@ async function checkUpdate() {
 }
 
 // ---------- 3. src/userscript/bridge.js : le travail du service de fond, dans la page ----------
-// Userscript version: what the extension's background worker answers to the page code, done in the page.
-// No notifications here: a userscript only runs while a kyara.games page is open.
+// Userscript: the background worker's answers to the page code, done in the page.
 let refreshTimer = 0;
 
-// The page code hands the session over a moment after it starts: until then, read it from the site directly.
+// Reads the session from the site until the page code hands it over.
 async function ensureAuth() {
   if ((await chrome.storage.local.get('auth')).auth?.token) return;
   try {
@@ -352,6 +496,7 @@ async function ensureAuth() {
   } catch {}
 }
 
+// Answers the messages of the page code.
 async function handle(msg) {
   if (msg?.type !== 'auth') await ensureAuth();
   switch (msg?.type) {
@@ -395,8 +540,7 @@ async function handle(msg) {
 }
 
 // ---------- 4. src/content/inject.js : lit les réponses que le site reçoit déjà ----------
-// Runs in the page itself: forwards the Kyara API answers the extension cares about to content.js.
-// Nothing is sent anywhere else and no request is changed.
+// Runs in the page: forwards to content.js the Kyara API answers the extension needs, without changing any request.
 (() => {
   if (window.__kyaraGamesHook) return;
   window.__kyaraGamesHook = true;
@@ -1471,86 +1615,6 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   margin-top: 14px;
 }
 
-.kyx-fm-favs,
-.kyx-fm-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.kyx-fm-fav {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 4px 2px 2px;
-  border: 1px solid var(--line3, #3a3642);
-  border-radius: 999px;
-  color: var(--fg, #fff);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.kyx-fm-fav.all {
-  padding-right: 2px;
-}
-
-.kyx-fm-fav[aria-pressed="true"] {
-  border-color: #f5c518;
-  background: rgba(245, 197, 24, 0.14);
-}
-
-.kyx-fm-fav .kyx-fm-pick {
-  height: 28px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.kyx-fm-fav .kyx-fm-pick:hover {
-  color: #f5c518;
-}
-
-.kyx-fm-fav .kyx-fm-del {
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--fg2, #a9a4b0);
-  font-size: 15px;
-  cursor: pointer;
-}
-
-.kyx-fm-fav .kyx-fm-del:hover {
-  color: var(--fg, #fff);
-  background: var(--raise, #1f1d25);
-}
-
-.kyx-fm-tools select {
-  height: 38px;
-  padding: 0 10px;
-  border: 1px solid var(--line2, #2a2731);
-  border-radius: 10px;
-  background: var(--panel2, #121117);
-  color: var(--fg, #fff);
-  font: inherit;
-  font-size: 14px;
-}
-
-.kyx-fm-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--fg2, #a9a4b0);
-  font-size: 14px;
-}
-
 .kyx-fm-note {
   margin: 0;
   color: var(--fg2, #a9a4b0);
@@ -1708,15 +1772,168 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   background: var(--raise, #1f1d25);
   color: var(--fg, #fff);
 }
+
+/* Userscript settings: moving the settings to another device */
+.kyx-sync {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line, #26232d);
+}
+
+.kyx-sync .kyx-order-btns {
+  justify-content: flex-start;
+}
+
+.kyx-sync textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line2, #2a2731);
+  border-radius: 10px;
+  background: var(--panel2, #121117);
+  color: var(--fg, #fff);
+  font: 12px/1.4 ui-monospace, Consolas, monospace;
+  resize: vertical;
+  word-break: break-all;
+}
+
+.kyx-sync-msg:empty {
+  display: none;
+}
+
+/* Market: list of the favourite series, in the site's filter row */
+.kyx-fav-pick select {
+  max-width: 260px;
+}
+
+.kyx-fav-del {
+  height: 30px;
+  margin-left: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg2, #a9a4b0);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.kyx-fav-del:hover {
+  border-color: var(--acc, #ff4d2e);
+  color: var(--fg, #fff);
+}
+
+/* Collection: how many duplicates per rarity, inside the site's recycling box */
+.kyx-rec {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-basis: 100%;
+  padding-top: 10px;
+  border-top: 1px solid var(--line, #26232d);
+}
+
+.kyx-rec-t {
+  margin: 0;
+  color: var(--fg2, #a9a4b0);
+  font-size: 13px;
+}
+
+.kyx-rec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.kyx-rec-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--r) 55%, transparent);
+  border-radius: 10px;
+}
+
+.kyx-rec-grid b {
+  color: var(--r);
+  font-size: 13px;
+}
+
+.kyx-rec-grid input {
+  width: 100%;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--line2, #2a2731);
+  border-radius: 8px;
+  background: var(--panel2, #121117);
+  color: var(--fg, #fff);
+  font: 600 14px var(--mono, monospace);
+}
+
+.kyx-rec-grid small {
+  color: var(--fg2, #a9a4b0);
+  font-size: 11px;
+}
+
+.kyx-rec-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kyx-rec-btns button {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg, #fff);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kyx-rec-btns .kyx-rec-go:not(:disabled) {
+  border-color: var(--acc, #ff4d2e);
+  background: var(--acc, #ff4d2e);
+}
+
+.kyx-rec-btns button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.kyx-rec-msg {
+  margin: 0;
+  color: var(--fg2, #a9a4b0);
+  font-size: 13px;
+}
+
+.kyx-rec-msg:empty {
+  display: none;
+}
+
+.kyx-rec-msg[data-kind="warn"] {
+  color: #f5c518;
+}
+
+.kyx-rec-msg[data-kind="ok"] {
+  color: #3fbf7f;
+}
+
+.kyx-rec-msg[data-kind="err"] {
+  color: #ff4d2e;
+}
 `;
   document.head.appendChild(style);
   // ---------- 5. src/content/content.js : tout ce qui s'affiche sur le site ----------
-// Kyara Games on kyara.games: card badges, completed and small albums hidden, missing cards greyed out with a buy order,
-// "Bloquer sauf doublons", last copy of a card on sale locked, compact completed series on Missions, "Boosters rentables" page,
-// "Amis" filter on the Classement page, "Possédées" and "Manquantes" chips on Collection and the "Ses doublons" filter in the trade composer.
-// Also built into the userscript version (build.py), where KYX_OWNER and a stand-in for the extension APIs are defined.
+// Kyara Games: everything the extension adds to the pages of kyara.games.
+// Also built into the userscript (build.py), which defines KYX_OWNER and stand-ins for the extension APIs.
 (() => {
-  // A single copy per tab when both the extension and the userscript are installed: the first one to start.
+  // Only one copy runs per tab when both the extension and the userscript are installed.
   const owner = typeof KYX_OWNER === 'string' ? KYX_OWNER : 'extension';
   if (document.documentElement.dataset.kyxOwner && document.documentElement.dataset.kyxOwner !== owner) return;
   document.documentElement.dataset.kyxOwner = owner;
@@ -1738,9 +1955,9 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   let series = null; // Map normalized series name -> { total, owned }
   let partner = null;
 
+  // Lower case without accents, to compare names.
   const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-  // After the extension is reloaded or updated, this copy keeps running in already open tabs
-  // but can no longer reach the extension: it then cleans up and stops.
+  // False once the extension was reloaded or updated: this copy then cleans up and stops.
   const alive = () => {
     try {
       return !!chrome.runtime?.id;
@@ -1748,6 +1965,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       return false;
     }
   };
+  // Message to the background worker (null once the extension is gone).
   const send = (msg) => {
     if (!alive()) return shutdown(), Promise.resolve(null);
     try {
@@ -1756,10 +1974,12 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       return Promise.resolve(null);
     }
   };
+  // Copies owned of a card.
   const qty = (id) => coll?.get(id)?.qty ?? 0;
 
   // ---------- data ----------
 
+  // Takes in values read from the extension's storage.
   function applyStorage({ settings: s, collection, catalog: cat, partner: p }) {
     if (s !== undefined) settings = { ...DEFAULTS, ...s };
     if (collection !== undefined) coll = collection?.items ? new Map(collection.items.map(([id, q, l]) => [id, { qty: q, listable: l }])) : null;
@@ -1768,6 +1988,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     series = null;
   }
 
+  // Total and owned cards of each series.
   function seriesIndex() {
     if (series || !catalog || !coll) return series;
     series = new Map();
@@ -1785,8 +2006,9 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     if (area !== 'local') return;
     const picked = {};
     if ('smartLock' in changes) smartLock = new Set(changes.smartLock.newValue ?? []);
-    if ('favSeries' in changes) {
-      favSeries = new Set(changes.favSeries.newValue ?? []);
+    if ('marketFav' in changes) marketFav = !!changes.marketFav.newValue;
+    if ('favSeries' in changes || 'marketFav' in changes) {
+      if ('favSeries' in changes) favSeries = new Set(changes.favSeries.newValue ?? []);
       marketShown = '';
       scanFavStars();
       scanMarket();
@@ -1797,7 +2019,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     refreshAll();
   });
 
-  // The site keeps its session in localStorage: hand it to the extension so it can poll for notifications.
+  // Hands the site's session (kyara_token in its localStorage) to the extension.
   let lastAuth = '';
   function syncAuth() {
     let token = null;
@@ -1815,11 +2037,10 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   // ---------- answers forwarded by inject.js ----------
 
   window.addEventListener('message', (e) => {
-    // No e.source check: Firefox hands content scripts a wrapped window that never equals e.source.
     if (e.origin !== location.origin || e.data?.__kyaraGames !== 1) return;
     const { kind, path, body } = e.data;
     if (kind === 'write') {
-      if (/^\/market\//.test(path)) setTimeout(refreshFavMarket, 1500); // offers just changed
+      if (/^\/market\//.test(path)) setTimeout(refreshFavMarket, 1500);
       return void send({ type: 'collection-stale' });
     }
     let m;
@@ -1848,6 +2069,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   });
 
   const pendingNames = new Map();
+  // Remembers what is known of the trade partner.
   async function setPartner(id, patch) {
     if (pendingNames.has(id)) patch.pseudo ??= pendingNames.get(id);
     const next = await send({ type: 'partner', partner: { id, ...patch } });
@@ -1859,7 +2081,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
   // ---------- badges on every card image ----------
 
-  // The trade composer is a dialog holding both sides of the deal ("Tu donnes" / "Tu reçois").
+  // True for a card inside the trade composer (the dialog with "Tu donnes" and "Tu reçois").
   const composers = new WeakSet();
   function inComposer(img) {
     const dialog = img.closest('[role="dialog"]');
@@ -1873,7 +2095,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     return false;
   }
 
-  // "Mes échanges": a card on the "Tu donnes" side of a trade still waiting for an answer (status pill .st-pending).
+  // True for a card on the "Tu donnes" side of a pending trade in "Mes échanges".
   function givenInPendingTrade(img) {
     const item = img.closest('li.trade');
     if (!item?.querySelector('.st-pending')) return false;
@@ -1886,8 +2108,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     return false;
   }
 
-  // Where each badge is wanted: the market only inside the trade composer; duplicates on Collection and in trades,
-  // and in trades also the cards held only once, so giving away a last copy is never a surprise.
+  // Badges a card gets where it is shown: missing, duplicate (×N), single copy (Unique).
   function badgeScope(img) {
     if (givenInPendingTrade(img)) return { missing: false, dupes: settings.badgeDupes, single: settings.badgeDupes };
     const trade = inComposer(img);
@@ -1897,6 +2118,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   }
 
   const MIN_SIZE = 48; // avatars and tiny chips stay clean
+  // Puts the right badge on a card picture, or removes it.
   function tag(img) {
     const m = CARD_SRC.exec(img.getAttribute('src') || '');
     const host = img.parentElement;
@@ -1933,6 +2155,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     badge.textContent = text;
   }
 
+  // Badges every card picture of an element.
   function scanBadges(root = document) {
     if (root.nodeType !== 1 && root !== document) return;
     if (root.tagName === 'IMG') return tag(root);
@@ -1941,8 +2164,10 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
   // ---------- completed albums ----------
 
+  // "owned/total" of an album tile.
   const albumCount = (li) => (li.querySelector('.a-meta')?.textContent ?? '').replace(/[\s  ]/g, '').match(/(\d+)\/(\d+)/);
 
+  // True for a completed album tile.
   function albumComplete(li) {
     const m = albumCount(li);
     if (m) return Number(m[1]) >= Number(m[2]);
@@ -1952,7 +2177,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     return s ? s.owned >= s.total : false;
   }
 
-  // Series with fewer than 5 characters in the whole catalog.
+  // True for a series with fewer than 5 characters in the catalog.
   const SMALL = 5;
   function albumSmall(li) {
     const m = albumCount(li);
@@ -1964,6 +2189,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   const PAGE = 60; // the site renders albums 60 at a time behind an "Afficher plus" button
   let autoMore = 0;
 
+  // Hides the completed and small series of the Collection album list.
   function scanAlbums() {
     const list = location.pathname === '/collection' ? document.querySelector('ul.albums') : null;
     if (!list) return;
@@ -1981,7 +2207,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       }
     }
     albumToggle(list, hidden);
-    // Hidden albums still use up the site's page: load the next ones until a full page of unfinished albums shows.
+    // Loads the site's next albums until a full page of visible ones shows.
     const more = list.nextElementSibling?.matches('button') ? list.nextElementSibling : list.nextElementSibling?.querySelector('button');
     if (filtering && visible < PAGE && more && autoMore < 40) {
       autoMore++;
@@ -1991,7 +2217,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     }
   }
 
-  // Toggles placed in the site's own toolbar, left of the "Trier" group.
+  // The two toggles (complete series, small series) in the site's album toolbar.
   function albumToggle(list, hidden) {
     const tools = list.parentElement?.querySelector('.al-tools');
     const views = tools?.querySelector('.views');
@@ -2009,6 +2235,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     );
   }
 
+  // One toggle of the album toolbar.
   function toggleButton(tools, views, key, label) {
     let btn = tools.querySelector(`:scope > .kyx-toggle[data-key="${key}"]`);
     if (!btn) {
@@ -2031,10 +2258,9 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
   // ---------- missing cards of the Collection grid ----------
 
-  // The site draws a card you don't own as a dashed box with a "?": show the card itself, greyed out,
-  // with its name above the site's number and rarity. Everything goes inside the site's box, so it leaves with it.
+  // Each missing card of the Collection grid shown greyed out with its name, instead of the site's "?".
   function scanMissing() {
-    // A card just bought leaves its "?" box: its buy order row goes too.
+    // Removes the buy order row of a card that is no longer missing.
     document.querySelectorAll('.kyx-order').forEach((row) => {
       if (!row.parentElement?.querySelector(':scope > a.slot > .miss')) row.remove();
     });
@@ -2072,8 +2298,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
   // ---------- buy order under each missing card ----------
 
-  // Like the "≈ price · Vendre" row of owned cards: the fair price and a button opening a small buy order form,
-  // the same one as on the card's wiki page (lowest price of the rarity or fair-play bound, 1 to 10 copies).
+  // Row under each missing card: its fair price and a button opening the buy order form.
   const MIN_PRICE = { C: 1, U: 1, R: 3, E: 10, L: 40, M: 150 };
   const RARITY_LABEL = { C: 'Commune', U: 'Peu commune', R: 'Rare', E: 'Épique', L: 'Légendaire', M: 'Mythique' };
   const ORDER_ERRORS = {
@@ -2087,7 +2312,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     network: 'Serveur injoignable.'
   };
 
-  // Same request as the site's own: session, device and anti-bot pass it keeps in localStorage, sent from the page.
+  // Calls the Kyara API from the page with the site's session, device id and anti-bot pass.
   async function siteApi(path, { method = 'GET', body, auth = true } = {}) {
     const headers = { accept: 'application/json' };
     try {
@@ -2102,7 +2327,6 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     if (body !== undefined) headers['content-type'] = 'application/json';
     let res;
     try {
-      // Firefox: content.fetch sends the request as the page itself, like Chrome's fetch does here.
       const init = { method, headers, body: body === undefined ? undefined : JSON.stringify(body) };
       const url = `${location.origin}/api${path}`;
       res = await (typeof content !== 'undefined' && content?.fetch ? content.fetch(url, init) : fetch(url, init));
@@ -2117,6 +2341,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     return data;
   }
 
+  // Buy order row under one missing card.
   function orderRow(slot, id) {
     const cell = slot.parentElement;
     if (!cell) return;
@@ -2135,7 +2360,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     if (med.textContent !== text) med.textContent = text;
   }
 
-  // The form opens in a pop-up over the page, with the card, like the site's own dialogs.
+  // Buy order dialog: price and quantity, with the minimum, lowest offer, median and best order.
   function toggleOrderForm(row) {
     if (!alive()) return shutdown();
     document.querySelector('.kyx-modal-back')?.remove();
@@ -2253,8 +2478,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
   // ---------- an owned card of the Collection grid opens its wiki page ----------
 
-  // The site opens a window when an owned card is clicked; its link already leads to the card's wiki page.
-  // The click is stopped before the site sees it and the same link is followed through the site's own navigation.
+  // A click on an owned card of the Collection grid opens its wiki page instead of the site's window.
   window.addEventListener(
     'click',
     (e) => {
@@ -2268,7 +2492,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       const link = Object.assign(document.createElement('a'), { href });
       link.hidden = true;
       document.body.appendChild(link);
-      link.click(); // handled by the site's router like any other link
+      link.click();
       link.remove();
     },
     true
@@ -2276,21 +2500,20 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
   // ---------- favourite series (œuvres) and the "★ Favoris" filter of the market ----------
 
+  // Text made safe for HTML.
   const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-  // A star on each album of Collection (and in the bar of the open album) marks a series as a favourite.
-  // In the market, the "★ Favoris" chip lists the offers of those series only: the market is asked for each
-  // of them and the offers are gathered in one list, shown instead of the site's own.
+  // A star on each album of Collection marks a series as a favourite; the market's "★ Favoris" chip shows their offers.
   let favSeries = new Set();
   let marketFav = false;
   let marketShown = '';
 
+  // Adds or removes a favourite series.
   async function toggleFav(name) {
     if (!alive()) return shutdown();
     const next = new Set(favSeries);
     if (next.has(name)) next.delete(name);
     else next.add(name);
-    // Taken into account at once, so that several stars touched in a row all count.
     favSeries = new Set([...next].sort((a, b) => a.localeCompare(b, 'fr')));
     marketShown = '';
     scanFavStars();
@@ -2298,18 +2521,20 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     await chrome.storage.local.set({ favSeries: [...favSeries] });
   }
 
+  // Star button of an album (inline: in the album bar).
   function favButton(inline) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = inline ? 'kyx-fav inline' : 'kyx-fav';
     btn.addEventListener('click', (e) => {
       e.preventDefault();
-      e.stopPropagation(); // the album tile itself opens the album
+      e.stopPropagation();
       toggleFav(btn.dataset.series);
     });
     return btn;
   }
 
+  // Shows whether the series is a favourite.
   function setStar(star, name, inline) {
     const on = favSeries.has(name);
     star.dataset.series = name;
@@ -2323,6 +2548,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     }
   }
 
+  // Stars on the album tiles and in the bar of the open album.
   function scanFavStars() {
     if (location.pathname !== '/collection') return;
     for (const li of document.querySelectorAll('ul.albums > li')) {
@@ -2349,15 +2575,49 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   }
 
   const RARITY_COLOR = { C: '#B5B1BB', U: '#3FBF7F', R: '#4D9BFF', E: '#B072FF', L: '#F5C518', M: '#FF4D2E' };
-  const MARKET_SORTS = [
-    ['price_asc', 'Prix croissant'],
-    ['price_desc', 'Prix décroissant'],
-    ['ending', 'Fin proche'],
-    ['newest', 'Plus récentes']
-  ];
+  let favOnly = null; // a single favourite series, or all of them
 
+  // Rarity of the site's chip that is on ('' for "Toutes" or none).
+  const RARITY_BY_LABEL = Object.fromEntries(Object.entries(RARITY_LABEL).map(([k, v]) => [norm(v), k]));
+  function siteRarity(chips) {
+    const on = [...(chips?.querySelectorAll(':scope > button.on:not(.kyx-chip)') ?? [])];
+    for (const b of on) {
+      const r = RARITY_BY_LABEL[norm(b.textContent)];
+      if (r) return r;
+    }
+    return '';
+  }
+
+  // Current values of the site's market filters, applied to the favourites too.
+  const marketFilters = () => (location.pathname === '/marche' ? document.querySelector('#mq')?.closest('.filters') : null);
+  // The site's sort select, and the label of its "Univers" select.
+  const sortSelect = (filters) => filters?.querySelector('.row2 select option[value="price_asc"]')?.parentElement ?? null;
+  const universeLabel = (filters) =>
+    [...(filters?.querySelectorAll('.row2 > label:not(.kyx-fav-pick)') ?? [])].find((l) => {
+      const sel = l.querySelector(':scope > select');
+      return sel && sel !== sortSelect(filters);
+    }) ?? null;
+
+  // The site's filters as request parameters.
+  function siteFilters(filters) {
+    const price = [...(filters?.querySelectorAll('.row2 label.price input') ?? [])];
+    const amount = (input) => (input && input.value !== '' && Number(input.value) >= 0 ? String(Math.round(Number(input.value))) : '');
+    const pill = (re) => [...(filters?.querySelectorAll('button.pill') ?? [])].find((b) => re.test(b.textContent))?.getAttribute('aria-pressed') === 'true';
+    return {
+      q: filters?.querySelector('#mq')?.value.trim() ?? '',
+      rarity: siteRarity(filters?.querySelector('.chips')),
+      sort: sortSelect(filters)?.value || 'ending',
+      min: amount(price[0]),
+      max: amount(price[1]),
+      missing: pill(/n.ai pas/i),
+      wished: pill(/cherche/i),
+      type: new URLSearchParams(location.search).get('onglet') === 'encheres' ? 'auction' : 'fixed'
+    };
+  }
+
+  // "★ Favoris" chip of the market and the favourites view.
   function scanMarket() {
-    const filters = location.pathname === '/marche' ? document.querySelector('#mq')?.closest('.filters') : null;
+    const filters = marketFilters();
     const chips = filters?.querySelector('.chips');
     if (!chips) return void (marketShown = '');
     let btn = chips.querySelector(':scope > .kyx-fav-chip');
@@ -2381,22 +2641,30 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     }
     btn.classList.toggle('on', marketFav);
     btn.setAttribute('aria-pressed', String(marketFav));
-    // The site's rarity chips ("Toutes", "Commune"…) filter the favourites as well.
-    if (!chips.dataset.kyxRarity) {
-      chips.dataset.kyxRarity = '1';
-      chips.addEventListener('click', (e) => {
-        if (!marketFav || !e.target.closest('button') || e.target.closest('.kyx-chip')) return;
-        setTimeout(() => {
+    // Asks the favourites again when a filter of the site changes.
+    if (!filters.dataset.kyxWatch) {
+      filters.dataset.kyxWatch = '1';
+      let timer = 0;
+      const later = (ms) => {
+        if (!marketFav) return;
+        clearTimeout(timer);
+        timer = setTimeout(() => {
           const view = document.querySelector('.kyx-favmarket');
-          if (!view?.kyxState) return;
-          const rarity = siteRarity(chips);
-          if (rarity === view.kyxState.rarity) return;
-          view.kyxState.rarity = rarity;
-          renderFavMarket(view);
-        }, 60);
-      });
+          if (view?.kyxState) loadFavOffers(view, true);
+        }, ms);
+      };
+      const ours = (e) => e.target.closest?.('.kyx-fav-pick, .kyx-chip');
+      filters.addEventListener('input', (e) => ours(e) || later(500));
+      filters.addEventListener('change', (e) => ours(e) || later(150));
+      filters.addEventListener('click', (e) => ours(e) || !e.target.closest('button') || later(150));
     }
-    // The site's offers (all that follows its filters) make way for the favourites while the chip is on.
+    const universe = universeLabel(filters);
+    if (universe) {
+      if (marketFav && universe.dataset.kyxHidden !== '1') universe.dataset.kyxHidden = '1';
+      else if (!marketFav && universe.dataset.kyxHidden) delete universe.dataset.kyxHidden;
+    }
+    favPicker(filters, universe);
+    // Hides the site's offers while the favourites are shown.
     let view = filters.parentElement.querySelector(':scope > .kyx-favmarket');
     for (let el = filters.nextElementSibling; el; el = el.nextElementSibling) {
       if (el === view) continue;
@@ -2411,92 +2679,75 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     if (!view) {
       view = document.createElement('section');
       view.className = 'kyx-favmarket';
-      view.kyxState = { type: 'fixed', sort: 'price_asc', missing: false, only: null, rarity: '' };
+      view.kyxState = {};
       filters.after(view);
     }
-    const key = [...favSeries].join('|');
+    // Shows the favourites again when they or the tab (buy, auctions) change.
+    const key = `${[...favSeries].join('|')}#${siteFilters(filters).type}`;
     if (marketShown === key && view.childElementCount) return;
     marketShown = key;
     renderFavMarket(view);
   }
 
-  // Rarity of the site's chip that is on ('' for "Toutes" or none).
-  const RARITY_BY_LABEL = Object.fromEntries(Object.entries(RARITY_LABEL).map(([k, v]) => [norm(v), k]));
-  function siteRarity(chips) {
-    const on = [...(chips?.querySelectorAll(':scope > button.on:not(.kyx-chip)') ?? [])];
-    for (const b of on) {
-      const r = RARITY_BY_LABEL[norm(b.textContent)];
-      if (r) return r;
+  // "★ Favoris" list in the site's filter row, where its "Univers" list was: all favourites or a single one.
+  function favPicker(filters, universe) {
+    const row = filters.querySelector('.row2');
+    let pick = row?.querySelector(':scope > .kyx-fav-pick');
+    if (!marketFav || !row) return void pick?.remove();
+    if (favOnly && !favSeries.has(favOnly)) favOnly = null;
+    if (!pick) {
+      pick = document.createElement('label');
+      pick.className = `kyx-fav-pick ${universe?.className ?? ''}`;
+      pick.innerHTML = `★ Favoris <select class="${esc(universe?.querySelector('select')?.className ?? '')}"></select>
+        <button type="button" class="kyx-fav-del" hidden>Retirer des favoris</button>`;
+      const select = pick.querySelector('select');
+      const del = pick.querySelector('.kyx-fav-del');
+      select.addEventListener('change', () => {
+        favOnly = select.value || null;
+        del.hidden = !favOnly;
+        const view = document.querySelector('.kyx-favmarket');
+        if (view?.kyxState) loadFavOffers(view, true);
+      });
+      del.addEventListener('click', (e) => {
+        e.preventDefault();
+        const name = favOnly;
+        favOnly = null;
+        if (name) toggleFav(name);
+      });
+      if (universe) universe.before(pick);
+      else row.prepend(pick);
     }
-    return '';
+    const select = pick.querySelector('select');
+    const names = [...favSeries];
+    const key = names.join('|');
+    if (pick.dataset.key !== key) {
+      pick.dataset.key = key;
+      select.innerHTML = '';
+      select.add(new Option(`Toutes mes favorites (${names.length})`, ''));
+      for (const name of names) select.add(new Option(name, name));
+    }
+    select.value = favOnly ?? '';
+    pick.querySelector('.kyx-fav-del').hidden = !favOnly;
   }
 
+  // Favourites view: status line, offers, "Voir plus d'offres".
   function renderFavMarket(view) {
-    const st = view.kyxState;
-    const names = [...favSeries];
-    if (st.only && !favSeries.has(st.only)) st.only = null;
-    st.rarity = siteRarity(document.querySelector('#mq')?.closest('.filters')?.querySelector('.chips')) || st.rarity;
-    if (!names.length) {
+    if (!favSeries.size) {
       view.innerHTML = '<p class="kyx-fm-note">Aucune œuvre en favori pour l’instant. Sur la page <a href="/collection">Collection</a>, onglet Albums, touche l’étoile ☆ d’un album pour l’ajouter.</p>';
       return;
     }
     view.innerHTML = `
-      <div class="kyx-fm-favs"></div>
-      <div class="kyx-fm-tools">
-        <select class="kyx-fm-type" aria-label="Type d’offre"><option value="fixed">Prix fixe</option><option value="auction">Enchères</option></select>
-        <select class="kyx-fm-sort" aria-label="Trier">${MARKET_SORTS.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>
-        <label class="kyx-fm-check"><input type="checkbox" /> Seulement mes manquantes</label>
-      </div>
       <div class="kyx-fm-status"><p class="kyx-fm-note" role="status"></p><button type="button" class="kyx-fm-refresh">↻ Actualiser</button></div>
       <ul class="kyx-fm-grid"></ul>
       <button type="button" class="kyx-fm-more" hidden>Voir plus d’offres</button>`;
-    // Choose the series to show: all the favourites, or a single one (× takes it out of the favourites).
-    const favs = view.querySelector('.kyx-fm-favs');
-    const pick = (only) => {
-      st.only = only;
-      favs.querySelectorAll('.kyx-fm-fav').forEach((c) => c.setAttribute('aria-pressed', String((c.dataset.series || null) === only)));
-      loadFavOffers(view, true);
-    };
-    const all = document.createElement('span');
-    all.className = 'kyx-fm-fav all';
-    all.dataset.series = '';
-    all.innerHTML = `<button type="button" class="kyx-fm-pick">★ Toutes mes favorites (${names.length})</button>`;
-    all.querySelector('button').addEventListener('click', () => pick(null));
-    favs.appendChild(all);
-    for (const name of names) {
-      const chip = document.createElement('span');
-      chip.className = 'kyx-fm-fav';
-      chip.dataset.series = name;
-      chip.innerHTML = '<button type="button" class="kyx-fm-pick"></button><button type="button" class="kyx-fm-del">×</button>';
-      chip.querySelector('.kyx-fm-pick').textContent = name;
-      chip.querySelector('.kyx-fm-pick').title = `Afficher seulement ${name}`;
-      chip.querySelector('.kyx-fm-pick').addEventListener('click', () => pick(st.only === name ? null : name));
-      chip.querySelector('.kyx-fm-del').title = `Retirer ${name} des favoris`;
-      chip.querySelector('.kyx-fm-del').addEventListener('click', () => toggleFav(name));
-      favs.appendChild(chip);
-    }
-    favs.querySelectorAll('.kyx-fm-fav').forEach((c) => c.setAttribute('aria-pressed', String((c.dataset.series || null) === st.only)));
-    const type = view.querySelector('.kyx-fm-type');
-    const sort = view.querySelector('.kyx-fm-sort');
-    const missing = view.querySelector('.kyx-fm-check input');
-    type.value = st.type;
-    sort.value = st.sort;
-    missing.checked = st.missing;
-    const reload = () => {
-      Object.assign(st, { type: type.value, sort: sort.value, missing: missing.checked });
-      loadFavOffers(view, true);
-    };
-    type.addEventListener('change', reload);
-    sort.addEventListener('change', reload);
-    missing.addEventListener('change', reload);
     view.querySelector('.kyx-fm-more').addEventListener('click', () => loadFavOffers(view, false));
     view.querySelector('.kyx-fm-refresh').addEventListener('click', () => loadFavOffers(view, 'refresh'));
     loadFavOffers(view, true);
   }
 
-  // The market changes all the time (offers sold, new ones, bids): the list is asked again every 15 seconds
-  // while it is on screen, when coming back to the tab and after a purchase or a sale.
+  // Refreshes the favourites every 15 seconds while shown, and when coming back to the tab.
   const FAV_REFRESH = 15e3;
+  // Asks the shown offers again.
   function refreshFavMarket() {
     const view = document.querySelector('.kyx-favmarket');
     if (view?.kyxState?.offers && !document.hidden) loadFavOffers(view, 'refresh');
@@ -2510,11 +2761,12 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     if (!document.hidden && view?.kyxLoadedAt && Date.now() - view.kyxLoadedAt >= 5e3) refreshFavMarket();
   });
 
-  // One request per favourite series (24 offers each), merged and sorted like the site would.
+  // Offers of the favourite series (one request each), merged in the order the site uses.
   async function loadFavOffers(view, mode) {
     const st = view.kyxState;
     const run = (view.kyxRun = (view.kyxRun ?? 0) + 1);
-    const names = st.only ? [st.only] : [...favSeries].slice(0, 30);
+    const f = siteFilters(marketFilters());
+    const names = favOnly ? [favOnly] : [...favSeries].slice(0, 30);
     const refresh = mode === 'refresh' && st.page > 0;
     if (mode === true || (mode === 'refresh' && !refresh)) {
       st.page = 0;
@@ -2522,18 +2774,22 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       st.more = false;
       view.querySelector('.kyx-fm-grid').innerHTML = '';
     }
-    // A refresh asks again for every page already shown, all at once.
     const page = refresh ? 1 : st.page + 1;
     const size = refresh ? 24 * st.page : 24;
     const note = view.querySelector('.kyx-fm-note');
     const more = view.querySelector('.kyx-fm-more');
+    if (!note) return;
     if (!refresh) note.textContent = 'Chargement des offres…';
     more.hidden = true;
     const answers = await Promise.all(
       names.map((series) => {
-        const q = new URLSearchParams({ type: st.type, sort: st.sort, series, page: String(page), pageSize: String(size) });
-        if (st.missing) q.set('missing', '1');
-        if (st.rarity) q.set('rarity', st.rarity);
+        const q = new URLSearchParams({ type: f.type, sort: f.sort, series, page: String(page), pageSize: String(size) });
+        if (f.q) q.set('q', f.q);
+        if (f.rarity) q.set('rarity', f.rarity);
+        if (f.min) q.set('minPrice', f.min);
+        if (f.max) q.set('maxPrice', f.max);
+        if (f.missing) q.set('missing', '1');
+        if (f.wished) q.set('wished', '1');
         return siteApi(`/market/listings?${q}`, { auth: false }).catch(() => null);
       })
     );
@@ -2550,11 +2806,17 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       price_desc: (a, b) => price(b) - price(a),
       ending: (a, b) => Date.parse(a.endsAt) - Date.parse(b.endsAt),
       newest: (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)
-    }[st.sort];
+    }[f.sort] ?? ((a, b) => Date.parse(a.endsAt) - Date.parse(b.endsAt));
     st.offers.sort(by);
     const total = answers.reduce((n, a) => n + (a?.total ?? 0), 0);
     const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const scope = `${st.only ?? `${names.length} œuvre${names.length > 1 ? 's' : ''} en favori`}${st.rarity ? ` · ${RARITY_LABEL[st.rarity]}` : ''}`;
+    const scope = [
+      favOnly ?? `${names.length} œuvre${names.length > 1 ? 's' : ''} en favori`,
+      f.type === 'auction' ? 'enchères' : null,
+      f.rarity ? RARITY_LABEL[f.rarity] : null
+    ]
+      .filter(Boolean)
+      .join(' · ');
     note.textContent = st.offers.length
       ? `${num(st.offers.length)} offre${st.offers.length > 1 ? 's' : ''} affichée${st.offers.length > 1 ? 's' : ''} sur ${num(total)} · ${scope} · à jour à ${time}, actualisé toutes les 15 s.`
       : `Aucune offre en ce moment · ${scope} · vérifié à ${time}.`;
@@ -2562,13 +2824,14 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     renderFavOffers(view);
   }
 
+  // One tile per offer, opening the site's own offer window.
   function renderFavOffers(view) {
     const grid = view.querySelector('.kyx-fm-grid');
     grid.innerHTML = '';
     for (const o of view.kyxState.offers) {
       const c = o.character ?? {};
       const url = new URL(location.href);
-      url.searchParams.set('annonce', o.id); // the site's own way to open an offer
+      url.searchParams.set('annonce', o.id);
       const li = document.createElement('li');
       li.innerHTML = `
         <a class="kyx-fm-tile" href="${esc(url.pathname + url.search)}">
@@ -2599,18 +2862,146 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     }
   }
 
+  // ---------- recycling: how many duplicates per rarity ----------
+
+  // How many duplicates to recycle per rarity, inside the site's recycling box.
+  const RECYCLE_VALUE = { C: 1, U: 1, R: 3, E: 10, L: 40, M: 150 };
+  // Copies of a card that can be recycled: never the last one, nor locked or on sale.
+  const spare = (x) => (x && !x.pinned ? Math.max(0, (x.qty ?? 0) - (x.locked ?? 0) - 1) : 0);
+
+  // Recyclable cards by rarity, the most spare copies first.
+  async function recyclePlan() {
+    const items = collectionItems(await siteApi('/me/collection?lean=1'));
+    const by = {};
+    for (const x of items) {
+      const r = catalog?.get(x.characterId ?? x.id)?.r;
+      const n = spare(x);
+      if (!r || !n) continue;
+      (by[r] ??= []).push({ id: x.characterId ?? x.id, n });
+    }
+    for (const r in by) by[r].sort((a, b) => b.n - a.n);
+    return by;
+  }
+
+  // Adds the block to the site's recycling box.
+  function scanRecycle() {
+    const box = location.pathname === '/collection' ? document.querySelector('.rec-box') : null;
+    if (!box || box.querySelector(':scope > .kyx-rec') || !catalog) return;
+    const block = document.createElement('div');
+    block.className = 'kyx-rec';
+    block.innerHTML = '<p class="kyx-rec-t">Ou choisis combien de doublons recycler par rareté :</p><p class="kyx-rec-msg">Chargement de tes doublons…</p>';
+    const actions = box.querySelector(':scope > .rec-a');
+    if (actions) actions.before(block);
+    else box.appendChild(block);
+    recyclePlan().then(
+      (plan) => block.isConnected && renderRecycle(block, plan),
+      () => (block.querySelector('.kyx-rec-msg').textContent = 'Impossible de charger tes doublons.')
+    );
+  }
+
+  // One field per rarity; recycles the chosen numbers card by card after a confirmation.
+  function renderRecycle(block, plan) {
+    const order = ['C', 'U', 'R', 'E', 'L', 'M'].filter((r) => plan[r]?.length);
+    if (!order.length) return void (block.querySelector('.kyx-rec-msg').textContent = 'Aucun doublon à recycler.');
+    const max = (r) => plan[r].reduce((n, c) => n + c.n, 0);
+    block.innerHTML = `
+      <p class="kyx-rec-t">Ou choisis combien de doublons recycler par rareté :</p>
+      <div class="kyx-rec-grid">${order
+        .map(
+          (r) => `<label style="--r:${RARITY_COLOR[r]}"><b>${RARITY_LABEL[r]}</b>
+            <input type="number" min="0" max="${max(r)}" step="1" value="0" data-r="${r}" inputmode="numeric" />
+            <small>sur ${num(max(r))} · +${RECYCLE_VALUE[r]} ◆ l’un</small></label>`
+        )
+        .join('')}</div>
+      <div class="kyx-rec-btns">
+        <button type="button" class="kyx-rec-all">Tout</button>
+        <button type="button" class="kyx-rec-none">Rien</button>
+        <button type="button" class="kyx-rec-go" disabled>Recycler</button>
+      </div>
+      <p class="kyx-rec-msg" role="status"></p>`;
+    const inputs = [...block.querySelectorAll('input[data-r]')];
+    const go = block.querySelector('.kyx-rec-go');
+    const msg = (t, kind = '') => {
+      block.querySelector('.kyx-rec-msg').textContent = t;
+      block.querySelector('.kyx-rec-msg').dataset.kind = kind;
+    };
+    const wanted = () => Object.fromEntries(inputs.map((i) => [i.dataset.r, Math.max(0, Math.min(max(i.dataset.r), Math.floor(Number(i.value) || 0)))]));
+    let confirm = false;
+    const update = () => {
+      confirm = false;
+      const w = wanted();
+      const count = Object.values(w).reduce((a, b) => a + b, 0);
+      const gain = Object.entries(w).reduce((a, [r, n]) => a + n * RECYCLE_VALUE[r], 0);
+      go.disabled = !count;
+      go.textContent = count ? `Recycler ${num(count)} doublon${count > 1 ? 's' : ''} · +${num(gain)} ◆` : 'Recycler';
+      msg('');
+    };
+    inputs.forEach((i) => i.addEventListener('input', update));
+    block.querySelector('.kyx-rec-all').addEventListener('click', () => (inputs.forEach((i) => (i.value = i.max)), update()));
+    block.querySelector('.kyx-rec-none').addEventListener('click', () => (inputs.forEach((i) => (i.value = 0)), update()));
+    go.addEventListener('click', async () => {
+      const w = wanted();
+      // A second click confirms, with a warning for the rare ones.
+      if (!confirm) {
+        confirm = true;
+        const rare = ['L', 'M'].filter((r) => w[r]).map((r) => `${w[r]} ${RARITY_LABEL[r]}${w[r] > 1 ? 's' : ''}`);
+        go.textContent = 'Confirmer le recyclage';
+        msg(`${rare.length ? `⚠ Dont ${rare.join(' et ')}. ` : ''}Tu gardes toujours au moins 1 exemplaire de chaque carte. Clique à nouveau pour confirmer.`, rare.length ? 'warn' : '');
+        return;
+      }
+      const jobs = [];
+      for (const [r, n] of Object.entries(w)) {
+        let left = n;
+        for (const c of plan[r] ?? []) {
+          if (left <= 0) break;
+          const k = Math.min(c.n, left);
+          jobs.push([c.id, k]);
+          left -= k;
+        }
+      }
+      const total = jobs.reduce((a, [, k]) => a + k, 0);
+      block.querySelectorAll('button, input').forEach((el) => (el.disabled = true));
+      let done = 0;
+      let failed = false;
+      for (const [id, k] of jobs) {
+        msg(`Recyclage… ${num(done)}/${num(total)}`);
+        try {
+          await siteApi(`/me/collection/${id}/recycle`, { method: 'POST', body: { qty: k } });
+        } catch (e) {
+          if (e?.code === 'rate_limited') {
+            await wait(3000);
+            try {
+              await siteApi(`/me/collection/${id}/recycle`, { method: 'POST', body: { qty: k } });
+            } catch {
+              failed = true;
+              break;
+            }
+          } else {
+            failed = true;
+            break;
+          }
+        }
+        done += k;
+        await wait(120);
+      }
+      msg(failed ? `Arrêté en route : ${num(done)} doublon${done > 1 ? 's' : ''} recyclé${done > 1 ? 's' : ''}. La page va se recharger.` : `${num(done)} doublon${done > 1 ? 's' : ''} recyclé${done > 1 ? 's' : ''} ✔ La page va se recharger.`, failed ? 'err' : 'ok');
+      setTimeout(() => location.reload(), 1800);
+    });
+    update();
+  }
+
   // ---------- "Bloquer sauf doublons" in the album bar ----------
 
-  // The site locks a card with all its copies, so the duplicates of a locked album can't be sold.
-  // This mode locks only the cards held once and leaves the others free: their duplicates can go to the market
-  // (the site never sells a last copy), and a card is locked again as soon as a single copy is left.
+  // "Bloquer sauf doublons": in a series, only the cards held once are locked, as the collection changes.
   let smartLock = new Set(); // series names
   let pinning = false;
+  // Pause.
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  // Items of a /me/collection answer.
   const collectionItems = (body) => (Array.isArray(body) ? body : Array.isArray(body?.items) ? body.items : []);
 
-  // Copies not on sale nor in a trade (those are held apart by the site and stay out of the lock).
+  // Copies not on sale nor in a trade.
   const freeCopies = (x) => (x.qty ?? 0) - (x.locked ?? 0);
 
   // [id, pinned] changes so that, in this series, exactly the cards with a single free copy are locked.
@@ -2626,7 +3017,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     return changes;
   }
 
-  // A duplicate put on sale leaves a single copy: lock it, so it can't go in a trade or a second sale by mistake.
+  // Locks a card whose duplicate is on sale when a single free copy is left.
   function listedPlan(items) {
     const changes = [];
     for (const x of items) {
@@ -2636,6 +3027,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     return changes;
   }
 
+  // Locks or unlocks cards one by one.
   async function applyPins(changes) {
     for (const [id, pinned] of changes) {
       await siteApi(`/me/collection/${id}/pin`, { method: 'POST', body: { pinned } });
@@ -2643,7 +3035,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     }
   }
 
-  // Each time the site reloads the collection: lock the cards that went down to one copy, free the new duplicates.
+  // Applies those locks each time the site reloads the collection.
   async function keepSmartLocks(body) {
     if (pinning) return;
     const items = collectionItems(body);
@@ -2661,6 +3053,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     }
   }
 
+  // Turns the mode on or off for a series.
   async function setSmart(series, on) {
     if (on) smartLock.add(series);
     else smartLock.delete(series);
@@ -2668,6 +3061,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     await chrome.storage.local.set({ smartLock: [...smartLock] });
   }
 
+  // Message under the album bar.
   function barMsg(bar, text, err = false) {
     let el = bar.querySelector(':scope > .kyx-smart-msg');
     if (!el) {
@@ -2679,6 +3073,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     el.dataset.kind = err ? 'err' : 'ok';
   }
 
+  // Click on "Bloquer sauf doublons": locks the cards of the series held once.
   async function smartClick(bar, btn) {
     if (!alive()) return shutdown();
     const series = bar.querySelector(':scope > b')?.textContent.trim();
@@ -2696,7 +3091,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       const changes = lockPlan(series, collectionItems(await siteApi('/me/collection?lean=1')));
       await setSmart(series, true);
       await applyPins(changes);
-      location.reload(); // the site keeps its own copy of the locks: show the new ones
+      location.reload();
     } catch (e) {
       const code = e?.code ?? String(e);
       barMsg(bar, ORDER_ERRORS[code] ?? `Échec (${code}).`, true);
@@ -2707,12 +3102,13 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     }
   }
 
+  // "Bloquer sauf doublons" button in the bar of the open album.
   function scanAlbumBar() {
     const bar = location.pathname === '/collection' ? document.querySelector('.album-bar') : null;
     const series = bar?.querySelector(':scope > b')?.textContent.trim();
     if (!series) return;
     const siteBtn = [...bar.querySelectorAll(':scope > button:not(.kyx-smart)')].find((b) => /loquer l.album/i.test(b.textContent));
-    // The site's own "Bloquer / Débloquer l'album" takes over: this mode stops for the series.
+    // The site's "Bloquer / Débloquer l'album" button stops this mode for the series.
     if (siteBtn && !siteBtn.dataset.kyxWatched) {
       siteBtn.dataset.kyxWatched = '1';
       siteBtn.addEventListener('click', () => {
@@ -2740,8 +3136,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
   // ---------- Missions: completed series next to the referral card ----------
 
-  // The "Séries complètes" card lists every completed series: kept to the height of the referral card beside it
-  // (scrolling inside), series still to claim first, and the total in its title.
+  // Keeps the "Séries complètes" card to the height of the referral card, with the total in its title.
   function scanMissions() {
     if (location.pathname !== '/missions') return;
     const card = document.querySelector('section[aria-labelledby="albums-t"]');
@@ -2767,10 +3162,10 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
   // ---------- "Amis" filter on the Classement page ----------
 
+  // Number in French format.
   const num = (n, digits = 0) => Number(n).toLocaleString('fr-FR', { maximumFractionDigits: digits });
 
-  // The ranking of the chosen tab (collection, prestige, mythiques…) among your friends and you,
-  // with each one's place in the general ranking. Shown instead of the general podium and list.
+  // Main value, unit and side value of each tab of the ranking.
   const plural = (n, one, many) => (Math.abs(n) < 2 ? one : many);
   const LADDER = {
     collection: { main: (r) => r.owned, unit: (n) => plural(n, 'carte', 'cartes'), side: (r) => `${num(r.mythics ?? 0)} ${plural(r.mythics ?? 0, 'mythique', 'mythiques')}` },
@@ -2783,6 +3178,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   let friendsOnly = false;
   let friendsShown = '';
 
+  // One player's row of a ranking, kept 5 minutes.
   async function ladderRow(by, id) {
     const key = `${by}|${id}`;
     const hit = ladderCache.get(key);
@@ -2793,12 +3189,14 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     return row;
   }
 
+  // Ids of the user's friends.
   async function friendIds() {
     const res = await siteApi('/me/friends');
     const list = Array.isArray(res) ? res : res?.friends ?? res?.items ?? [];
     return list.map((f) => (f.user ?? f.friend ?? f).id ?? f.userId).filter((id) => id != null);
   }
 
+  // "Amis" button among the ranking tabs, and the friends ranking.
   function scanLadder() {
     const head = location.pathname === '/classement' ? document.querySelector('main#contenu section.head') : null;
     const tabs = head?.querySelector('.tabs[role="tablist"]');
@@ -2825,7 +3223,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     btn.classList.toggle('on', friendsOnly);
     btn.setAttribute('aria-pressed', String(friendsOnly));
     const by = LADDER[new URLSearchParams(location.search).get('par')] ? new URLSearchParams(location.search).get('par') : 'collection';
-    // The site's podium and lists sit after the head: hidden while the filter is on.
+    // Hides the site's podium and lists while the filter is on.
     for (const el of head.parentElement.children) {
       if (el === head || el.classList.contains('kyx-friends')) continue;
       if (friendsOnly && el.dataset.kyxHidden !== '1') el.dataset.kyxHidden = '1';
@@ -2843,8 +3241,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     renderFriends(board, by);
   }
 
-  // The site's own markup for the podium and the list, so the friends ranking looks like the other tabs.
-  // Its style classes (svelte-xxxx) change with each version of the site: read from what is on the page.
+  // Style class (svelte-xxxx) of an element of the site, read from the page.
   function siteScope(selector, fallback) {
     const el = document.querySelector(selector);
     return [...(el?.classList ?? [])].find((c) => c.startsWith('svelte-')) ?? fallback;
@@ -2886,12 +3283,14 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     return `<span class="rs r-${esc(rank.id)} ${size} l-${label} ${sc}" title="Rang ${esc(rank.label)}"><b class="${sc}"><span class="k ${sc}">${esc(rank.kanji)}</span></b>${small}</span>`;
   }
 
+  // Same as the site's badges next to a pseudo.
   const badgesHtml = (row, n, sc) =>
     (row.badges ?? [])
       .slice(0, n)
       .map((b) => `<span class="bd ${b.frame === 'gold' && !String(b.id).startsWith('membre-') ? 'gold' : ''} ${b.frame === 'staff' ? 'staff' : ''} ${sc}" title="${esc(b.label)}">${esc(b.kanji)}</span>`)
       .join('');
 
+  // Friends ranking: podium then list, in the site's markup.
   async function renderFriends(board, by) {
     const def = LADDER[by];
     board.innerHTML = '<p class="kyx-friends-note">Chargement du classement de tes amis…</p>';
@@ -2972,11 +3371,11 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
   // ---------- "Boosters rentables" page, in the site's "Plus" menu ----------
 
-  // A copy of the menu's own items, after them.
+  // "Boosters rentables" entry at the end of the site's "Plus" menu.
   function scanMoreMenu() {
     const menu = document.querySelector('#nav-more');
     const open = !!document.querySelector('.kyx-view');
-    // While the page is open the site's own item of the current page is not the one shown.
+    // Marks the entry as the current page while it is open.
     menu?.querySelectorAll(':scope > a.on:not(.kyx-more)').forEach((a) => open && a.classList.remove('on'));
     const mine = menu?.querySelector(':scope > .kyx-more');
     if (mine) return void mine.classList.toggle('on', open);
@@ -2992,7 +3391,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     item.querySelector('.dt b').textContent = 'Boosters rentables';
     const hint = item.querySelector('.dt small');
     if (hint) hint.textContent = 'Le meilleur booster pour une carte';
-    [...item.children].forEach((el) => el.matches('.dk, .dt') || el.remove()); // the model's badges
+    [...item.children].forEach((el) => el.matches('.dk, .dt') || el.remove());
     item.addEventListener('click', (e) => {
       e.preventDefault();
       document.querySelector('button[aria-controls="nav-more"][aria-expanded="true"]')?.click(); // close the menu
@@ -3001,7 +3400,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     menu.appendChild(item);
   }
 
-  // On a phone the site's menu is a sheet of tiles (#mobile-nav): the same entry goes there.
+  // The same entry in the site's phone menu (#mobile-nav).
   function scanMobileNav() {
     const grid = document.querySelector('#mobile-nav .sheet-grid');
     if (!grid) return;
@@ -3017,7 +3416,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       tile.href = '#boosters-rentables';
       tile.querySelector('.tk').textContent = '得';
       tile.querySelector('.tl').textContent = 'Boosters rentables';
-      [...tile.children].forEach((el) => el.matches('.tk, .tl') || el.remove()); // the model's counters
+      [...tile.children].forEach((el) => el.matches('.tk, .tl') || el.remove());
       tile.addEventListener('click', (e) => {
         e.preventDefault();
         document.querySelector('button.burger[aria-controls="mobile-nav"]')?.click(); // close the sheet
@@ -3031,7 +3430,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   let packsCache = null;
   const dropCache = new Map(); // id -> { packId: chance per booster }
 
-  // Boosters on sale right now (not the ones only given as rewards).
+  // Boosters on sale right now (not the reward-only ones), kept until midnight.
   async function loadPacks() {
     checkBoostersDay();
     if (packsCache) return packsCache;
@@ -3043,6 +3442,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     return packsCache;
   }
 
+  // Chance of each character per booster, asked 4 at a time and cached.
   async function dropChances(ids, progress) {
     let next = 0;
     let done = 0;
@@ -3069,19 +3469,20 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     const percent = (p * 100).toLocaleString('fr-FR', p >= 0.1 ? { maximumFractionDigits: 0 } : { maximumSignificantDigits: 2 });
     return p >= 0.01 ? `${percent} %` : `${percent} % (1 chance sur ${num(Math.round(1 / p))})`;
   };
+  // "N boosters".
   const boosters = (n) => `${num(n)} booster${n >= 2 ? 's' : ''}`;
 
-  // How the boosters are ranked: by price (fewest chakra spent on average, free boosters first)
-  // or by drop rate (best chance at each booster, whatever it costs). Remembered in this browser.
+  // Ranking criterion, "price" or "drop", remembered in this browser.
   let rankBy = 'price';
   try {
     if (localStorage.getItem('kyx-rank-by') === 'drop') rankBy = 'drop';
   } catch {}
 
+  // Shows the boosters ranked by price or by drop rate.
   // rows: [{ pack, hits: wanted cards per booster on average, chance: chance of at least one per booster }].
   // what: what is looked for, as in "pour avoir {what}".
   function renderPacks(page, rows, what) {
-    page.kyxLast = [rows, what]; // ranked again without new requests when the criterion changes
+    page.kyxLast = [rows, what];
     const list = page.querySelector('.kyx-b-list');
     const summary = page.querySelector('.kyx-b-summary');
     const byDrop = rankBy === 'drop';
@@ -3131,8 +3532,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       const first = byDrop ? 'Meilleur taux' : 'Le plus rentable';
       const worst = byDrop ? 'Pire taux' : 'Le moins rentable';
       const label = i === 0 ? first : i === rows.length - 1 && rows.length > 2 ? worst : '';
-      // The bar compares with the best of the list: drop rate against the best rate,
-      // price against the cheapest paid booster (a free booster has no chakra cost to compare).
+      // Bar: share of the best drop rate, or of the cheapest paid booster's cost.
       const score = byDrop ? Math.round((r.hits / top.hits) * 100) : r.cost ? Math.round((cheapest.cost / r.cost) * 100) : null;
       const barText = byDrop
         ? score >= 100 ? 'Taux 100 % (la référence)' : `Taux ${score} % du meilleur`
@@ -3163,10 +3563,10 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     });
   }
 
-  // A page of its own: it takes the place of the site's content (header and menu stay) at …#boosters-rentables,
-  // so the back button and a reload work; following any link of the site leaves it.
+  // The "Boosters rentables" page, shown in place of the site's content at …#boosters-rentables.
   const BOOSTERS_HASH = '#boosters-rentables';
 
+  // Leaves the "Boosters rentables" page.
   function closeBoosters() {
     document.querySelector('.kyx-view')?.remove();
     const main = document.querySelector('main#contenu');
@@ -3180,6 +3580,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   let boostersDay = parisDay();
   let refreshBoosters = null; // computes the ranking on screen again
 
+  // After midnight (Paris), forgets the boosters and chances and ranks again.
   function checkBoostersDay() {
     const day = parisDay();
     if (day === boostersDay) return;
@@ -3189,14 +3590,16 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     refreshBoosters?.();
   }
 
+  // Opens or closes the page with the address.
   function onBoostersHash() {
     if (location.hash === BOOSTERS_HASH) openBoosters();
     else closeBoosters();
   }
 
+  // Builds the page: modes (rarity, character, series), search and ranking.
   function openBoosters() {
     if (!alive()) return shutdown();
-    if (location.hash !== BOOSTERS_HASH) return void (location.hash = BOOSTERS_HASH); // comes back through hashchange
+    if (location.hash !== BOOSTERS_HASH) return void (location.hash = BOOSTERS_HASH);
     const main = document.querySelector('main#contenu');
     if (!main || document.querySelector('.kyx-view')) return;
     document.querySelector('.kyx-modal-back')?.remove();
@@ -3233,6 +3636,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     page.querySelector('.kyx-page-close').addEventListener('click', () => (history.length > 1 ? history.back() : (location.hash = '')));
     let run = 0; // answers of an older search are dropped
 
+    // Ranking for one character.
     async function forCharacter(card) {
       const mine = ++run;
       refreshBoosters = () => forCharacter(card);
@@ -3262,6 +3666,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       );
     }
 
+    // Ranking for one rarity.
     async function forRarity(r) {
       const mine = ++run;
       refreshBoosters = () => forRarity(r);
@@ -3280,6 +3685,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       );
     }
 
+    // Ranking for the cards (or the missing cards) of a series.
     async function forSeries(name, onlyMissing) {
       const mine = ++run;
       refreshBoosters = () => forSeries(name, onlyMissing);
@@ -3351,13 +3757,14 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
         if (e.key === 'Enter') suggest.querySelector('button')?.click();
         if (e.key === 'Escape') suggest.hidden = true;
       });
-      // Closes when clicking elsewhere on the page.
+      // Closes the suggestions on a click elsewhere.
       page.addEventListener('click', (e) => e.target.closest('.kyx-search-wrap') || (suggest.hidden = true));
       input.focus();
       if (!catalog) note('Catalogue pas encore chargé, réessaie dans un instant.');
       return input;
     }
 
+    // Switches between rarity, character and series.
     function mode(m) {
       run++;
       refreshBoosters = null;
@@ -3417,17 +3824,18 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     );
     page.querySelectorAll('.kyx-b-sort [data-by]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.by === rankBy)));
     mode('rar');
-    forRarity('M'); // a ranking right away
+    forRarity('M');
   }
 
   // ---------- series and price under each card of the trade confirmation ----------
 
-  // "Confirmer l'échange" only shows name and rarity: add the series (cut short, full name on hover),
-  // the site's fair price of each card and the gap between both sides.
+  // Series and fair price under each card of "Confirmer l'échange", and the value gap between both sides.
   const prices = new Map(); // id -> fair price in chakra, null when unknown
   const pricing = new Set();
+  // "1 234 ◆".
   const chakra = (n) => `${Math.round(n).toLocaleString('fr-FR')} ◆`;
 
+  // Fair prices of the cards, asked 200 at a time.
   function loadPrices(ids) {
     const wanted = ids.filter((id) => !prices.has(id) && !pricing.has(id));
     if (!wanted.length) return;
@@ -3446,6 +3854,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     }
   }
 
+  // One line under a card of the confirmation, removed when text is null.
   function line(side, cls, text, title) {
     let el = side.querySelector(`:scope > .${cls}`);
     if (text == null) return void el?.remove();
@@ -3458,6 +3867,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     if (title && el.title !== title) el.title = title;
   }
 
+  // Fills the trade confirmation.
   function scanConfirm() {
     const sides = [...document.querySelectorAll('[role="dialog"] .cf-s')];
     if (!sides.length) return;
@@ -3503,15 +3913,15 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     el.dataset.kind = kind;
   }
 
-  // ---------- "Manquantes" chip on the Collection page ----------
+  // ---------- "Possédées" and "Manquantes" chips on the Collection page ----------
 
-  // The site's card filter (all / owned / missing / dupes…) sits in a select: this chip, next to the rarity chips, drives it.
-  // "Possédées" and "Manquantes", in this order right after the site's "Toutes" chip.
+  // They drive the site's "Cartes" select (all / owned / missing…), right after its "Toutes" chip.
   const CARD_CHIPS = [
     { value: 'owned', label: 'Possédées', cls: 'kyx-owned' },
     { value: 'missing', label: 'Manquantes', cls: 'kyx-missing' }
   ];
 
+  // Adds and updates the two chips.
   function scanCollectionChips() {
     if (location.pathname !== '/collection') return;
     for (const select of document.querySelectorAll('select')) {
@@ -3550,11 +3960,10 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
   // ---------- "Ses doublons" filter in the trade composer ----------
 
-  // The site only offers "Je l'ai" / "Il me manque" on the partner's tab: this chip keeps the cards they hold twice or more.
-  // On by default in every trade composer (profile, market offer, comptoir); turning it off is remembered.
+  // Keeps only the cards the partner holds twice or more; on by default, turning it off is remembered.
   let composerMore = 0;
 
-  // Their spare copies when they share their collection, else the copies the trade API lets us ask for (the last one included).
+  // True when the partner holds the card twice or more, null when unknown.
   let dupeIndex = { of: null, spare: null, tradeable: null };
   function theirDupe(id) {
     if (dupeIndex.of !== partner) {
@@ -3565,8 +3974,9 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     return n == null ? null : n >= 2;
   }
 
+  // The chip, and the shelf of the trade composer filtered on it.
   function scanComposer() {
-    // The trade composer is a form; the market's "Proposer une carte" dialog has the same shelf but is not.
+    // Shelf of the trade composer (a form, unlike the market's "Proposer une carte" dialog).
     const shelf = document.querySelector('[role="dialog"] form .shelf');
     const chips = shelf?.querySelector('.filters .chips');
     if (!chips) {
@@ -3615,7 +4025,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
         if (li.dataset.kyxHidden) delete li.dataset.kyxHidden;
       }
     }
-    // Hidden tiles still use up the site's page of 60: load more until a full page of duplicates shows.
+    // Loads the site's next cards until a full page of duplicates shows.
     const more = grid.parentElement?.querySelector(':scope > button.more');
     if (active && visible < PAGE && more && composerMore < 40) {
       composerMore++;
@@ -3637,6 +4047,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     if (!frame) frame = requestAnimationFrame(flush);
   });
 
+  // Scans what changed in the page since the last frame.
   function flush() {
     if (stopped) return;
     frame = 0;
@@ -3654,9 +4065,11 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     scanMobileNav();
     scanFavStars();
     scanMarket();
+    scanRecycle();
     scanConfirm();
   }
 
+  // Scans the whole page again.
   function refreshAll() {
     if (stopped) return;
     scanBadges(document);
@@ -3671,17 +4084,19 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     scanMobileNav();
     scanFavStars();
     scanMarket();
+    scanRecycle();
     scanConfirm();
   }
 
   let stopped = false;
+  // Removes everything the extension added and stops.
   function shutdown() {
     if (stopped) return;
     stopped = true;
     if (document.documentElement.dataset.kyxOwner === owner) delete document.documentElement.dataset.kyxOwner;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket').forEach((el) => el.remove());
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket, .kyx-fav-pick, .kyx-rec').forEach((el) => el.remove());
     delete document.documentElement.dataset.kyxView;
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched], [data-kyx-ghost]').forEach((el) => {
       delete el.dataset.kyxHidden;
@@ -3726,8 +4141,8 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
   // ---------- 6. src/userscript/panel.js : panneau de réglages ----------
   if (document.documentElement.dataset.kyxOwner === KYX_OWNER) {
-// Userscript version: there is no popup, so the settings open from the site's own menu
-// ("Plus" on a computer, the menu sheet on a phone).
+// Userscript: settings panel opened from the site's menu ("Plus" on a computer, the menu sheet on a phone),
+// and the banners of new versions.
 (() => {
   const OPTIONS = [
     ['hideComplete', 'Masquer les séries complètes'],
@@ -3740,6 +4155,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     ['notifyUpdated', 'Bandeau « nouvelle version installée » après une mise à jour du script']
   ];
 
+  // Settings panel: checkboxes and the code for another device.
   async function openSettings() {
     document.querySelector('.kyx-modal-back')?.remove();
     const settings = await getSettings();
@@ -3749,6 +4165,14 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       <section class="kyx-modal kyx-settings" role="dialog" aria-modal="true" aria-label="Réglages de Kyara Games">
         <div class="kyx-modal-head"><div><small>Script Kyara Games · ${KYX_VERSION}</small><b class="kyx-modal-name">Réglages</b></div></div>
         <div class="kyx-settings-list"></div>
+        <div class="kyx-sync">
+          <b>Autre appareil</b>
+          <p class="kyx-settings-note">Pour retrouver tes réglages et tes œuvres favorites sur un autre appareil (PC, téléphone, extension ou script) : copie ton code ici, puis colle-le sur l’autre appareil. Les verrous de cartes et les envies sont déjà gardés par Kyara sur ton compte.</p>
+          <div class="kyx-order-btns"><button type="button" class="kyx-sync-copy">Copier mon code</button></div>
+          <textarea rows="2" placeholder="Tape ou colle ici le code de ton autre appareil (ex. 1A2B-3C4D-…)" spellcheck="false"></textarea>
+          <div class="kyx-order-btns"><button type="button" class="kyx-sync-import">Importer ce code</button></div>
+          <p class="kyx-settings-note kyx-sync-msg" role="status"></p>
+        </div>
         <p class="kyx-settings-note">Les mises à jour du script s’installent toutes seules par ton gestionnaire de scripts. Les notifications ne sont disponibles qu’avec l’extension.</p>
         <div class="kyx-order-btns"><button type="button" class="kyx-settings-close">Fermer</button></div>
       </section>`;
@@ -3762,6 +4186,25 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       box.addEventListener('change', () => setSettings({ [key]: box.checked }));
       list.appendChild(label);
     }
+    const area = back.querySelector('.kyx-sync textarea');
+    const msg = (t) => (back.querySelector('.kyx-sync-msg').textContent = t);
+    back.querySelector('.kyx-sync-copy').addEventListener('click', async () => {
+      const code = await exportCode();
+      area.value = code;
+      area.select();
+      const copied = await navigator.clipboard?.writeText(code).then(() => true, () => false);
+      msg(copied ? 'Code copié ✔ Colle-le sur ton autre appareil.' : 'Copie le code ci-dessus et colle-le sur ton autre appareil.');
+    });
+    back.querySelector('.kyx-sync-import').addEventListener('click', async () => {
+      try {
+        const res = await importCode(area.value);
+        const now = await getSettings();
+        list.querySelectorAll('input').forEach((box, i) => (box.checked = !!now[OPTIONS[i][0]]));
+        msg(`Importé ✔ ${res.favs} œuvre${res.favs > 1 ? 's' : ''} favorite${res.favs > 1 ? 's' : ''}, réglages à jour.`);
+      } catch (e) {
+        msg(e?.code === 'other_catalog' ? 'Ce code a été fait avec un autre catalogue de cartes : recrée-le sur l’autre appareil, puis réessaie.' : 'Ce code n’est pas reconnu : vérifie qu’il est recopié en entier.');
+      }
+    });
     const close = () => {
       back.remove();
       document.removeEventListener('keydown', onKey, true);
@@ -3773,7 +4216,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     document.body.appendChild(back);
   }
 
-  // A copy of one of the menu's own items, at its end. closer: the button that closes that menu.
+  // "Kyara Games" entry at the end of a menu of the site; closer: the button that closes that menu.
   function addEntry(menu, closer) {
     if (!menu || menu.querySelector(':scope > .kyx-settings-entry')) return;
     const model = menu.querySelector(':scope > a:not(.kyx-more)');
@@ -3798,8 +4241,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     menu.appendChild(entry);
   }
 
-  // Tampermonkey and Userscripts install new versions silently: say it once, at the first visit after an update.
-  // Nothing at the very first install.
+  // "Kyara Games est passé en X" once, at the first visit after an update (not after the first install).
   async function announceUpdate() {
     const { lastVersion } = await chrome.storage.local.get('lastVersion');
     if (lastVersion === KYX_VERSION) return;
@@ -3817,8 +4259,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     document.body.appendChild(bar);
   }
 
-  // Tampermonkey checks for new versions on its own schedule (once a day by default): the script also asks GitHub
-  // every 15 minutes while kyara.games is open, once for all the open tabs, and offers the update.
+  // Asks GitHub for a new version every 15 minutes while kyara.games is open, once for all the open tabs.
   const UPDATE_EVERY = 15 * 60e3;
   async function lookForUpdate(maxAge = UPDATE_EVERY) {
     const { updateCheckedAt } = await chrome.storage.local.get('updateCheckedAt');
@@ -3829,6 +4270,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     offerUpdate();
   }
 
+  // "Kyara Games X est disponible" banner with the "Mettre à jour" button.
   async function offerUpdate() {
     const { update, updateLater } = await chrome.storage.local.get(['update', 'updateLater']);
     const shown = document.querySelector('.kyx-update-toast.offer');
@@ -3845,7 +4287,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       <a class="kyx-update-notes" target="_blank" rel="noopener">Nouveautés</a>
       <button type="button" aria-label="Plus tard" title="Plus tard">✕</button>`;
     bar.querySelector('b').textContent = update.version;
-    // The script of the latest release (never an in-between one): Tampermonkey (or Userscripts) recognises it and offers to update.
+    // The script of the latest release: Tampermonkey (or Userscripts) offers to update.
     bar.querySelector('.kyx-update-go').href = `https://github.com/${REPO}/releases/latest/download/kyara-games.user.js`;
     bar.querySelector('.kyx-update-notes').href = `https://github.com/${REPO}/releases/latest`;
     bar.querySelector('.kyx-update-go').addEventListener('click', () => {
@@ -3861,6 +4303,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     document.body.appendChild(bar);
   }
 
+  // Adds the entry to the site's menus.
   const scan = () => {
     addEntry(document.querySelector('#nav-more'), 'button[aria-controls="nav-more"][aria-expanded="true"]');
     addEntry(document.querySelector('#mobile-nav .sheet-grid'), 'button.burger[aria-controls="mobile-nav"]');

@@ -1032,86 +1032,6 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   margin-top: 14px;
 }
 
-.kyx-fm-favs,
-.kyx-fm-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.kyx-fm-fav {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 4px 2px 2px;
-  border: 1px solid var(--line3, #3a3642);
-  border-radius: 999px;
-  color: var(--fg, #fff);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.kyx-fm-fav.all {
-  padding-right: 2px;
-}
-
-.kyx-fm-fav[aria-pressed="true"] {
-  border-color: #f5c518;
-  background: rgba(245, 197, 24, 0.14);
-}
-
-.kyx-fm-fav .kyx-fm-pick {
-  height: 28px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.kyx-fm-fav .kyx-fm-pick:hover {
-  color: #f5c518;
-}
-
-.kyx-fm-fav .kyx-fm-del {
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--fg2, #a9a4b0);
-  font-size: 15px;
-  cursor: pointer;
-}
-
-.kyx-fm-fav .kyx-fm-del:hover {
-  color: var(--fg, #fff);
-  background: var(--raise, #1f1d25);
-}
-
-.kyx-fm-tools select {
-  height: 38px;
-  padding: 0 10px;
-  border: 1px solid var(--line2, #2a2731);
-  border-radius: 10px;
-  background: var(--panel2, #121117);
-  color: var(--fg, #fff);
-  font: inherit;
-  font-size: 14px;
-}
-
-.kyx-fm-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--fg2, #a9a4b0);
-  font-size: 14px;
-}
-
 .kyx-fm-note {
   margin: 0;
   color: var(--fg2, #a9a4b0);
@@ -1268,4 +1188,159 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 .kyx-update-toast button:hover {
   background: var(--raise, #1f1d25);
   color: var(--fg, #fff);
+}
+
+/* Userscript settings: moving the settings to another device */
+.kyx-sync {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line, #26232d);
+}
+
+.kyx-sync .kyx-order-btns {
+  justify-content: flex-start;
+}
+
+.kyx-sync textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line2, #2a2731);
+  border-radius: 10px;
+  background: var(--panel2, #121117);
+  color: var(--fg, #fff);
+  font: 12px/1.4 ui-monospace, Consolas, monospace;
+  resize: vertical;
+  word-break: break-all;
+}
+
+.kyx-sync-msg:empty {
+  display: none;
+}
+
+/* Market: list of the favourite series, in the site's filter row */
+.kyx-fav-pick select {
+  max-width: 260px;
+}
+
+.kyx-fav-del {
+  height: 30px;
+  margin-left: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg2, #a9a4b0);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.kyx-fav-del:hover {
+  border-color: var(--acc, #ff4d2e);
+  color: var(--fg, #fff);
+}
+
+/* Collection: how many duplicates per rarity, inside the site's recycling box */
+.kyx-rec {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-basis: 100%;
+  padding-top: 10px;
+  border-top: 1px solid var(--line, #26232d);
+}
+
+.kyx-rec-t {
+  margin: 0;
+  color: var(--fg2, #a9a4b0);
+  font-size: 13px;
+}
+
+.kyx-rec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.kyx-rec-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--r) 55%, transparent);
+  border-radius: 10px;
+}
+
+.kyx-rec-grid b {
+  color: var(--r);
+  font-size: 13px;
+}
+
+.kyx-rec-grid input {
+  width: 100%;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--line2, #2a2731);
+  border-radius: 8px;
+  background: var(--panel2, #121117);
+  color: var(--fg, #fff);
+  font: 600 14px var(--mono, monospace);
+}
+
+.kyx-rec-grid small {
+  color: var(--fg2, #a9a4b0);
+  font-size: 11px;
+}
+
+.kyx-rec-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kyx-rec-btns button {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg, #fff);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kyx-rec-btns .kyx-rec-go:not(:disabled) {
+  border-color: var(--acc, #ff4d2e);
+  background: var(--acc, #ff4d2e);
+}
+
+.kyx-rec-btns button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.kyx-rec-msg {
+  margin: 0;
+  color: var(--fg2, #a9a4b0);
+  font-size: 13px;
+}
+
+.kyx-rec-msg:empty {
+  display: none;
+}
+
+.kyx-rec-msg[data-kind="warn"] {
+  color: #f5c518;
+}
+
+.kyx-rec-msg[data-kind="ok"] {
+  color: #3fbf7f;
+}
+
+.kyx-rec-msg[data-kind="err"] {
+  color: #ff4d2e;
 }

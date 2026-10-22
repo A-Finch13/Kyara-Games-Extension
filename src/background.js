@@ -1,4 +1,4 @@
-import { ORIGIN, REPO, api, checkUpdate, newer, getSettings, loadCatalog, loadCollection, slimCollection, slimMe } from './lib/kyara.js';
+import { ORIGIN, REPO, api, checkUpdate, newer, getSettings, setSettings, loadCatalog, loadCollection, slimCollection, slimMe } from './lib/kyara.js';
 
 const ALARM = 'kyara-poll';
 const UPDATE_ALARM = 'kyara-update';
@@ -27,16 +27,18 @@ const CATEGORY = {
   collection_shared: 'notifyFriends'
 };
 
+// Alarms: notifications at the interval of the settings (15 seconds by default), new versions every 15 minutes.
+// An alarm can't repeat faster than every 30 seconds: below that, a second check runs in between (onAlarm).
+const pollEvery = (settings) => Math.max(0.25, Number(settings.pollMinutes) || 0.25);
 async function schedule() {
-  const { pollMinutes } = await getSettings();
-  await chrome.alarms.create(ALARM, { periodInMinutes: Math.max(1, Number(pollMinutes) || 1) });
+  const every = pollEvery(await getSettings());
+  await chrome.alarms.create(ALARM, { periodInMinutes: Math.max(0.5, every) });
   if ((await chrome.alarms.get(UPDATE_ALARM))?.periodInMinutes !== 15) await chrome.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: 15 });
 }
 
-// A new release on GitHub: one notification per version, and a banner in the popup until it is installed.
-// Always the latest release: someone on 1.6.1 while 1.6.2 and 1.6.3 came out is offered 1.6.3 straight away.
+// Looks for a newer release on GitHub (always the latest one) and notifies it once per version.
 async function lookForUpdate(maxAge = 10 * 60e3) {
-  if (FIREFOX) return; // in Firefox the extension is only tried out (about:debugging): Firefox users run the userscript
+  if (FIREFOX) return; // Firefox users run the userscript
   // The alarm asks every 15 minutes; the popup asks each time it opens, for an answer a minute old at most.
   const { updateCheckedAt } = await chrome.storage.local.get('updateCheckedAt');
   if (Date.now() - (updateCheckedAt ?? 0) < maxAge) return;
@@ -55,8 +57,8 @@ async function lookForUpdate(maxAge = 10 * 60e3) {
   } catch {}
 }
 
-// A browser never lets an extension rewrite itself: the small updater installed on the computer
-// (installer-mises-a-jour.bat) replaces the files, then the extension reloads on its new version.
+// "Mettre à jour": the updater installed on the computer (installer-mises-a-jour.bat) replaces the files,
+// then the extension reloads.
 const UPDATER = 'com.kyara_games.updater';
 
 async function installUpdate() {
@@ -69,7 +71,7 @@ async function installUpdate() {
   } catch {
     return { error: 'no_updater', update };
   }
-  // An older updater refuses a folder already newer than the version asked for: that is a success too.
+  // A folder already newer than the version asked for is a success too.
   if (res?.error === 'version_mismatch' && res.detail && !newer(update.version, res.detail)) res = { ok: true, version: res.detail };
   if (!res?.ok) return { error: res?.error ?? 'failed', detail: res?.detail, update };
   setTimeout(() => chrome.runtime.reload(), 800);
@@ -83,10 +85,13 @@ chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
   loadCatalog(reason === 'update').catch(() => {});
   lookForUpdate();
   if (reason === 'update') announceUpdate(previousVersion);
+  if (reason === 'update' && previousVersion && newer('1.7.0', previousVersion)) {
+    const settings = await getSettings();
+    if (Number(settings.pollMinutes) === 1) await setSettings({ pollMinutes: 0.25 });
+  }
 });
 
 // Says that a new version was installed, with a link to what changed.
-// Reloading the same version (an unpacked folder) says nothing.
 async function announceUpdate(previousVersion) {
   const version = chrome.runtime.getManifest().version;
   if (!previousVersion || previousVersion === version) return;
@@ -98,9 +103,7 @@ async function announceUpdate(previousVersion) {
   });
 }
 
-// After an update: the site's caches are emptied and its open tabs reloaded, so pages and the new extension start fresh.
-// Only the caches go (HTTP cache and the cache of the site's service worker): session, cookies and the service worker
-// itself (the site's push notifications) stay. Firefox can't empty the cache of a single site: the tabs skip it instead.
+// After an update: empties the caches of kyara.games and reloads its tabs (session and push notifications stay).
 async function refreshSite() {
   try {
     await chrome.browsingData?.remove({ origins: [ORIGIN] }, { cache: true, cacheStorage: true });
@@ -112,9 +115,13 @@ chrome.runtime.onStartup.addListener(() => {
   schedule();
   lookForUpdate();
 });
-chrome.alarms.onAlarm.addListener((a) => {
-  if (a.name === ALARM) poll();
+// Checks the account at each alarm, and once more in between when the interval is under 30 seconds.
+chrome.alarms.onAlarm.addListener(async (a) => {
   if (a.name === UPDATE_ALARM) lookForUpdate();
+  if (a.name !== ALARM) return;
+  poll();
+  const every = pollEvery(await getSettings());
+  if (every < 0.5) setTimeout(poll, every * 60e3);
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -125,10 +132,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 let polling = null;
+// Runs a check, never two at once.
 function poll() {
   return (polling ??= run().finally(() => (polling = null)));
 }
 
+// Free boosters and new notifications of the account.
 async function run() {
   const { auth } = await chrome.storage.local.get('auth');
   if (!auth?.token) return updateBadge(null, true);
@@ -146,6 +155,7 @@ async function run() {
   }
 }
 
+// Notifies once when the free boosters are full.
 async function checkBoosters(me, settings) {
   const max = me.freePacksMax ?? 10;
   const full = me.freePacks >= max;
@@ -160,6 +170,7 @@ async function checkBoosters(me, settings) {
   await chrome.storage.local.set({ boosterFull: full });
 }
 
+// Notifies the account's new notifications, by category chosen in the settings.
 async function checkNotifications(items, settings) {
   const { seenNotifs, notifsReady } = await chrome.storage.local.get(['seenNotifs', 'notifsReady']);
   const seen = new Set(seenNotifs ?? []);
@@ -180,8 +191,10 @@ async function checkNotifications(items, settings) {
   for (const n of wanted) notify(`n-${n.id}`, format(n));
 }
 
+// First value that is set.
 const pick = (...v) => v.find((x) => x != null && x !== '');
 
+// Title, text and link of a Kyara notification.
 function format(n) {
   const d = n.data ?? {};
   const name = pick(d.name, d.characterName, d.character?.name) ?? 'une carte';
@@ -221,12 +234,12 @@ function format(n) {
   }
 }
 
-// chrome.notifications keeps only the id, so the link is remembered per notification.
+// Shows a notification; its link is remembered for the click.
 const links = new Map();
 function notify(id, { title, message, href }) {
   const nid = `${id}-${Date.now()}`;
   links.set(nid, href);
-  // The worker can be unloaded before the click: keep a copy that survives it.
+  // Also kept in session storage, in case the worker is unloaded before the click.
   chrome.storage.session?.set({ [`link:${nid}`]: href }).catch(() => {});
   chrome.notifications.create(nid, { type: 'basic', iconUrl: ICON, title, message: message || ' ' });
 }
@@ -238,6 +251,7 @@ chrome.notifications.onClicked.addListener(async (nid) => {
   chrome.notifications.clear(nid);
 });
 
+// Opens a page of kyara.games in its tab (or a new one).
 async function openSite(href) {
   const url = new URL(href, ORIGIN).href;
   if (!url.startsWith(`${ORIGIN}/`)) return void (await chrome.tabs.create({ url })); // GitHub release page
@@ -250,6 +264,7 @@ async function openSite(href) {
   }
 }
 
+// Free boosters on the extension's icon, "!" when logged out.
 function updateBadge(me, loggedOut = false) {
   if (loggedOut || !me) {
     chrome.action.setBadgeText({ text: loggedOut ? '!' : '' });
@@ -276,6 +291,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   return true;
 });
 
+// Answers the messages of the content script and the popup.
 async function handle(msg) {
   switch (msg?.type) {
     case 'auth': {

@@ -1,8 +1,7 @@
-// Userscript version: what the extension's background worker answers to the page code, done in the page.
-// No notifications here: a userscript only runs while a kyara.games page is open.
+// Userscript: the background worker's answers to the page code, done in the page.
 let refreshTimer = 0;
 
-// The page code hands the session over a moment after it starts: until then, read it from the site directly.
+// Reads the session from the site until the page code hands it over.
 async function ensureAuth() {
   if ((await chrome.storage.local.get('auth')).auth?.token) return;
   try {
@@ -11,6 +10,7 @@ async function ensureAuth() {
   } catch {}
 }
 
+// Answers the messages of the page code.
 async function handle(msg) {
   if (msg?.type !== 'auth') await ensureAuth();
   switch (msg?.type) {

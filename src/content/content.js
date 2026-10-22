@@ -1,9 +1,7 @@
-// Kyara Games on kyara.games: card badges, completed and small albums hidden, missing cards greyed out with a buy order,
-// "Bloquer sauf doublons", last copy of a card on sale locked, compact completed series on Missions, "Boosters rentables" page,
-// "Amis" filter on the Classement page, "Possédées" and "Manquantes" chips on Collection and the "Ses doublons" filter in the trade composer.
-// Also built into the userscript version (build.py), where KYX_OWNER and a stand-in for the extension APIs are defined.
+// Kyara Games: everything the extension adds to the pages of kyara.games.
+// Also built into the userscript (build.py), which defines KYX_OWNER and stand-ins for the extension APIs.
 (() => {
-  // A single copy per tab when both the extension and the userscript are installed: the first one to start.
+  // Only one copy runs per tab when both the extension and the userscript are installed.
   const owner = typeof KYX_OWNER === 'string' ? KYX_OWNER : 'extension';
   if (document.documentElement.dataset.kyxOwner && document.documentElement.dataset.kyxOwner !== owner) return;
   document.documentElement.dataset.kyxOwner = owner;
@@ -25,9 +23,9 @@
   let series = null; // Map normalized series name -> { total, owned }
   let partner = null;
 
+  // Lower case without accents, to compare names.
   const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-  // After the extension is reloaded or updated, this copy keeps running in already open tabs
-  // but can no longer reach the extension: it then cleans up and stops.
+  // False once the extension was reloaded or updated: this copy then cleans up and stops.
   const alive = () => {
     try {
       return !!chrome.runtime?.id;
@@ -35,6 +33,7 @@
       return false;
     }
   };
+  // Message to the background worker (null once the extension is gone).
   const send = (msg) => {
     if (!alive()) return shutdown(), Promise.resolve(null);
     try {
@@ -43,10 +42,12 @@
       return Promise.resolve(null);
     }
   };
+  // Copies owned of a card.
   const qty = (id) => coll?.get(id)?.qty ?? 0;
 
   // ---------- data ----------
 
+  // Takes in values read from the extension's storage.
   function applyStorage({ settings: s, collection, catalog: cat, partner: p }) {
     if (s !== undefined) settings = { ...DEFAULTS, ...s };
     if (collection !== undefined) coll = collection?.items ? new Map(collection.items.map(([id, q, l]) => [id, { qty: q, listable: l }])) : null;
@@ -55,6 +56,7 @@
     series = null;
   }
 
+  // Total and owned cards of each series.
   function seriesIndex() {
     if (series || !catalog || !coll) return series;
     series = new Map();
@@ -72,8 +74,9 @@
     if (area !== 'local') return;
     const picked = {};
     if ('smartLock' in changes) smartLock = new Set(changes.smartLock.newValue ?? []);
-    if ('favSeries' in changes) {
-      favSeries = new Set(changes.favSeries.newValue ?? []);
+    if ('marketFav' in changes) marketFav = !!changes.marketFav.newValue;
+    if ('favSeries' in changes || 'marketFav' in changes) {
+      if ('favSeries' in changes) favSeries = new Set(changes.favSeries.newValue ?? []);
       marketShown = '';
       scanFavStars();
       scanMarket();
@@ -84,7 +87,7 @@
     refreshAll();
   });
 
-  // The site keeps its session in localStorage: hand it to the extension so it can poll for notifications.
+  // Hands the site's session (kyara_token in its localStorage) to the extension.
   let lastAuth = '';
   function syncAuth() {
     let token = null;
@@ -102,11 +105,10 @@
   // ---------- answers forwarded by inject.js ----------
 
   window.addEventListener('message', (e) => {
-    // No e.source check: Firefox hands content scripts a wrapped window that never equals e.source.
     if (e.origin !== location.origin || e.data?.__kyaraGames !== 1) return;
     const { kind, path, body } = e.data;
     if (kind === 'write') {
-      if (/^\/market\//.test(path)) setTimeout(refreshFavMarket, 1500); // offers just changed
+      if (/^\/market\//.test(path)) setTimeout(refreshFavMarket, 1500);
       return void send({ type: 'collection-stale' });
     }
     let m;
@@ -135,6 +137,7 @@
   });
 
   const pendingNames = new Map();
+  // Remembers what is known of the trade partner.
   async function setPartner(id, patch) {
     if (pendingNames.has(id)) patch.pseudo ??= pendingNames.get(id);
     const next = await send({ type: 'partner', partner: { id, ...patch } });
@@ -146,7 +149,7 @@
 
   // ---------- badges on every card image ----------
 
-  // The trade composer is a dialog holding both sides of the deal ("Tu donnes" / "Tu reçois").
+  // True for a card inside the trade composer (the dialog with "Tu donnes" and "Tu reçois").
   const composers = new WeakSet();
   function inComposer(img) {
     const dialog = img.closest('[role="dialog"]');
@@ -160,7 +163,7 @@
     return false;
   }
 
-  // "Mes échanges": a card on the "Tu donnes" side of a trade still waiting for an answer (status pill .st-pending).
+  // True for a card on the "Tu donnes" side of a pending trade in "Mes échanges".
   function givenInPendingTrade(img) {
     const item = img.closest('li.trade');
     if (!item?.querySelector('.st-pending')) return false;
@@ -173,8 +176,7 @@
     return false;
   }
 
-  // Where each badge is wanted: the market only inside the trade composer; duplicates on Collection and in trades,
-  // and in trades also the cards held only once, so giving away a last copy is never a surprise.
+  // Badges a card gets where it is shown: missing, duplicate (×N), single copy (Unique).
   function badgeScope(img) {
     if (givenInPendingTrade(img)) return { missing: false, dupes: settings.badgeDupes, single: settings.badgeDupes };
     const trade = inComposer(img);
@@ -184,6 +186,7 @@
   }
 
   const MIN_SIZE = 48; // avatars and tiny chips stay clean
+  // Puts the right badge on a card picture, or removes it.
   function tag(img) {
     const m = CARD_SRC.exec(img.getAttribute('src') || '');
     const host = img.parentElement;
@@ -220,6 +223,7 @@
     badge.textContent = text;
   }
 
+  // Badges every card picture of an element.
   function scanBadges(root = document) {
     if (root.nodeType !== 1 && root !== document) return;
     if (root.tagName === 'IMG') return tag(root);
@@ -228,8 +232,10 @@
 
   // ---------- completed albums ----------
 
+  // "owned/total" of an album tile.
   const albumCount = (li) => (li.querySelector('.a-meta')?.textContent ?? '').replace(/[\s  ]/g, '').match(/(\d+)\/(\d+)/);
 
+  // True for a completed album tile.
   function albumComplete(li) {
     const m = albumCount(li);
     if (m) return Number(m[1]) >= Number(m[2]);
@@ -239,7 +245,7 @@
     return s ? s.owned >= s.total : false;
   }
 
-  // Series with fewer than 5 characters in the whole catalog.
+  // True for a series with fewer than 5 characters in the catalog.
   const SMALL = 5;
   function albumSmall(li) {
     const m = albumCount(li);
@@ -251,6 +257,7 @@
   const PAGE = 60; // the site renders albums 60 at a time behind an "Afficher plus" button
   let autoMore = 0;
 
+  // Hides the completed and small series of the Collection album list.
   function scanAlbums() {
     const list = location.pathname === '/collection' ? document.querySelector('ul.albums') : null;
     if (!list) return;
@@ -268,7 +275,7 @@
       }
     }
     albumToggle(list, hidden);
-    // Hidden albums still use up the site's page: load the next ones until a full page of unfinished albums shows.
+    // Loads the site's next albums until a full page of visible ones shows.
     const more = list.nextElementSibling?.matches('button') ? list.nextElementSibling : list.nextElementSibling?.querySelector('button');
     if (filtering && visible < PAGE && more && autoMore < 40) {
       autoMore++;
@@ -278,7 +285,7 @@
     }
   }
 
-  // Toggles placed in the site's own toolbar, left of the "Trier" group.
+  // The two toggles (complete series, small series) in the site's album toolbar.
   function albumToggle(list, hidden) {
     const tools = list.parentElement?.querySelector('.al-tools');
     const views = tools?.querySelector('.views');
@@ -296,6 +303,7 @@
     );
   }
 
+  // One toggle of the album toolbar.
   function toggleButton(tools, views, key, label) {
     let btn = tools.querySelector(`:scope > .kyx-toggle[data-key="${key}"]`);
     if (!btn) {
@@ -318,10 +326,9 @@
 
   // ---------- missing cards of the Collection grid ----------
 
-  // The site draws a card you don't own as a dashed box with a "?": show the card itself, greyed out,
-  // with its name above the site's number and rarity. Everything goes inside the site's box, so it leaves with it.
+  // Each missing card of the Collection grid shown greyed out with its name, instead of the site's "?".
   function scanMissing() {
-    // A card just bought leaves its "?" box: its buy order row goes too.
+    // Removes the buy order row of a card that is no longer missing.
     document.querySelectorAll('.kyx-order').forEach((row) => {
       if (!row.parentElement?.querySelector(':scope > a.slot > .miss')) row.remove();
     });
@@ -359,8 +366,7 @@
 
   // ---------- buy order under each missing card ----------
 
-  // Like the "≈ price · Vendre" row of owned cards: the fair price and a button opening a small buy order form,
-  // the same one as on the card's wiki page (lowest price of the rarity or fair-play bound, 1 to 10 copies).
+  // Row under each missing card: its fair price and a button opening the buy order form.
   const MIN_PRICE = { C: 1, U: 1, R: 3, E: 10, L: 40, M: 150 };
   const RARITY_LABEL = { C: 'Commune', U: 'Peu commune', R: 'Rare', E: 'Épique', L: 'Légendaire', M: 'Mythique' };
   const ORDER_ERRORS = {
@@ -374,7 +380,7 @@
     network: 'Serveur injoignable.'
   };
 
-  // Same request as the site's own: session, device and anti-bot pass it keeps in localStorage, sent from the page.
+  // Calls the Kyara API from the page with the site's session, device id and anti-bot pass.
   async function siteApi(path, { method = 'GET', body, auth = true } = {}) {
     const headers = { accept: 'application/json' };
     try {
@@ -389,7 +395,6 @@
     if (body !== undefined) headers['content-type'] = 'application/json';
     let res;
     try {
-      // Firefox: content.fetch sends the request as the page itself, like Chrome's fetch does here.
       const init = { method, headers, body: body === undefined ? undefined : JSON.stringify(body) };
       const url = `${location.origin}/api${path}`;
       res = await (typeof content !== 'undefined' && content?.fetch ? content.fetch(url, init) : fetch(url, init));
@@ -404,6 +409,7 @@
     return data;
   }
 
+  // Buy order row under one missing card.
   function orderRow(slot, id) {
     const cell = slot.parentElement;
     if (!cell) return;
@@ -422,7 +428,7 @@
     if (med.textContent !== text) med.textContent = text;
   }
 
-  // The form opens in a pop-up over the page, with the card, like the site's own dialogs.
+  // Buy order dialog: price and quantity, with the minimum, lowest offer, median and best order.
   function toggleOrderForm(row) {
     if (!alive()) return shutdown();
     document.querySelector('.kyx-modal-back')?.remove();
@@ -540,8 +546,7 @@
 
   // ---------- an owned card of the Collection grid opens its wiki page ----------
 
-  // The site opens a window when an owned card is clicked; its link already leads to the card's wiki page.
-  // The click is stopped before the site sees it and the same link is followed through the site's own navigation.
+  // A click on an owned card of the Collection grid opens its wiki page instead of the site's window.
   window.addEventListener(
     'click',
     (e) => {
@@ -555,7 +560,7 @@
       const link = Object.assign(document.createElement('a'), { href });
       link.hidden = true;
       document.body.appendChild(link);
-      link.click(); // handled by the site's router like any other link
+      link.click();
       link.remove();
     },
     true
@@ -563,21 +568,20 @@
 
   // ---------- favourite series (œuvres) and the "★ Favoris" filter of the market ----------
 
+  // Text made safe for HTML.
   const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-  // A star on each album of Collection (and in the bar of the open album) marks a series as a favourite.
-  // In the market, the "★ Favoris" chip lists the offers of those series only: the market is asked for each
-  // of them and the offers are gathered in one list, shown instead of the site's own.
+  // A star on each album of Collection marks a series as a favourite; the market's "★ Favoris" chip shows their offers.
   let favSeries = new Set();
   let marketFav = false;
   let marketShown = '';
 
+  // Adds or removes a favourite series.
   async function toggleFav(name) {
     if (!alive()) return shutdown();
     const next = new Set(favSeries);
     if (next.has(name)) next.delete(name);
     else next.add(name);
-    // Taken into account at once, so that several stars touched in a row all count.
     favSeries = new Set([...next].sort((a, b) => a.localeCompare(b, 'fr')));
     marketShown = '';
     scanFavStars();
@@ -585,18 +589,20 @@
     await chrome.storage.local.set({ favSeries: [...favSeries] });
   }
 
+  // Star button of an album (inline: in the album bar).
   function favButton(inline) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = inline ? 'kyx-fav inline' : 'kyx-fav';
     btn.addEventListener('click', (e) => {
       e.preventDefault();
-      e.stopPropagation(); // the album tile itself opens the album
+      e.stopPropagation();
       toggleFav(btn.dataset.series);
     });
     return btn;
   }
 
+  // Shows whether the series is a favourite.
   function setStar(star, name, inline) {
     const on = favSeries.has(name);
     star.dataset.series = name;
@@ -610,6 +616,7 @@
     }
   }
 
+  // Stars on the album tiles and in the bar of the open album.
   function scanFavStars() {
     if (location.pathname !== '/collection') return;
     for (const li of document.querySelectorAll('ul.albums > li')) {
@@ -636,15 +643,49 @@
   }
 
   const RARITY_COLOR = { C: '#B5B1BB', U: '#3FBF7F', R: '#4D9BFF', E: '#B072FF', L: '#F5C518', M: '#FF4D2E' };
-  const MARKET_SORTS = [
-    ['price_asc', 'Prix croissant'],
-    ['price_desc', 'Prix décroissant'],
-    ['ending', 'Fin proche'],
-    ['newest', 'Plus récentes']
-  ];
+  let favOnly = null; // a single favourite series, or all of them
 
+  // Rarity of the site's chip that is on ('' for "Toutes" or none).
+  const RARITY_BY_LABEL = Object.fromEntries(Object.entries(RARITY_LABEL).map(([k, v]) => [norm(v), k]));
+  function siteRarity(chips) {
+    const on = [...(chips?.querySelectorAll(':scope > button.on:not(.kyx-chip)') ?? [])];
+    for (const b of on) {
+      const r = RARITY_BY_LABEL[norm(b.textContent)];
+      if (r) return r;
+    }
+    return '';
+  }
+
+  // Current values of the site's market filters, applied to the favourites too.
+  const marketFilters = () => (location.pathname === '/marche' ? document.querySelector('#mq')?.closest('.filters') : null);
+  // The site's sort select, and the label of its "Univers" select.
+  const sortSelect = (filters) => filters?.querySelector('.row2 select option[value="price_asc"]')?.parentElement ?? null;
+  const universeLabel = (filters) =>
+    [...(filters?.querySelectorAll('.row2 > label:not(.kyx-fav-pick)') ?? [])].find((l) => {
+      const sel = l.querySelector(':scope > select');
+      return sel && sel !== sortSelect(filters);
+    }) ?? null;
+
+  // The site's filters as request parameters.
+  function siteFilters(filters) {
+    const price = [...(filters?.querySelectorAll('.row2 label.price input') ?? [])];
+    const amount = (input) => (input && input.value !== '' && Number(input.value) >= 0 ? String(Math.round(Number(input.value))) : '');
+    const pill = (re) => [...(filters?.querySelectorAll('button.pill') ?? [])].find((b) => re.test(b.textContent))?.getAttribute('aria-pressed') === 'true';
+    return {
+      q: filters?.querySelector('#mq')?.value.trim() ?? '',
+      rarity: siteRarity(filters?.querySelector('.chips')),
+      sort: sortSelect(filters)?.value || 'ending',
+      min: amount(price[0]),
+      max: amount(price[1]),
+      missing: pill(/n.ai pas/i),
+      wished: pill(/cherche/i),
+      type: new URLSearchParams(location.search).get('onglet') === 'encheres' ? 'auction' : 'fixed'
+    };
+  }
+
+  // "★ Favoris" chip of the market and the favourites view.
   function scanMarket() {
-    const filters = location.pathname === '/marche' ? document.querySelector('#mq')?.closest('.filters') : null;
+    const filters = marketFilters();
     const chips = filters?.querySelector('.chips');
     if (!chips) return void (marketShown = '');
     let btn = chips.querySelector(':scope > .kyx-fav-chip');
@@ -668,22 +709,30 @@
     }
     btn.classList.toggle('on', marketFav);
     btn.setAttribute('aria-pressed', String(marketFav));
-    // The site's rarity chips ("Toutes", "Commune"…) filter the favourites as well.
-    if (!chips.dataset.kyxRarity) {
-      chips.dataset.kyxRarity = '1';
-      chips.addEventListener('click', (e) => {
-        if (!marketFav || !e.target.closest('button') || e.target.closest('.kyx-chip')) return;
-        setTimeout(() => {
+    // Asks the favourites again when a filter of the site changes.
+    if (!filters.dataset.kyxWatch) {
+      filters.dataset.kyxWatch = '1';
+      let timer = 0;
+      const later = (ms) => {
+        if (!marketFav) return;
+        clearTimeout(timer);
+        timer = setTimeout(() => {
           const view = document.querySelector('.kyx-favmarket');
-          if (!view?.kyxState) return;
-          const rarity = siteRarity(chips);
-          if (rarity === view.kyxState.rarity) return;
-          view.kyxState.rarity = rarity;
-          renderFavMarket(view);
-        }, 60);
-      });
+          if (view?.kyxState) loadFavOffers(view, true);
+        }, ms);
+      };
+      const ours = (e) => e.target.closest?.('.kyx-fav-pick, .kyx-chip');
+      filters.addEventListener('input', (e) => ours(e) || later(500));
+      filters.addEventListener('change', (e) => ours(e) || later(150));
+      filters.addEventListener('click', (e) => ours(e) || !e.target.closest('button') || later(150));
     }
-    // The site's offers (all that follows its filters) make way for the favourites while the chip is on.
+    const universe = universeLabel(filters);
+    if (universe) {
+      if (marketFav && universe.dataset.kyxHidden !== '1') universe.dataset.kyxHidden = '1';
+      else if (!marketFav && universe.dataset.kyxHidden) delete universe.dataset.kyxHidden;
+    }
+    favPicker(filters, universe);
+    // Hides the site's offers while the favourites are shown.
     let view = filters.parentElement.querySelector(':scope > .kyx-favmarket');
     for (let el = filters.nextElementSibling; el; el = el.nextElementSibling) {
       if (el === view) continue;
@@ -698,92 +747,75 @@
     if (!view) {
       view = document.createElement('section');
       view.className = 'kyx-favmarket';
-      view.kyxState = { type: 'fixed', sort: 'price_asc', missing: false, only: null, rarity: '' };
+      view.kyxState = {};
       filters.after(view);
     }
-    const key = [...favSeries].join('|');
+    // Shows the favourites again when they or the tab (buy, auctions) change.
+    const key = `${[...favSeries].join('|')}#${siteFilters(filters).type}`;
     if (marketShown === key && view.childElementCount) return;
     marketShown = key;
     renderFavMarket(view);
   }
 
-  // Rarity of the site's chip that is on ('' for "Toutes" or none).
-  const RARITY_BY_LABEL = Object.fromEntries(Object.entries(RARITY_LABEL).map(([k, v]) => [norm(v), k]));
-  function siteRarity(chips) {
-    const on = [...(chips?.querySelectorAll(':scope > button.on:not(.kyx-chip)') ?? [])];
-    for (const b of on) {
-      const r = RARITY_BY_LABEL[norm(b.textContent)];
-      if (r) return r;
+  // "★ Favoris" list in the site's filter row, where its "Univers" list was: all favourites or a single one.
+  function favPicker(filters, universe) {
+    const row = filters.querySelector('.row2');
+    let pick = row?.querySelector(':scope > .kyx-fav-pick');
+    if (!marketFav || !row) return void pick?.remove();
+    if (favOnly && !favSeries.has(favOnly)) favOnly = null;
+    if (!pick) {
+      pick = document.createElement('label');
+      pick.className = `kyx-fav-pick ${universe?.className ?? ''}`;
+      pick.innerHTML = `★ Favoris <select class="${esc(universe?.querySelector('select')?.className ?? '')}"></select>
+        <button type="button" class="kyx-fav-del" hidden>Retirer des favoris</button>`;
+      const select = pick.querySelector('select');
+      const del = pick.querySelector('.kyx-fav-del');
+      select.addEventListener('change', () => {
+        favOnly = select.value || null;
+        del.hidden = !favOnly;
+        const view = document.querySelector('.kyx-favmarket');
+        if (view?.kyxState) loadFavOffers(view, true);
+      });
+      del.addEventListener('click', (e) => {
+        e.preventDefault();
+        const name = favOnly;
+        favOnly = null;
+        if (name) toggleFav(name);
+      });
+      if (universe) universe.before(pick);
+      else row.prepend(pick);
     }
-    return '';
+    const select = pick.querySelector('select');
+    const names = [...favSeries];
+    const key = names.join('|');
+    if (pick.dataset.key !== key) {
+      pick.dataset.key = key;
+      select.innerHTML = '';
+      select.add(new Option(`Toutes mes favorites (${names.length})`, ''));
+      for (const name of names) select.add(new Option(name, name));
+    }
+    select.value = favOnly ?? '';
+    pick.querySelector('.kyx-fav-del').hidden = !favOnly;
   }
 
+  // Favourites view: status line, offers, "Voir plus d'offres".
   function renderFavMarket(view) {
-    const st = view.kyxState;
-    const names = [...favSeries];
-    if (st.only && !favSeries.has(st.only)) st.only = null;
-    st.rarity = siteRarity(document.querySelector('#mq')?.closest('.filters')?.querySelector('.chips')) || st.rarity;
-    if (!names.length) {
+    if (!favSeries.size) {
       view.innerHTML = '<p class="kyx-fm-note">Aucune œuvre en favori pour l’instant. Sur la page <a href="/collection">Collection</a>, onglet Albums, touche l’étoile ☆ d’un album pour l’ajouter.</p>';
       return;
     }
     view.innerHTML = `
-      <div class="kyx-fm-favs"></div>
-      <div class="kyx-fm-tools">
-        <select class="kyx-fm-type" aria-label="Type d’offre"><option value="fixed">Prix fixe</option><option value="auction">Enchères</option></select>
-        <select class="kyx-fm-sort" aria-label="Trier">${MARKET_SORTS.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>
-        <label class="kyx-fm-check"><input type="checkbox" /> Seulement mes manquantes</label>
-      </div>
       <div class="kyx-fm-status"><p class="kyx-fm-note" role="status"></p><button type="button" class="kyx-fm-refresh">↻ Actualiser</button></div>
       <ul class="kyx-fm-grid"></ul>
       <button type="button" class="kyx-fm-more" hidden>Voir plus d’offres</button>`;
-    // Choose the series to show: all the favourites, or a single one (× takes it out of the favourites).
-    const favs = view.querySelector('.kyx-fm-favs');
-    const pick = (only) => {
-      st.only = only;
-      favs.querySelectorAll('.kyx-fm-fav').forEach((c) => c.setAttribute('aria-pressed', String((c.dataset.series || null) === only)));
-      loadFavOffers(view, true);
-    };
-    const all = document.createElement('span');
-    all.className = 'kyx-fm-fav all';
-    all.dataset.series = '';
-    all.innerHTML = `<button type="button" class="kyx-fm-pick">★ Toutes mes favorites (${names.length})</button>`;
-    all.querySelector('button').addEventListener('click', () => pick(null));
-    favs.appendChild(all);
-    for (const name of names) {
-      const chip = document.createElement('span');
-      chip.className = 'kyx-fm-fav';
-      chip.dataset.series = name;
-      chip.innerHTML = '<button type="button" class="kyx-fm-pick"></button><button type="button" class="kyx-fm-del">×</button>';
-      chip.querySelector('.kyx-fm-pick').textContent = name;
-      chip.querySelector('.kyx-fm-pick').title = `Afficher seulement ${name}`;
-      chip.querySelector('.kyx-fm-pick').addEventListener('click', () => pick(st.only === name ? null : name));
-      chip.querySelector('.kyx-fm-del').title = `Retirer ${name} des favoris`;
-      chip.querySelector('.kyx-fm-del').addEventListener('click', () => toggleFav(name));
-      favs.appendChild(chip);
-    }
-    favs.querySelectorAll('.kyx-fm-fav').forEach((c) => c.setAttribute('aria-pressed', String((c.dataset.series || null) === st.only)));
-    const type = view.querySelector('.kyx-fm-type');
-    const sort = view.querySelector('.kyx-fm-sort');
-    const missing = view.querySelector('.kyx-fm-check input');
-    type.value = st.type;
-    sort.value = st.sort;
-    missing.checked = st.missing;
-    const reload = () => {
-      Object.assign(st, { type: type.value, sort: sort.value, missing: missing.checked });
-      loadFavOffers(view, true);
-    };
-    type.addEventListener('change', reload);
-    sort.addEventListener('change', reload);
-    missing.addEventListener('change', reload);
     view.querySelector('.kyx-fm-more').addEventListener('click', () => loadFavOffers(view, false));
     view.querySelector('.kyx-fm-refresh').addEventListener('click', () => loadFavOffers(view, 'refresh'));
     loadFavOffers(view, true);
   }
 
-  // The market changes all the time (offers sold, new ones, bids): the list is asked again every 15 seconds
-  // while it is on screen, when coming back to the tab and after a purchase or a sale.
+  // Refreshes the favourites every 15 seconds while shown, and when coming back to the tab.
   const FAV_REFRESH = 15e3;
+  // Asks the shown offers again.
   function refreshFavMarket() {
     const view = document.querySelector('.kyx-favmarket');
     if (view?.kyxState?.offers && !document.hidden) loadFavOffers(view, 'refresh');
@@ -797,11 +829,12 @@
     if (!document.hidden && view?.kyxLoadedAt && Date.now() - view.kyxLoadedAt >= 5e3) refreshFavMarket();
   });
 
-  // One request per favourite series (24 offers each), merged and sorted like the site would.
+  // Offers of the favourite series (one request each), merged in the order the site uses.
   async function loadFavOffers(view, mode) {
     const st = view.kyxState;
     const run = (view.kyxRun = (view.kyxRun ?? 0) + 1);
-    const names = st.only ? [st.only] : [...favSeries].slice(0, 30);
+    const f = siteFilters(marketFilters());
+    const names = favOnly ? [favOnly] : [...favSeries].slice(0, 30);
     const refresh = mode === 'refresh' && st.page > 0;
     if (mode === true || (mode === 'refresh' && !refresh)) {
       st.page = 0;
@@ -809,18 +842,22 @@
       st.more = false;
       view.querySelector('.kyx-fm-grid').innerHTML = '';
     }
-    // A refresh asks again for every page already shown, all at once.
     const page = refresh ? 1 : st.page + 1;
     const size = refresh ? 24 * st.page : 24;
     const note = view.querySelector('.kyx-fm-note');
     const more = view.querySelector('.kyx-fm-more');
+    if (!note) return;
     if (!refresh) note.textContent = 'Chargement des offres…';
     more.hidden = true;
     const answers = await Promise.all(
       names.map((series) => {
-        const q = new URLSearchParams({ type: st.type, sort: st.sort, series, page: String(page), pageSize: String(size) });
-        if (st.missing) q.set('missing', '1');
-        if (st.rarity) q.set('rarity', st.rarity);
+        const q = new URLSearchParams({ type: f.type, sort: f.sort, series, page: String(page), pageSize: String(size) });
+        if (f.q) q.set('q', f.q);
+        if (f.rarity) q.set('rarity', f.rarity);
+        if (f.min) q.set('minPrice', f.min);
+        if (f.max) q.set('maxPrice', f.max);
+        if (f.missing) q.set('missing', '1');
+        if (f.wished) q.set('wished', '1');
         return siteApi(`/market/listings?${q}`, { auth: false }).catch(() => null);
       })
     );
@@ -837,11 +874,17 @@
       price_desc: (a, b) => price(b) - price(a),
       ending: (a, b) => Date.parse(a.endsAt) - Date.parse(b.endsAt),
       newest: (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)
-    }[st.sort];
+    }[f.sort] ?? ((a, b) => Date.parse(a.endsAt) - Date.parse(b.endsAt));
     st.offers.sort(by);
     const total = answers.reduce((n, a) => n + (a?.total ?? 0), 0);
     const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const scope = `${st.only ?? `${names.length} œuvre${names.length > 1 ? 's' : ''} en favori`}${st.rarity ? ` · ${RARITY_LABEL[st.rarity]}` : ''}`;
+    const scope = [
+      favOnly ?? `${names.length} œuvre${names.length > 1 ? 's' : ''} en favori`,
+      f.type === 'auction' ? 'enchères' : null,
+      f.rarity ? RARITY_LABEL[f.rarity] : null
+    ]
+      .filter(Boolean)
+      .join(' · ');
     note.textContent = st.offers.length
       ? `${num(st.offers.length)} offre${st.offers.length > 1 ? 's' : ''} affichée${st.offers.length > 1 ? 's' : ''} sur ${num(total)} · ${scope} · à jour à ${time}, actualisé toutes les 15 s.`
       : `Aucune offre en ce moment · ${scope} · vérifié à ${time}.`;
@@ -849,13 +892,14 @@
     renderFavOffers(view);
   }
 
+  // One tile per offer, opening the site's own offer window.
   function renderFavOffers(view) {
     const grid = view.querySelector('.kyx-fm-grid');
     grid.innerHTML = '';
     for (const o of view.kyxState.offers) {
       const c = o.character ?? {};
       const url = new URL(location.href);
-      url.searchParams.set('annonce', o.id); // the site's own way to open an offer
+      url.searchParams.set('annonce', o.id);
       const li = document.createElement('li');
       li.innerHTML = `
         <a class="kyx-fm-tile" href="${esc(url.pathname + url.search)}">
@@ -886,18 +930,146 @@
     }
   }
 
+  // ---------- recycling: how many duplicates per rarity ----------
+
+  // How many duplicates to recycle per rarity, inside the site's recycling box.
+  const RECYCLE_VALUE = { C: 1, U: 1, R: 3, E: 10, L: 40, M: 150 };
+  // Copies of a card that can be recycled: never the last one, nor locked or on sale.
+  const spare = (x) => (x && !x.pinned ? Math.max(0, (x.qty ?? 0) - (x.locked ?? 0) - 1) : 0);
+
+  // Recyclable cards by rarity, the most spare copies first.
+  async function recyclePlan() {
+    const items = collectionItems(await siteApi('/me/collection?lean=1'));
+    const by = {};
+    for (const x of items) {
+      const r = catalog?.get(x.characterId ?? x.id)?.r;
+      const n = spare(x);
+      if (!r || !n) continue;
+      (by[r] ??= []).push({ id: x.characterId ?? x.id, n });
+    }
+    for (const r in by) by[r].sort((a, b) => b.n - a.n);
+    return by;
+  }
+
+  // Adds the block to the site's recycling box.
+  function scanRecycle() {
+    const box = location.pathname === '/collection' ? document.querySelector('.rec-box') : null;
+    if (!box || box.querySelector(':scope > .kyx-rec') || !catalog) return;
+    const block = document.createElement('div');
+    block.className = 'kyx-rec';
+    block.innerHTML = '<p class="kyx-rec-t">Ou choisis combien de doublons recycler par rareté :</p><p class="kyx-rec-msg">Chargement de tes doublons…</p>';
+    const actions = box.querySelector(':scope > .rec-a');
+    if (actions) actions.before(block);
+    else box.appendChild(block);
+    recyclePlan().then(
+      (plan) => block.isConnected && renderRecycle(block, plan),
+      () => (block.querySelector('.kyx-rec-msg').textContent = 'Impossible de charger tes doublons.')
+    );
+  }
+
+  // One field per rarity; recycles the chosen numbers card by card after a confirmation.
+  function renderRecycle(block, plan) {
+    const order = ['C', 'U', 'R', 'E', 'L', 'M'].filter((r) => plan[r]?.length);
+    if (!order.length) return void (block.querySelector('.kyx-rec-msg').textContent = 'Aucun doublon à recycler.');
+    const max = (r) => plan[r].reduce((n, c) => n + c.n, 0);
+    block.innerHTML = `
+      <p class="kyx-rec-t">Ou choisis combien de doublons recycler par rareté :</p>
+      <div class="kyx-rec-grid">${order
+        .map(
+          (r) => `<label style="--r:${RARITY_COLOR[r]}"><b>${RARITY_LABEL[r]}</b>
+            <input type="number" min="0" max="${max(r)}" step="1" value="0" data-r="${r}" inputmode="numeric" />
+            <small>sur ${num(max(r))} · +${RECYCLE_VALUE[r]} ◆ l’un</small></label>`
+        )
+        .join('')}</div>
+      <div class="kyx-rec-btns">
+        <button type="button" class="kyx-rec-all">Tout</button>
+        <button type="button" class="kyx-rec-none">Rien</button>
+        <button type="button" class="kyx-rec-go" disabled>Recycler</button>
+      </div>
+      <p class="kyx-rec-msg" role="status"></p>`;
+    const inputs = [...block.querySelectorAll('input[data-r]')];
+    const go = block.querySelector('.kyx-rec-go');
+    const msg = (t, kind = '') => {
+      block.querySelector('.kyx-rec-msg').textContent = t;
+      block.querySelector('.kyx-rec-msg').dataset.kind = kind;
+    };
+    const wanted = () => Object.fromEntries(inputs.map((i) => [i.dataset.r, Math.max(0, Math.min(max(i.dataset.r), Math.floor(Number(i.value) || 0)))]));
+    let confirm = false;
+    const update = () => {
+      confirm = false;
+      const w = wanted();
+      const count = Object.values(w).reduce((a, b) => a + b, 0);
+      const gain = Object.entries(w).reduce((a, [r, n]) => a + n * RECYCLE_VALUE[r], 0);
+      go.disabled = !count;
+      go.textContent = count ? `Recycler ${num(count)} doublon${count > 1 ? 's' : ''} · +${num(gain)} ◆` : 'Recycler';
+      msg('');
+    };
+    inputs.forEach((i) => i.addEventListener('input', update));
+    block.querySelector('.kyx-rec-all').addEventListener('click', () => (inputs.forEach((i) => (i.value = i.max)), update()));
+    block.querySelector('.kyx-rec-none').addEventListener('click', () => (inputs.forEach((i) => (i.value = 0)), update()));
+    go.addEventListener('click', async () => {
+      const w = wanted();
+      // A second click confirms, with a warning for the rare ones.
+      if (!confirm) {
+        confirm = true;
+        const rare = ['L', 'M'].filter((r) => w[r]).map((r) => `${w[r]} ${RARITY_LABEL[r]}${w[r] > 1 ? 's' : ''}`);
+        go.textContent = 'Confirmer le recyclage';
+        msg(`${rare.length ? `⚠ Dont ${rare.join(' et ')}. ` : ''}Tu gardes toujours au moins 1 exemplaire de chaque carte. Clique à nouveau pour confirmer.`, rare.length ? 'warn' : '');
+        return;
+      }
+      const jobs = [];
+      for (const [r, n] of Object.entries(w)) {
+        let left = n;
+        for (const c of plan[r] ?? []) {
+          if (left <= 0) break;
+          const k = Math.min(c.n, left);
+          jobs.push([c.id, k]);
+          left -= k;
+        }
+      }
+      const total = jobs.reduce((a, [, k]) => a + k, 0);
+      block.querySelectorAll('button, input').forEach((el) => (el.disabled = true));
+      let done = 0;
+      let failed = false;
+      for (const [id, k] of jobs) {
+        msg(`Recyclage… ${num(done)}/${num(total)}`);
+        try {
+          await siteApi(`/me/collection/${id}/recycle`, { method: 'POST', body: { qty: k } });
+        } catch (e) {
+          if (e?.code === 'rate_limited') {
+            await wait(3000);
+            try {
+              await siteApi(`/me/collection/${id}/recycle`, { method: 'POST', body: { qty: k } });
+            } catch {
+              failed = true;
+              break;
+            }
+          } else {
+            failed = true;
+            break;
+          }
+        }
+        done += k;
+        await wait(120);
+      }
+      msg(failed ? `Arrêté en route : ${num(done)} doublon${done > 1 ? 's' : ''} recyclé${done > 1 ? 's' : ''}. La page va se recharger.` : `${num(done)} doublon${done > 1 ? 's' : ''} recyclé${done > 1 ? 's' : ''} ✔ La page va se recharger.`, failed ? 'err' : 'ok');
+      setTimeout(() => location.reload(), 1800);
+    });
+    update();
+  }
+
   // ---------- "Bloquer sauf doublons" in the album bar ----------
 
-  // The site locks a card with all its copies, so the duplicates of a locked album can't be sold.
-  // This mode locks only the cards held once and leaves the others free: their duplicates can go to the market
-  // (the site never sells a last copy), and a card is locked again as soon as a single copy is left.
+  // "Bloquer sauf doublons": in a series, only the cards held once are locked, as the collection changes.
   let smartLock = new Set(); // series names
   let pinning = false;
+  // Pause.
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  // Items of a /me/collection answer.
   const collectionItems = (body) => (Array.isArray(body) ? body : Array.isArray(body?.items) ? body.items : []);
 
-  // Copies not on sale nor in a trade (those are held apart by the site and stay out of the lock).
+  // Copies not on sale nor in a trade.
   const freeCopies = (x) => (x.qty ?? 0) - (x.locked ?? 0);
 
   // [id, pinned] changes so that, in this series, exactly the cards with a single free copy are locked.
@@ -913,7 +1085,7 @@
     return changes;
   }
 
-  // A duplicate put on sale leaves a single copy: lock it, so it can't go in a trade or a second sale by mistake.
+  // Locks a card whose duplicate is on sale when a single free copy is left.
   function listedPlan(items) {
     const changes = [];
     for (const x of items) {
@@ -923,6 +1095,7 @@
     return changes;
   }
 
+  // Locks or unlocks cards one by one.
   async function applyPins(changes) {
     for (const [id, pinned] of changes) {
       await siteApi(`/me/collection/${id}/pin`, { method: 'POST', body: { pinned } });
@@ -930,7 +1103,7 @@
     }
   }
 
-  // Each time the site reloads the collection: lock the cards that went down to one copy, free the new duplicates.
+  // Applies those locks each time the site reloads the collection.
   async function keepSmartLocks(body) {
     if (pinning) return;
     const items = collectionItems(body);
@@ -948,6 +1121,7 @@
     }
   }
 
+  // Turns the mode on or off for a series.
   async function setSmart(series, on) {
     if (on) smartLock.add(series);
     else smartLock.delete(series);
@@ -955,6 +1129,7 @@
     await chrome.storage.local.set({ smartLock: [...smartLock] });
   }
 
+  // Message under the album bar.
   function barMsg(bar, text, err = false) {
     let el = bar.querySelector(':scope > .kyx-smart-msg');
     if (!el) {
@@ -966,6 +1141,7 @@
     el.dataset.kind = err ? 'err' : 'ok';
   }
 
+  // Click on "Bloquer sauf doublons": locks the cards of the series held once.
   async function smartClick(bar, btn) {
     if (!alive()) return shutdown();
     const series = bar.querySelector(':scope > b')?.textContent.trim();
@@ -983,7 +1159,7 @@
       const changes = lockPlan(series, collectionItems(await siteApi('/me/collection?lean=1')));
       await setSmart(series, true);
       await applyPins(changes);
-      location.reload(); // the site keeps its own copy of the locks: show the new ones
+      location.reload();
     } catch (e) {
       const code = e?.code ?? String(e);
       barMsg(bar, ORDER_ERRORS[code] ?? `Échec (${code}).`, true);
@@ -994,12 +1170,13 @@
     }
   }
 
+  // "Bloquer sauf doublons" button in the bar of the open album.
   function scanAlbumBar() {
     const bar = location.pathname === '/collection' ? document.querySelector('.album-bar') : null;
     const series = bar?.querySelector(':scope > b')?.textContent.trim();
     if (!series) return;
     const siteBtn = [...bar.querySelectorAll(':scope > button:not(.kyx-smart)')].find((b) => /loquer l.album/i.test(b.textContent));
-    // The site's own "Bloquer / Débloquer l'album" takes over: this mode stops for the series.
+    // The site's "Bloquer / Débloquer l'album" button stops this mode for the series.
     if (siteBtn && !siteBtn.dataset.kyxWatched) {
       siteBtn.dataset.kyxWatched = '1';
       siteBtn.addEventListener('click', () => {
@@ -1027,8 +1204,7 @@
 
   // ---------- Missions: completed series next to the referral card ----------
 
-  // The "Séries complètes" card lists every completed series: kept to the height of the referral card beside it
-  // (scrolling inside), series still to claim first, and the total in its title.
+  // Keeps the "Séries complètes" card to the height of the referral card, with the total in its title.
   function scanMissions() {
     if (location.pathname !== '/missions') return;
     const card = document.querySelector('section[aria-labelledby="albums-t"]');
@@ -1054,10 +1230,10 @@
 
   // ---------- "Amis" filter on the Classement page ----------
 
+  // Number in French format.
   const num = (n, digits = 0) => Number(n).toLocaleString('fr-FR', { maximumFractionDigits: digits });
 
-  // The ranking of the chosen tab (collection, prestige, mythiques…) among your friends and you,
-  // with each one's place in the general ranking. Shown instead of the general podium and list.
+  // Main value, unit and side value of each tab of the ranking.
   const plural = (n, one, many) => (Math.abs(n) < 2 ? one : many);
   const LADDER = {
     collection: { main: (r) => r.owned, unit: (n) => plural(n, 'carte', 'cartes'), side: (r) => `${num(r.mythics ?? 0)} ${plural(r.mythics ?? 0, 'mythique', 'mythiques')}` },
@@ -1070,6 +1246,7 @@
   let friendsOnly = false;
   let friendsShown = '';
 
+  // One player's row of a ranking, kept 5 minutes.
   async function ladderRow(by, id) {
     const key = `${by}|${id}`;
     const hit = ladderCache.get(key);
@@ -1080,12 +1257,14 @@
     return row;
   }
 
+  // Ids of the user's friends.
   async function friendIds() {
     const res = await siteApi('/me/friends');
     const list = Array.isArray(res) ? res : res?.friends ?? res?.items ?? [];
     return list.map((f) => (f.user ?? f.friend ?? f).id ?? f.userId).filter((id) => id != null);
   }
 
+  // "Amis" button among the ranking tabs, and the friends ranking.
   function scanLadder() {
     const head = location.pathname === '/classement' ? document.querySelector('main#contenu section.head') : null;
     const tabs = head?.querySelector('.tabs[role="tablist"]');
@@ -1112,7 +1291,7 @@
     btn.classList.toggle('on', friendsOnly);
     btn.setAttribute('aria-pressed', String(friendsOnly));
     const by = LADDER[new URLSearchParams(location.search).get('par')] ? new URLSearchParams(location.search).get('par') : 'collection';
-    // The site's podium and lists sit after the head: hidden while the filter is on.
+    // Hides the site's podium and lists while the filter is on.
     for (const el of head.parentElement.children) {
       if (el === head || el.classList.contains('kyx-friends')) continue;
       if (friendsOnly && el.dataset.kyxHidden !== '1') el.dataset.kyxHidden = '1';
@@ -1130,8 +1309,7 @@
     renderFriends(board, by);
   }
 
-  // The site's own markup for the podium and the list, so the friends ranking looks like the other tabs.
-  // Its style classes (svelte-xxxx) change with each version of the site: read from what is on the page.
+  // Style class (svelte-xxxx) of an element of the site, read from the page.
   function siteScope(selector, fallback) {
     const el = document.querySelector(selector);
     return [...(el?.classList ?? [])].find((c) => c.startsWith('svelte-')) ?? fallback;
@@ -1173,12 +1351,14 @@
     return `<span class="rs r-${esc(rank.id)} ${size} l-${label} ${sc}" title="Rang ${esc(rank.label)}"><b class="${sc}"><span class="k ${sc}">${esc(rank.kanji)}</span></b>${small}</span>`;
   }
 
+  // Same as the site's badges next to a pseudo.
   const badgesHtml = (row, n, sc) =>
     (row.badges ?? [])
       .slice(0, n)
       .map((b) => `<span class="bd ${b.frame === 'gold' && !String(b.id).startsWith('membre-') ? 'gold' : ''} ${b.frame === 'staff' ? 'staff' : ''} ${sc}" title="${esc(b.label)}">${esc(b.kanji)}</span>`)
       .join('');
 
+  // Friends ranking: podium then list, in the site's markup.
   async function renderFriends(board, by) {
     const def = LADDER[by];
     board.innerHTML = '<p class="kyx-friends-note">Chargement du classement de tes amis…</p>';
@@ -1259,11 +1439,11 @@
 
   // ---------- "Boosters rentables" page, in the site's "Plus" menu ----------
 
-  // A copy of the menu's own items, after them.
+  // "Boosters rentables" entry at the end of the site's "Plus" menu.
   function scanMoreMenu() {
     const menu = document.querySelector('#nav-more');
     const open = !!document.querySelector('.kyx-view');
-    // While the page is open the site's own item of the current page is not the one shown.
+    // Marks the entry as the current page while it is open.
     menu?.querySelectorAll(':scope > a.on:not(.kyx-more)').forEach((a) => open && a.classList.remove('on'));
     const mine = menu?.querySelector(':scope > .kyx-more');
     if (mine) return void mine.classList.toggle('on', open);
@@ -1279,7 +1459,7 @@
     item.querySelector('.dt b').textContent = 'Boosters rentables';
     const hint = item.querySelector('.dt small');
     if (hint) hint.textContent = 'Le meilleur booster pour une carte';
-    [...item.children].forEach((el) => el.matches('.dk, .dt') || el.remove()); // the model's badges
+    [...item.children].forEach((el) => el.matches('.dk, .dt') || el.remove());
     item.addEventListener('click', (e) => {
       e.preventDefault();
       document.querySelector('button[aria-controls="nav-more"][aria-expanded="true"]')?.click(); // close the menu
@@ -1288,7 +1468,7 @@
     menu.appendChild(item);
   }
 
-  // On a phone the site's menu is a sheet of tiles (#mobile-nav): the same entry goes there.
+  // The same entry in the site's phone menu (#mobile-nav).
   function scanMobileNav() {
     const grid = document.querySelector('#mobile-nav .sheet-grid');
     if (!grid) return;
@@ -1304,7 +1484,7 @@
       tile.href = '#boosters-rentables';
       tile.querySelector('.tk').textContent = '得';
       tile.querySelector('.tl').textContent = 'Boosters rentables';
-      [...tile.children].forEach((el) => el.matches('.tk, .tl') || el.remove()); // the model's counters
+      [...tile.children].forEach((el) => el.matches('.tk, .tl') || el.remove());
       tile.addEventListener('click', (e) => {
         e.preventDefault();
         document.querySelector('button.burger[aria-controls="mobile-nav"]')?.click(); // close the sheet
@@ -1318,7 +1498,7 @@
   let packsCache = null;
   const dropCache = new Map(); // id -> { packId: chance per booster }
 
-  // Boosters on sale right now (not the ones only given as rewards).
+  // Boosters on sale right now (not the reward-only ones), kept until midnight.
   async function loadPacks() {
     checkBoostersDay();
     if (packsCache) return packsCache;
@@ -1330,6 +1510,7 @@
     return packsCache;
   }
 
+  // Chance of each character per booster, asked 4 at a time and cached.
   async function dropChances(ids, progress) {
     let next = 0;
     let done = 0;
@@ -1356,19 +1537,20 @@
     const percent = (p * 100).toLocaleString('fr-FR', p >= 0.1 ? { maximumFractionDigits: 0 } : { maximumSignificantDigits: 2 });
     return p >= 0.01 ? `${percent} %` : `${percent} % (1 chance sur ${num(Math.round(1 / p))})`;
   };
+  // "N boosters".
   const boosters = (n) => `${num(n)} booster${n >= 2 ? 's' : ''}`;
 
-  // How the boosters are ranked: by price (fewest chakra spent on average, free boosters first)
-  // or by drop rate (best chance at each booster, whatever it costs). Remembered in this browser.
+  // Ranking criterion, "price" or "drop", remembered in this browser.
   let rankBy = 'price';
   try {
     if (localStorage.getItem('kyx-rank-by') === 'drop') rankBy = 'drop';
   } catch {}
 
+  // Shows the boosters ranked by price or by drop rate.
   // rows: [{ pack, hits: wanted cards per booster on average, chance: chance of at least one per booster }].
   // what: what is looked for, as in "pour avoir {what}".
   function renderPacks(page, rows, what) {
-    page.kyxLast = [rows, what]; // ranked again without new requests when the criterion changes
+    page.kyxLast = [rows, what];
     const list = page.querySelector('.kyx-b-list');
     const summary = page.querySelector('.kyx-b-summary');
     const byDrop = rankBy === 'drop';
@@ -1418,8 +1600,7 @@
       const first = byDrop ? 'Meilleur taux' : 'Le plus rentable';
       const worst = byDrop ? 'Pire taux' : 'Le moins rentable';
       const label = i === 0 ? first : i === rows.length - 1 && rows.length > 2 ? worst : '';
-      // The bar compares with the best of the list: drop rate against the best rate,
-      // price against the cheapest paid booster (a free booster has no chakra cost to compare).
+      // Bar: share of the best drop rate, or of the cheapest paid booster's cost.
       const score = byDrop ? Math.round((r.hits / top.hits) * 100) : r.cost ? Math.round((cheapest.cost / r.cost) * 100) : null;
       const barText = byDrop
         ? score >= 100 ? 'Taux 100 % (la référence)' : `Taux ${score} % du meilleur`
@@ -1450,10 +1631,10 @@
     });
   }
 
-  // A page of its own: it takes the place of the site's content (header and menu stay) at …#boosters-rentables,
-  // so the back button and a reload work; following any link of the site leaves it.
+  // The "Boosters rentables" page, shown in place of the site's content at …#boosters-rentables.
   const BOOSTERS_HASH = '#boosters-rentables';
 
+  // Leaves the "Boosters rentables" page.
   function closeBoosters() {
     document.querySelector('.kyx-view')?.remove();
     const main = document.querySelector('main#contenu');
@@ -1467,6 +1648,7 @@
   let boostersDay = parisDay();
   let refreshBoosters = null; // computes the ranking on screen again
 
+  // After midnight (Paris), forgets the boosters and chances and ranks again.
   function checkBoostersDay() {
     const day = parisDay();
     if (day === boostersDay) return;
@@ -1476,14 +1658,16 @@
     refreshBoosters?.();
   }
 
+  // Opens or closes the page with the address.
   function onBoostersHash() {
     if (location.hash === BOOSTERS_HASH) openBoosters();
     else closeBoosters();
   }
 
+  // Builds the page: modes (rarity, character, series), search and ranking.
   function openBoosters() {
     if (!alive()) return shutdown();
-    if (location.hash !== BOOSTERS_HASH) return void (location.hash = BOOSTERS_HASH); // comes back through hashchange
+    if (location.hash !== BOOSTERS_HASH) return void (location.hash = BOOSTERS_HASH);
     const main = document.querySelector('main#contenu');
     if (!main || document.querySelector('.kyx-view')) return;
     document.querySelector('.kyx-modal-back')?.remove();
@@ -1520,6 +1704,7 @@
     page.querySelector('.kyx-page-close').addEventListener('click', () => (history.length > 1 ? history.back() : (location.hash = '')));
     let run = 0; // answers of an older search are dropped
 
+    // Ranking for one character.
     async function forCharacter(card) {
       const mine = ++run;
       refreshBoosters = () => forCharacter(card);
@@ -1549,6 +1734,7 @@
       );
     }
 
+    // Ranking for one rarity.
     async function forRarity(r) {
       const mine = ++run;
       refreshBoosters = () => forRarity(r);
@@ -1567,6 +1753,7 @@
       );
     }
 
+    // Ranking for the cards (or the missing cards) of a series.
     async function forSeries(name, onlyMissing) {
       const mine = ++run;
       refreshBoosters = () => forSeries(name, onlyMissing);
@@ -1638,13 +1825,14 @@
         if (e.key === 'Enter') suggest.querySelector('button')?.click();
         if (e.key === 'Escape') suggest.hidden = true;
       });
-      // Closes when clicking elsewhere on the page.
+      // Closes the suggestions on a click elsewhere.
       page.addEventListener('click', (e) => e.target.closest('.kyx-search-wrap') || (suggest.hidden = true));
       input.focus();
       if (!catalog) note('Catalogue pas encore chargé, réessaie dans un instant.');
       return input;
     }
 
+    // Switches between rarity, character and series.
     function mode(m) {
       run++;
       refreshBoosters = null;
@@ -1704,17 +1892,18 @@
     );
     page.querySelectorAll('.kyx-b-sort [data-by]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.by === rankBy)));
     mode('rar');
-    forRarity('M'); // a ranking right away
+    forRarity('M');
   }
 
   // ---------- series and price under each card of the trade confirmation ----------
 
-  // "Confirmer l'échange" only shows name and rarity: add the series (cut short, full name on hover),
-  // the site's fair price of each card and the gap between both sides.
+  // Series and fair price under each card of "Confirmer l'échange", and the value gap between both sides.
   const prices = new Map(); // id -> fair price in chakra, null when unknown
   const pricing = new Set();
+  // "1 234 ◆".
   const chakra = (n) => `${Math.round(n).toLocaleString('fr-FR')} ◆`;
 
+  // Fair prices of the cards, asked 200 at a time.
   function loadPrices(ids) {
     const wanted = ids.filter((id) => !prices.has(id) && !pricing.has(id));
     if (!wanted.length) return;
@@ -1733,6 +1922,7 @@
     }
   }
 
+  // One line under a card of the confirmation, removed when text is null.
   function line(side, cls, text, title) {
     let el = side.querySelector(`:scope > .${cls}`);
     if (text == null) return void el?.remove();
@@ -1745,6 +1935,7 @@
     if (title && el.title !== title) el.title = title;
   }
 
+  // Fills the trade confirmation.
   function scanConfirm() {
     const sides = [...document.querySelectorAll('[role="dialog"] .cf-s')];
     if (!sides.length) return;
@@ -1790,15 +1981,15 @@
     el.dataset.kind = kind;
   }
 
-  // ---------- "Manquantes" chip on the Collection page ----------
+  // ---------- "Possédées" and "Manquantes" chips on the Collection page ----------
 
-  // The site's card filter (all / owned / missing / dupes…) sits in a select: this chip, next to the rarity chips, drives it.
-  // "Possédées" and "Manquantes", in this order right after the site's "Toutes" chip.
+  // They drive the site's "Cartes" select (all / owned / missing…), right after its "Toutes" chip.
   const CARD_CHIPS = [
     { value: 'owned', label: 'Possédées', cls: 'kyx-owned' },
     { value: 'missing', label: 'Manquantes', cls: 'kyx-missing' }
   ];
 
+  // Adds and updates the two chips.
   function scanCollectionChips() {
     if (location.pathname !== '/collection') return;
     for (const select of document.querySelectorAll('select')) {
@@ -1837,11 +2028,10 @@
 
   // ---------- "Ses doublons" filter in the trade composer ----------
 
-  // The site only offers "Je l'ai" / "Il me manque" on the partner's tab: this chip keeps the cards they hold twice or more.
-  // On by default in every trade composer (profile, market offer, comptoir); turning it off is remembered.
+  // Keeps only the cards the partner holds twice or more; on by default, turning it off is remembered.
   let composerMore = 0;
 
-  // Their spare copies when they share their collection, else the copies the trade API lets us ask for (the last one included).
+  // True when the partner holds the card twice or more, null when unknown.
   let dupeIndex = { of: null, spare: null, tradeable: null };
   function theirDupe(id) {
     if (dupeIndex.of !== partner) {
@@ -1852,8 +2042,9 @@
     return n == null ? null : n >= 2;
   }
 
+  // The chip, and the shelf of the trade composer filtered on it.
   function scanComposer() {
-    // The trade composer is a form; the market's "Proposer une carte" dialog has the same shelf but is not.
+    // Shelf of the trade composer (a form, unlike the market's "Proposer une carte" dialog).
     const shelf = document.querySelector('[role="dialog"] form .shelf');
     const chips = shelf?.querySelector('.filters .chips');
     if (!chips) {
@@ -1902,7 +2093,7 @@
         if (li.dataset.kyxHidden) delete li.dataset.kyxHidden;
       }
     }
-    // Hidden tiles still use up the site's page of 60: load more until a full page of duplicates shows.
+    // Loads the site's next cards until a full page of duplicates shows.
     const more = grid.parentElement?.querySelector(':scope > button.more');
     if (active && visible < PAGE && more && composerMore < 40) {
       composerMore++;
@@ -1924,6 +2115,7 @@
     if (!frame) frame = requestAnimationFrame(flush);
   });
 
+  // Scans what changed in the page since the last frame.
   function flush() {
     if (stopped) return;
     frame = 0;
@@ -1941,9 +2133,11 @@
     scanMobileNav();
     scanFavStars();
     scanMarket();
+    scanRecycle();
     scanConfirm();
   }
 
+  // Scans the whole page again.
   function refreshAll() {
     if (stopped) return;
     scanBadges(document);
@@ -1958,17 +2152,19 @@
     scanMobileNav();
     scanFavStars();
     scanMarket();
+    scanRecycle();
     scanConfirm();
   }
 
   let stopped = false;
+  // Removes everything the extension added and stops.
   function shutdown() {
     if (stopped) return;
     stopped = true;
     if (document.documentElement.dataset.kyxOwner === owner) delete document.documentElement.dataset.kyxOwner;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket').forEach((el) => el.remove());
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket, .kyx-fav-pick, .kyx-rec').forEach((el) => el.remove());
     delete document.documentElement.dataset.kyxView;
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched], [data-kyx-ghost]').forEach((el) => {
       delete el.dataset.kyxHidden;

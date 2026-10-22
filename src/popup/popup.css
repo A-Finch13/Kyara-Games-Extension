@@ -394,3 +394,21 @@ footer {
   border-top: 1px solid var(--line);
   text-align: center;
 }
+
+#sync-code {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font: 12px/1.4 ui-monospace, Consolas, monospace;
+  resize: vertical;
+  word-break: break-all;
+}
+
+#sync-msg:empty {
+  display: none;
+}

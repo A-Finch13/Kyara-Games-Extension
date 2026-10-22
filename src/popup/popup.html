@@ -79,6 +79,7 @@
         <label class="switch"><input type="checkbox" data-setting="notifyUpdated" /> Nouvelle version de l’extension installée</label>
         <label class="row">Vérifier toutes les
           <select data-setting="pollMinutes">
+            <option value="0.25">15 s</option>
             <option value="1">1 min</option>
             <option value="2">2 min</option>
             <option value="5">5 min</option>
@@ -89,6 +90,12 @@
           <button id="test">Tester une notification</button>
           <button id="refresh">Actualiser les données</button>
         </div>
+        <h2>Autre appareil</h2>
+        <p class="hint">Pour retrouver tes réglages et tes œuvres favorites sur un autre appareil (PC, téléphone, extension ou script) : copie ton code ici, puis colle-le sur l’autre appareil. Les verrous de cartes et les envies sont déjà gardés par Kyara sur ton compte.</p>
+        <div class="actions"><button id="sync-copy">Copier mon code</button></div>
+        <textarea id="sync-code" rows="2" placeholder="Tape ou colle ici le code de ton autre appareil (ex. 1A2B-3C4D-…)" spellcheck="false"></textarea>
+        <div class="actions"><button id="sync-import">Importer ce code</button></div>
+        <p class="hint" id="sync-msg" role="status"></p>
         <p class="hint">La connexion est reprise automatiquement de ton onglet kyara.games. Rien n’est envoyé ailleurs que sur kyara.games.</p>
       </section>
     </main>

@@ -1,5 +1,4 @@
-// Runs in the page itself: forwards the Kyara API answers the extension cares about to content.js.
-// Nothing is sent anywhere else and no request is changed.
+// Runs in the page: forwards to content.js the Kyara API answers the extension needs, without changing any request.
 (() => {
   if (window.__kyaraGamesHook) return;
   window.__kyaraGamesHook = true;

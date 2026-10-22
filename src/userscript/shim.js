@@ -1,6 +1,5 @@
-// Userscript version: the few extension APIs the page code uses, rebuilt on top of the page itself.
-// Storage lives in the site's localStorage under "kyx:" (kept in memory when it is full);
-// messages to the background worker are answered by handle() in bridge.js, in the same page.
+// Userscript: the extension APIs used by the page code, rebuilt in the page.
+// Storage in the site's localStorage under "kyx:" (in memory when full); messages answered by handle() (bridge.js).
 const KYX_OWNER = 'userscript';
 
 const chrome = (() => {

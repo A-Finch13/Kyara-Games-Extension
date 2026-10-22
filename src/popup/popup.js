@@ -1,11 +1,14 @@
 import {
   RARITIES, RARITY, api, asList, cardImg, collectionMap, getSettings, loadCatalog, loadCollection,
-  norm, seriesStats, setSettings, slimMe
+  exportCode, importCode, norm, seriesStats, setSettings, slimMe
 } from '../lib/kyara.js';
 
 const $ = (s) => document.querySelector(s);
+// Text made safe for HTML.
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+// "3 cartes".
 const plural = (n, w) => `${n.toLocaleString('fr-FR')} ${w}${n > 1 ? 's' : ''}`;
+// Rarest first, then by name.
 const byRarity = (a, b) => RARITIES.indexOf(a.r) - RARITIES.indexOf(b.r) || a.n.localeCompare(b.n);
 
 let settings;
@@ -24,12 +27,14 @@ document.querySelectorAll('[role=tab]').forEach((tab) =>
   })
 );
 
+// Message at the top of the popup.
 function notice(text) {
   const el = $('#notice');
   el.hidden = !text;
   el.innerHTML = text ?? '';
 }
 
+// Small card picture with its name and number.
 const thumb = (c, extra = '') => `
   <figure class="card" style="--rc:${RARITY[c.r]?.color ?? '#888'}" title="${esc(c.n)} — ${esc(c.s)} · ${RARITY[c.r]?.label ?? ''}">
     <img loading="lazy" src="${cardImg(c.id)}" alt="">${extra}
@@ -38,6 +43,7 @@ const thumb = (c, extra = '') => `
 
 // ---------- header ----------
 
+// Pseudo and free boosters in the header.
 function renderMe(me) {
   if (!me) return;
   $('#who').textContent = me.pseudo ?? 'Connecté';
@@ -54,6 +60,7 @@ function renderMe(me) {
 
 // ---------- albums ----------
 
+// Albums tab: progress of each series, searchable and sortable.
 function renderAlbums() {
   const q = norm($('#album-q').value);
   const sort = $('#album-sort').value;
@@ -88,6 +95,7 @@ $('#albums').addEventListener('click', (e) => {
 // ---------- missing ----------
 
 let missingLimit = 90;
+// Missing tab: missing cards by rarity and series.
 function renderMissing() {
   const q = norm($('#missing-q').value);
   const r = $('#missing-r').value;
@@ -112,6 +120,7 @@ $('#missing').addEventListener('click', (e) => {
 
 let tradeData = null;
 
+// Players to compare with: last trade partner and friends.
 async function loadPartners() {
   const pick = $('#partner-pick');
   const { partner } = await chrome.storage.local.get('partner');
@@ -156,6 +165,7 @@ $('#partner-pick').addEventListener('change', async (e) => {
   renderTrade();
 });
 
+// Trade tab: the partner's duplicates you miss, and yours they miss.
 function renderTrade() {
   const el = $('#trade');
   if (!tradeData) return void (el.innerHTML = '');
@@ -182,6 +192,7 @@ function renderTrade() {
 
 // ---------- settings ----------
 
+// Settings tab: checkboxes and lists saved as they change.
 function bindSettings() {
   document.querySelectorAll('[data-setting]').forEach((input) => {
     const key = input.dataset.setting;
@@ -197,6 +208,30 @@ function bindSettings() {
 }
 
 $('#test').addEventListener('click', () => chrome.runtime.sendMessage({ type: 'test-notification' }));
+
+// ---------- another device ----------
+
+$('#sync-copy').addEventListener('click', async () => {
+  const code = await exportCode();
+  $('#sync-code').value = code;
+  $('#sync-code').select();
+  const copied = await navigator.clipboard?.writeText(code).then(() => true, () => false);
+  $('#sync-msg').textContent = copied ? 'Code copié ✔ Colle-le sur ton autre appareil.' : 'Copie le code ci-dessus et colle-le sur ton autre appareil.';
+});
+$('#sync-import').addEventListener('click', async () => {
+  try {
+    const res = await importCode($('#sync-code').value);
+    settings = await getSettings();
+    document.querySelectorAll('[data-setting]').forEach((input) => {
+      if (input.type === 'checkbox') input.checked = !!settings[input.dataset.setting];
+      else input.value = String(settings[input.dataset.setting]);
+    });
+    renderAlbums();
+    $('#sync-msg').textContent = `Importé ✔ ${res.favs} œuvre${res.favs > 1 ? 's' : ''} favorite${res.favs > 1 ? 's' : ''}, réglages à jour.`;
+  } catch (e) {
+    $('#sync-msg').textContent = e?.code === 'other_catalog' ? 'Ce code a été fait avec un autre catalogue de cartes : recrée-le sur l’autre appareil, puis réessaie.' : 'Ce code n’est pas reconnu : vérifie qu’il est recopié en entier.';
+  }
+});
 $('#refresh').addEventListener('click', async (e) => {
   e.target.disabled = true;
   await chrome.runtime.sendMessage({ type: 'refresh' });
@@ -204,6 +239,7 @@ $('#refresh').addEventListener('click', async (e) => {
   e.target.disabled = false;
 });
 
+// Opens a page of kyara.games and closes the popup.
 function openSite(href) {
   chrome.runtime.sendMessage({ type: 'open', href });
   window.close();
@@ -216,7 +252,7 @@ document.addEventListener('click', (e) => {
 
 // ---------- boot ----------
 
-// Firefox can install the extension without access to kyara.games: it has to be granted from a click.
+// Asks for the access to kyara.games when the browser did not grant it at install.
 const SITE = { origins: ['https://kyara.games/*'] };
 document.addEventListener('click', async (e) => {
   if (!e.target.closest('#grant')) return;
@@ -224,6 +260,7 @@ document.addEventListener('click', async (e) => {
   if (await chrome.permissions.request(SITE)) loadData(true);
 });
 
+// Loads the catalog and the collection, then fills the tabs.
 async function loadData(force = false) {
   if (!(await chrome.permissions.contains(SITE))) {
     return notice('L’extension n’a pas encore accès à kyara.games. <a href="#" id="grant">Autoriser l’accès</a>, puis recharge l’onglet du site.');
@@ -275,6 +312,7 @@ async function loadData(force = false) {
 const FIREFOX = navigator.userAgent.includes('Firefox');
 let shownUpdate = null;
 
+// Banner of a new version.
 function renderUpdate(update) {
   $('#update').hidden = !update;
   if (!update || update.version === shownUpdate?.version) return;
@@ -285,12 +323,13 @@ function renderUpdate(update) {
   $('#update-help').hidden = true;
 }
 
+// Help line under the banner.
 function updateHelp(html) {
   $('#update-help').innerHTML = html;
   $('#update-help').hidden = false;
 }
 
-// The updater installed on the computer replaces the files, then the extension reloads itself (the popup closes).
+// "Mettre à jour": the updater replaces the files, then the extension reloads (the popup closes).
 $('#update-go').addEventListener('click', async () => {
   const btn = $('#update-go');
   btn.disabled = true;

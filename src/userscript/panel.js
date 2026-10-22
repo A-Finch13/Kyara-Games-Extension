@@ -1,5 +1,5 @@
-// Userscript version: there is no popup, so the settings open from the site's own menu
-// ("Plus" on a computer, the menu sheet on a phone).
+// Userscript: settings panel opened from the site's menu ("Plus" on a computer, the menu sheet on a phone),
+// and the banners of new versions.
 (() => {
   const OPTIONS = [
     ['hideComplete', 'Masquer les séries complètes'],
@@ -12,6 +12,7 @@
     ['notifyUpdated', 'Bandeau « nouvelle version installée » après une mise à jour du script']
   ];
 
+  // Settings panel: checkboxes and the code for another device.
   async function openSettings() {
     document.querySelector('.kyx-modal-back')?.remove();
     const settings = await getSettings();
@@ -21,6 +22,14 @@
       <section class="kyx-modal kyx-settings" role="dialog" aria-modal="true" aria-label="Réglages de Kyara Games">
         <div class="kyx-modal-head"><div><small>Script Kyara Games · ${KYX_VERSION}</small><b class="kyx-modal-name">Réglages</b></div></div>
         <div class="kyx-settings-list"></div>
+        <div class="kyx-sync">
+          <b>Autre appareil</b>
+          <p class="kyx-settings-note">Pour retrouver tes réglages et tes œuvres favorites sur un autre appareil (PC, téléphone, extension ou script) : copie ton code ici, puis colle-le sur l’autre appareil. Les verrous de cartes et les envies sont déjà gardés par Kyara sur ton compte.</p>
+          <div class="kyx-order-btns"><button type="button" class="kyx-sync-copy">Copier mon code</button></div>
+          <textarea rows="2" placeholder="Tape ou colle ici le code de ton autre appareil (ex. 1A2B-3C4D-…)" spellcheck="false"></textarea>
+          <div class="kyx-order-btns"><button type="button" class="kyx-sync-import">Importer ce code</button></div>
+          <p class="kyx-settings-note kyx-sync-msg" role="status"></p>
+        </div>
         <p class="kyx-settings-note">Les mises à jour du script s’installent toutes seules par ton gestionnaire de scripts. Les notifications ne sont disponibles qu’avec l’extension.</p>
         <div class="kyx-order-btns"><button type="button" class="kyx-settings-close">Fermer</button></div>
       </section>`;
@@ -34,6 +43,25 @@
       box.addEventListener('change', () => setSettings({ [key]: box.checked }));
       list.appendChild(label);
     }
+    const area = back.querySelector('.kyx-sync textarea');
+    const msg = (t) => (back.querySelector('.kyx-sync-msg').textContent = t);
+    back.querySelector('.kyx-sync-copy').addEventListener('click', async () => {
+      const code = await exportCode();
+      area.value = code;
+      area.select();
+      const copied = await navigator.clipboard?.writeText(code).then(() => true, () => false);
+      msg(copied ? 'Code copié ✔ Colle-le sur ton autre appareil.' : 'Copie le code ci-dessus et colle-le sur ton autre appareil.');
+    });
+    back.querySelector('.kyx-sync-import').addEventListener('click', async () => {
+      try {
+        const res = await importCode(area.value);
+        const now = await getSettings();
+        list.querySelectorAll('input').forEach((box, i) => (box.checked = !!now[OPTIONS[i][0]]));
+        msg(`Importé ✔ ${res.favs} œuvre${res.favs > 1 ? 's' : ''} favorite${res.favs > 1 ? 's' : ''}, réglages à jour.`);
+      } catch (e) {
+        msg(e?.code === 'other_catalog' ? 'Ce code a été fait avec un autre catalogue de cartes : recrée-le sur l’autre appareil, puis réessaie.' : 'Ce code n’est pas reconnu : vérifie qu’il est recopié en entier.');
+      }
+    });
     const close = () => {
       back.remove();
       document.removeEventListener('keydown', onKey, true);
@@ -45,7 +73,7 @@
     document.body.appendChild(back);
   }
 
-  // A copy of one of the menu's own items, at its end. closer: the button that closes that menu.
+  // "Kyara Games" entry at the end of a menu of the site; closer: the button that closes that menu.
   function addEntry(menu, closer) {
     if (!menu || menu.querySelector(':scope > .kyx-settings-entry')) return;
     const model = menu.querySelector(':scope > a:not(.kyx-more)');
@@ -70,8 +98,7 @@
     menu.appendChild(entry);
   }
 
-  // Tampermonkey and Userscripts install new versions silently: say it once, at the first visit after an update.
-  // Nothing at the very first install.
+  // "Kyara Games est passé en X" once, at the first visit after an update (not after the first install).
   async function announceUpdate() {
     const { lastVersion } = await chrome.storage.local.get('lastVersion');
     if (lastVersion === KYX_VERSION) return;
@@ -89,8 +116,7 @@
     document.body.appendChild(bar);
   }
 
-  // Tampermonkey checks for new versions on its own schedule (once a day by default): the script also asks GitHub
-  // every 15 minutes while kyara.games is open, once for all the open tabs, and offers the update.
+  // Asks GitHub for a new version every 15 minutes while kyara.games is open, once for all the open tabs.
   const UPDATE_EVERY = 15 * 60e3;
   async function lookForUpdate(maxAge = UPDATE_EVERY) {
     const { updateCheckedAt } = await chrome.storage.local.get('updateCheckedAt');
@@ -101,6 +127,7 @@
     offerUpdate();
   }
 
+  // "Kyara Games X est disponible" banner with the "Mettre à jour" button.
   async function offerUpdate() {
     const { update, updateLater } = await chrome.storage.local.get(['update', 'updateLater']);
     const shown = document.querySelector('.kyx-update-toast.offer');
@@ -117,7 +144,7 @@
       <a class="kyx-update-notes" target="_blank" rel="noopener">Nouveautés</a>
       <button type="button" aria-label="Plus tard" title="Plus tard">✕</button>`;
     bar.querySelector('b').textContent = update.version;
-    // The script of the latest release (never an in-between one): Tampermonkey (or Userscripts) recognises it and offers to update.
+    // The script of the latest release: Tampermonkey (or Userscripts) offers to update.
     bar.querySelector('.kyx-update-go').href = `https://github.com/${REPO}/releases/latest/download/kyara-games.user.js`;
     bar.querySelector('.kyx-update-notes').href = `https://github.com/${REPO}/releases/latest`;
     bar.querySelector('.kyx-update-go').addEventListener('click', () => {
@@ -133,6 +160,7 @@
     document.body.appendChild(bar);
   }
 
+  // Adds the entry to the site's menus.
   const scan = () => {
     addEntry(document.querySelector('#nav-more'), 'button[aria-controls="nav-more"][aria-expanded="true"]');
     addEntry(document.querySelector('#mobile-nav .sheet-grid'), 'button.burger[aria-controls="mobile-nav"]');
