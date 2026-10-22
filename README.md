@@ -118,13 +118,6 @@ Au clic sur **Mettre à jour**, l'assistant télécharge la release GitHub et re
 
 `manifest.json` sert à Brave/Chrome, `manifest.firefox.json` à Firefox : garde le même numéro de version dans les deux.
 
-## Publier une nouvelle version
-
-1. Monte le numéro de version, le même dans `manifest.json` et `manifest.firefox.json` (toujours plus haut que le précédent : c'est lui qui déclenche les mises à jour).
-2. Ajoute les nouveautés de la version en tête de `KYX_CHANGES` dans `src/content/tutorial.js` (et une étape à `KYX_TOUR` pour une nouvelle fonction) : `build.py` refuse une version sans nouveautés.
-3. `python build.py`.
-4. **GitHub** : crée la release `vX.Y.Z` avec `dist/kyara-games-chromium.zip` et `dist/kyara-games.user.js`. Brave / Chrome / Edge la voient dans les 15 minutes (bouton **Mettre à jour** de la popup) ; les gestionnaires de scripts récupèrent le script de la dernière release tout seuls.
-
 ## Comment ça marche
 
 - La session (`kyara_token`) est lue dans l'onglet kyara.games et n'est envoyée qu'à `https://kyara.games/api`.
