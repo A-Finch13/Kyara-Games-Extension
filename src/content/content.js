@@ -992,14 +992,23 @@
   };
   const boosters = (n) => `${num(n)} booster${n >= 2 ? 's' : ''}`;
 
-  // rows: [{ pack, hits: wanted cards per booster on average, chance: chance of at least one per booster }],
-  // ranked from the most to the least profitable: free boosters first, then the fewest chakra per wanted card.
+  // How the boosters are ranked: by price (fewest chakra spent on average, free boosters first)
+  // or by drop rate (best chance at each booster, whatever it costs). Remembered in this browser.
+  let rankBy = 'price';
+  try {
+    if (localStorage.getItem('kyx-rank-by') === 'drop') rankBy = 'drop';
+  } catch {}
+
+  // rows: [{ pack, hits: wanted cards per booster on average, chance: chance of at least one per booster }].
   // what: what is looked for, as in "pour avoir {what}".
   function renderPacks(page, rows, what) {
+    page.kyxLast = [rows, what]; // ranked again without new requests when the criterion changes
     const list = page.querySelector('.kyx-b-list');
     const summary = page.querySelector('.kyx-b-summary');
+    const byDrop = rankBy === 'drop';
+    page.querySelectorAll('.kyx-b-sort [data-by]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.by === rankBy)));
     rows = rows.filter((r) => r.hits > 0).map((r) => ({ ...r, cost: r.pack.chakraPrice > 0 ? r.pack.chakraPrice / r.hits : 0 }));
-    rows.sort((a, b) => a.cost - b.cost || b.hits - a.hits);
+    rows.sort(byDrop ? (a, b) => b.hits - a.hits || a.cost - b.cost : (a, b) => a.cost - b.cost || b.hits - a.hits);
     list.innerHTML = '';
     summary.innerHTML = '';
     if (!rows.length) {
@@ -1008,28 +1017,50 @@
     }
     // How many boosters to open on average for one wanted card, said plainly.
     const needed = (r) => (r.hits >= 1 ? `≈ ${num(r.hits, 1)} par booster en moyenne` : `≈ ${boosters(Math.max(1, Math.round(1 / r.hits)))} à ouvrir en moyenne`);
+    const spent = (r) => (r.cost ? `≈ ${chakra(r.cost)} en moyenne` : 'gratuit');
     const free = rows.find((r) => !r.cost);
     const paid = rows.filter((r) => r.cost);
-    const best = paid[0];
-    const lines = [];
-    if (best) lines.push(`<b>Meilleur achat :</b> <span class="kyx-b-n"></span> · ${needed(best)} pour avoir ${what}, soit ≈ ${chakra(best.cost)} au total.`);
-    if (free) lines.push(`<b>Gratuit :</b> <span class="kyx-b-n"></span> · ${needed(free)}.`);
-    if (paid.length > 1) {
-      const worst = paid[paid.length - 1];
-      lines.push(`<b>À éviter :</b> <span class="kyx-b-n"></span> · ≈ ${chakra(worst.cost)}, ${num(worst.cost / best.cost, 1)} fois plus cher que le meilleur achat.`);
+    const cheapest = [...paid].sort((a, b) => a.cost - b.cost)[0];
+    const top = rows[0];
+    const last = rows.length > 1 ? rows[rows.length - 1] : null;
+
+    // Summary: [label, row, text after the name]
+    const lines = byDrop
+      ? [
+          ['Meilleur taux', top, ` · ${pct(Math.min(top.chance, 1))} de chance à chaque booster, ${needed(top)} pour avoir ${what} (${spent(top)}).`],
+          cheapest && cheapest !== top ? ['Le moins cher', cheapest, ` · ${spent(cheapest)}, mais ${needed(cheapest)}.`] : null,
+          last ? ['Pire taux', last, ` · ${num(top.hits / last.hits, 1)} fois moins de chances que le meilleur taux.`] : null
+        ]
+      : [
+          cheapest ? ['Meilleur achat', cheapest, ` · ${needed(cheapest)} pour avoir ${what}, soit ≈ ${chakra(cheapest.cost)} au total.`] : null,
+          free ? ['Gratuit', free, ` · ${needed(free)}.`] : null,
+          paid.length > 1 ? ['À éviter', paid[paid.length - 1], ` · ≈ ${chakra(paid[paid.length - 1].cost)}, ${num(paid[paid.length - 1].cost / cheapest.cost, 1)} fois plus cher que le meilleur achat.`] : null
+        ];
+    for (const line of lines.filter(Boolean)) {
+      const el = document.createElement('p');
+      el.innerHTML = `<b></b> <span class="kyx-b-n"></span>${line[2]}`;
+      el.querySelector('b').textContent = `${line[0]} :`;
+      el.querySelector('.kyx-b-n').textContent = line[1].pack.name;
+      summary.appendChild(el);
     }
-    summary.innerHTML = lines.map((l) => `<p>${l}</p>`).join('');
-    const names = summary.querySelectorAll('.kyx-b-n');
-    [best, free, paid.length > 1 ? paid[paid.length - 1] : null].filter(Boolean).forEach((r, i) => (names[i].textContent = r.pack.name));
 
     rows.forEach((r, i) => {
       const li = document.createElement('li');
       const p = r.pack;
       const price = p.chakraPrice > 0 ? `${chakra(p.chakraPrice)} le booster` : 'booster gratuit';
       const freeOk = p.usesFreePacks ? '<span class="kyx-b-tag">accepte tes boosters gratuits</span>' : '';
-      const label = i === 0 ? 'Le plus rentable' : i === rows.length - 1 && rows.length > 2 ? 'Le moins rentable' : '';
-      // Profitability against the best paid booster (a free booster has no chakra cost to compare).
-      const score = r.cost ? Math.round((best.cost / r.cost) * 100) : null;
+      const first = byDrop ? 'Meilleur taux' : 'Le plus rentable';
+      const worst = byDrop ? 'Pire taux' : 'Le moins rentable';
+      const label = i === 0 ? first : i === rows.length - 1 && rows.length > 2 ? worst : '';
+      // The bar compares with the best of the list: drop rate against the best rate,
+      // price against the cheapest paid booster (a free booster has no chakra cost to compare).
+      const score = byDrop ? Math.round((r.hits / top.hits) * 100) : r.cost ? Math.round((cheapest.cost / r.cost) * 100) : null;
+      const barText = byDrop
+        ? score >= 100 ? 'Taux 100 % (la référence)' : `Taux ${score} % du meilleur`
+        : score >= 100 ? 'Prix 100 % (la référence)' : `Rentabilité prix ${score} % du meilleur achat`;
+      const right = byDrop
+        ? `<b>${r.hits >= 1 ? `${num(r.hits, 1)} / booster` : `1 sur ${num(Math.round(1 / r.hits))}`}</b><small>${r.cost ? `≈ ${chakra(r.cost)} en moyenne` : 'gratuit'}</small>`
+        : r.cost ? `<b>≈ ${chakra(r.cost)}</b><small>dépensés en moyenne</small>` : `<b class="kyx-b-free">Gratuit</b><small>aucun chakra</small>`;
       li.innerHTML = `
         <a href="/ouvrir/${encodeURIComponent(p.id)}">
           <span class="kyx-b-rank">${i + 1}</span>
@@ -1040,8 +1071,8 @@
             <small>${pct(Math.min(r.chance, 1))} de chance à chaque booster${p.sub ? ` · <span class="kyx-b-sub"></span>` : ''}</small>
             ${freeOk}
           </span>
-          <span class="kyx-b-num">${r.cost ? `<b>≈ ${chakra(r.cost)}</b><small>dépensés en moyenne</small>` : `<b class="kyx-b-free">Gratuit</b><small>aucun chakra</small>`}</span>
-          ${score != null ? `<span class="kyx-b-bar"><span><i style="width:${Math.max(2, Math.min(100, score))}%"></i></span><small>${score >= 100 ? 'Rentabilité 100 % (la référence)' : `Rentabilité ${score} % du meilleur achat`}</small></span>` : ''}
+          <span class="kyx-b-num">${right}</span>
+          ${score != null ? `<span class="kyx-b-bar"><span><i style="width:${Math.max(2, Math.min(100, score))}%"></i></span><small>${barText}</small></span>` : ''}
         </a>`;
       li.querySelector('.kyx-b-kanji').textContent = p.kanji ?? '';
       li.querySelector('.kyx-b-kanji').style.color = p.color ?? '';
@@ -1106,9 +1137,14 @@
         </div>
         <div class="kyx-page-query"></div>
         <p class="kyx-page-note" role="status"></p>
+        <div class="kyx-b-sort" role="group" aria-label="Classer les boosters">
+          <span>Classer par</span>
+          <button type="button" data-by="price" aria-pressed="false"><b>Prix</b><small>le moins de chakra dépensé</small></button>
+          <button type="button" data-by="drop" aria-pressed="false"><b>Taux de drop</b><small>la meilleure chance par booster</small></button>
+        </div>
         <div class="kyx-b-summary"></div>
         <ol class="kyx-b-list"></ol>
-        <p class="kyx-page-foot">Comment c’est calculé : avec les taux publiés par le site, on compte combien de boosters il faut ouvrir en moyenne pour tomber une fois sur ce que tu cherches, puis combien de chakra ça représente (nombre de boosters × prix du booster). La rentabilité compare chaque booster au meilleur achat : 50 % veut dire qu’il coûte deux fois plus cher pour le même résultat. Ce sont des moyennes, la chance peut faire mieux ou pire. Cliquer sur un booster ouvre sa page, rien n’est acheté.</p>`;
+        <p class="kyx-page-foot">Comment c’est calculé : avec les taux publiés par le site, on compte combien de boosters il faut ouvrir en moyenne pour tomber une fois sur ce que tu cherches, puis combien de chakra ça représente (nombre de boosters × prix du booster). Classé par <b>prix</b>, la barre compare au meilleur achat : 50 % veut dire deux fois plus cher pour le même résultat. Classé par <b>taux de drop</b>, elle compare au meilleur taux : 50 % veut dire deux fois moins de chances à chaque booster, quel que soit son prix. Ce sont des moyennes, la chance peut faire mieux ou pire. Cliquer sur un booster ouvre sa page, rien n’est acheté.</p>`;
     main.dataset.kyxHidden = '1';
     main.after(page);
     document.documentElement.dataset.kyxView = 'boosters'; // "Plus" underlined in the site's header
@@ -1249,6 +1285,7 @@
       page.querySelectorAll('.kyx-seg [data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
       page.querySelector('.kyx-b-list').innerHTML = '';
       page.querySelector('.kyx-b-summary').innerHTML = '';
+      page.kyxLast = null;
       query.innerHTML = '';
       note('');
       if (m === 'char') {
@@ -1289,6 +1326,17 @@
       }
     }
     page.querySelectorAll('.kyx-seg [data-mode]').forEach((b) => b.addEventListener('click', () => mode(b.dataset.mode)));
+    page.querySelectorAll('.kyx-b-sort [data-by]').forEach((b) =>
+      b.addEventListener('click', () => {
+        rankBy = b.dataset.by;
+        try {
+          localStorage.setItem('kyx-rank-by', rankBy);
+        } catch {}
+        if (page.kyxLast) renderPacks(page, ...page.kyxLast);
+        else page.querySelectorAll('.kyx-b-sort [data-by]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      })
+    );
+    page.querySelectorAll('.kyx-b-sort [data-by]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.by === rankBy)));
     mode('rar');
     forRarity('M'); // a ranking right away
   }
