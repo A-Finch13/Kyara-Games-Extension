@@ -60,7 +60,7 @@ function renderAlbums() {
   const done = stats.filter((s) => s.complete).length;
   $('#album-summary').textContent = `${done} / ${stats.length} albums complets · ${coll.size ? [...coll.values()].filter((v) => v.qty > 0).length.toLocaleString('fr-FR') : 0} / ${catalog.length.toLocaleString('fr-FR')} cartes`;
   const list = stats
-    .filter((s) => !(settings.hideComplete && s.complete) && !(settings.hideSmall && s.total < 4) && (!q || norm(s.name).includes(q)))
+    .filter((s) => !(settings.hideComplete && s.complete) && !(settings.hideSmall && s.total < 5) && (!q || norm(s.name).includes(q)))
     .sort(
       sort === 'az' ? (a, b) => a.name.localeCompare(b.name)
         : sort === 'pct' ? (a, b) => b.pct - a.pct || a.name.localeCompare(b.name)

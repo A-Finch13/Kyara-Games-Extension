@@ -1,11 +1,14 @@
-// Kyara Games on kyara.games: card badges, completed and small albums hidden, missing cards greyed out with a buy order, "Bloquer sauf doublons", "Manquantes" chip on Collection and the "Ses doublons" filter in the trade composer.
+// Kyara Games on kyara.games: card badges, completed and small albums hidden, missing cards greyed out with a buy order,
+// "Bloquer sauf doublons", last copy of a card on sale locked, compact completed series on Missions, "Boosters rentables" page,
+// "Amis" filter on the Classement page, "Manquantes" chip on Collection and the "Ses doublons" filter in the trade composer.
 (() => {
   const DEFAULTS = {
     hideComplete: true,
     hideSmall: false,
     badgeMissing: true,
     badgeDupes: true,
-    theirDupes: true
+    theirDupes: true,
+    lockLastListed: true
   };
   const CARD_SRC = /\/cards\/[a-z0-9]+\/(\d+)\.webp/i;
 
@@ -220,8 +223,8 @@
     return s ? s.owned >= s.total : false;
   }
 
-  // Series with fewer than 4 characters in the whole catalog.
-  const SMALL = 4;
+  // Series with fewer than 5 characters in the whole catalog.
+  const SMALL = 5;
   function albumSmall(li) {
     const m = albumCount(li);
     if (m) return Number(m[2]) < SMALL;
@@ -356,7 +359,7 @@
   };
 
   // Same request as the site's own: session, device and anti-bot pass it keeps in localStorage, sent from the page.
-  async function siteApi(path, { method = 'GET', body } = {}) {
+  async function siteApi(path, { method = 'GET', body, auth = true } = {}) {
     const headers = { accept: 'application/json' };
     try {
       const token = localStorage.getItem('kyara_token');
@@ -366,7 +369,7 @@
       if (device) headers['x-device-id'] = device;
       if (pass?.pass && pass.expiresAt > Date.now()) headers['x-pass'] = pass.pass;
     } catch {}
-    if (!headers.authorization) throw Object.assign(new Error('no_token'), { code: 'no_token' });
+    if (auth && !headers.authorization) throw Object.assign(new Error('no_token'), { code: 'no_token' });
     if (body !== undefined) headers['content-type'] = 'application/json';
     let res;
     try {
@@ -530,15 +533,28 @@
 
   const collectionItems = (body) => (Array.isArray(body) ? body : Array.isArray(body?.items) ? body.items : []);
 
-  // [id, pinned] changes so that, in this series, exactly the cards held once are locked.
+  // Copies not on sale nor in a trade (those are held apart by the site and stay out of the lock).
+  const freeCopies = (x) => (x.qty ?? 0) - (x.locked ?? 0);
+
+  // [id, pinned] changes so that, in this series, exactly the cards with a single free copy are locked.
   function lockPlan(series, items) {
     const ids = new Set([...(catalog?.values() ?? [])].filter((c) => norm(c.s) === norm(series)).map((c) => c.id));
     const changes = [];
     for (const x of items) {
       const id = x.characterId ?? x.id;
       if (!ids.has(id) || !(x.qty > 0)) continue;
-      const want = x.qty === 1;
+      const want = freeCopies(x) <= 1;
       if (!!x.pinned !== want) changes.push([id, want]);
+    }
+    return changes;
+  }
+
+  // A duplicate put on sale leaves a single copy: lock it, so it can't go in a trade or a second sale by mistake.
+  function listedPlan(items) {
+    const changes = [];
+    for (const x of items) {
+      const onSale = x.escrow ? !!x.escrow.listings : (x.locked ?? 0) > 0;
+      if (!x.pinned && onSale && (x.locked ?? 0) > 0 && freeCopies(x) === 1) changes.push([x.characterId ?? x.id, true]);
     }
     return changes;
   }
@@ -552,9 +568,12 @@
 
   // Each time the site reloads the collection: lock the cards that went down to one copy, free the new duplicates.
   async function keepSmartLocks(body) {
-    if (pinning || !smartLock.size || !catalog) return;
+    if (pinning) return;
     const items = collectionItems(body);
-    const changes = [...smartLock].flatMap((series) => lockPlan(series, items));
+    const changes = catalog ? [...smartLock].flatMap((series) => lockPlan(series, items)) : [];
+    if (settings.lockLastListed) {
+      for (const change of listedPlan(items)) if (!changes.some(([id]) => id === change[0])) changes.push(change);
+    }
     if (!changes.length) return;
     pinning = true;
     try {
@@ -640,6 +659,609 @@
     btn.title = on
       ? 'Les cartes en un seul exemplaire sont verrouillées, les doublons restent vendables. Clique pour arrêter ce mode.'
       : 'Verrouille les cartes que tu as en un seul exemplaire et laisse les doublons vendables au marché.';
+  }
+
+  // ---------- Missions: completed series next to the referral card ----------
+
+  // The "Séries complètes" card lists every completed series: kept to the height of the referral card beside it
+  // (scrolling inside), series still to claim first, and the total in its title.
+  function scanMissions() {
+    if (location.pathname !== '/missions') return;
+    const card = document.querySelector('section[aria-labelledby="albums-t"]');
+    const list = card?.querySelector('ul.quests');
+    const title = card?.querySelector('#albums-t');
+    if (!list || !title) return;
+    card.classList.add('kyx-albums');
+    const total = list.children.length;
+    const toClaim = [...list.children].filter((li) => !li.classList.contains('claimed')).length;
+    let count = title.querySelector(':scope > .kyx-count');
+    if (!count) {
+      count = document.createElement('span');
+      count.className = 'kyx-count';
+      title.appendChild(count);
+    }
+    const text = `${total.toLocaleString('fr-FR')}${toClaim ? ` · ${toClaim} à réclamer` : ''}`;
+    if (count.textContent !== text) count.textContent = text;
+    const ref = document.querySelector('section[aria-labelledby="ref-t"]');
+    const height = ref && ref.offsetTop === card.offsetTop ? ref.offsetHeight : 0;
+    const max = height > 150 ? `${height}px` : '320px';
+    if (card.style.maxHeight !== max) card.style.maxHeight = max;
+  }
+
+  // ---------- "Amis" filter on the Classement page ----------
+
+  const num = (n, digits = 0) => Number(n).toLocaleString('fr-FR', { maximumFractionDigits: digits });
+
+  // The ranking of the chosen tab (collection, prestige, mythiques…) among your friends and you,
+  // with each one's place in the general ranking. Shown instead of the general podium and list.
+  const plural = (n, one, many) => (Math.abs(n) < 2 ? one : many);
+  const LADDER = {
+    collection: { main: (r) => r.owned, unit: (n) => plural(n, 'carte', 'cartes'), side: (r) => `${num(r.mythics ?? 0)} ${plural(r.mythics ?? 0, 'mythique', 'mythiques')}` },
+    prestige: { main: (r) => r.points, unit: () => 'points', side: (r) => `${num(r.owned ?? 0)} cartes` },
+    mythics: { main: (r) => r.mythics, unit: (n) => plural(n, 'mythique', 'mythiques'), side: (r) => `${num(r.points ?? 0)} pts` },
+    series: { main: (r) => r.series, unit: (n) => plural(n, 'série', 'séries'), side: (r) => `${num(r.owned ?? 0)} cartes` },
+    achievements: { main: (r) => r.achievements, unit: () => 'succès', side: (r) => `${num(r.points ?? 0)} pts` }
+  };
+  const ladderCache = new Map(); // `${by}|${id}` -> { at, row }
+  let friendsOnly = false;
+  let friendsShown = '';
+
+  async function ladderRow(by, id) {
+    const key = `${by}|${id}`;
+    const hit = ladderCache.get(key);
+    if (hit && Date.now() - hit.at < 5 * 60e3) return hit.row;
+    const res = await siteApi(`/leaderboard/ladder?by=${by}&me=${encodeURIComponent(id)}`, { auth: false }).catch(() => null);
+    const row = res?.me ?? null;
+    ladderCache.set(key, { at: Date.now(), row });
+    return row;
+  }
+
+  async function friendIds() {
+    const res = await siteApi('/me/friends');
+    const list = Array.isArray(res) ? res : res?.friends ?? res?.items ?? [];
+    return list.map((f) => (f.user ?? f.friend ?? f).id ?? f.userId).filter((id) => id != null);
+  }
+
+  function scanLadder() {
+    const head = location.pathname === '/classement' ? document.querySelector('main#contenu section.head') : null;
+    const tabs = head?.querySelector('.tabs[role="tablist"]');
+    if (!tabs) return void (friendsShown = '');
+    let btn = tabs.querySelector(':scope > .kyx-friends-tab');
+    if (!btn) {
+      const model = tabs.querySelector(':scope > button[role="tab"]');
+      if (!model) return;
+      btn = model.cloneNode(true);
+      btn.classList.add('kyx-friends-tab');
+      btn.classList.remove('on');
+      btn.removeAttribute('role');
+      btn.removeAttribute('aria-selected');
+      btn.querySelector('.tk').textContent = '友';
+      btn.lastChild.textContent = ' Amis';
+      btn.title = 'Seulement tes amis et toi';
+      btn.addEventListener('click', () => {
+        friendsOnly = !friendsOnly;
+        friendsShown = '';
+        scanLadder();
+      });
+      tabs.appendChild(btn);
+    }
+    btn.classList.toggle('on', friendsOnly);
+    btn.setAttribute('aria-pressed', String(friendsOnly));
+    const by = LADDER[new URLSearchParams(location.search).get('par')] ? new URLSearchParams(location.search).get('par') : 'collection';
+    // The site's podium and lists sit after the head: hidden while the filter is on.
+    for (const el of head.parentElement.children) {
+      if (el === head || el.classList.contains('kyx-friends')) continue;
+      if (friendsOnly && el.dataset.kyxHidden !== '1') el.dataset.kyxHidden = '1';
+      else if (!friendsOnly && el.dataset.kyxHidden) delete el.dataset.kyxHidden;
+    }
+    let board = head.parentElement.querySelector(':scope > .kyx-friends');
+    if (!friendsOnly) return void board?.remove();
+    if (!board) {
+      board = document.createElement('section');
+      board.className = 'kyx-friends wrap body';
+      head.after(board);
+    }
+    if (friendsShown === by) return;
+    friendsShown = by;
+    renderFriends(board, by);
+  }
+
+  // The site's own markup for the podium and the list, so the friends ranking looks like the other tabs.
+  // Its style classes (svelte-xxxx) change with each version of the site: read from what is on the page.
+  function siteScope(selector, fallback) {
+    const el = document.querySelector(selector);
+    return [...(el?.classList ?? [])].find((c) => c.startsWith('svelte-')) ?? fallback;
+  }
+
+  const AVATAR_COLORS = ['#FF4D2E', '#4D9BFF', '#3FBF7F', '#B072FF', '#F5C518', '#4DD6FF'];
+  const FRAME_ANIM = { staff: 'spin', 'r-legende': 'spin', 'x-pantheon': 'spin', 'r-virtuose': 'sheen', gold: 'glint', mecene: 'sheen', daimyo: 'spin', 'r-maitre': 'twinkle', 'e-lancement': 'bloom', 'e-guilde': 'spin' };
+  const FRAME_ORN = {
+    gold: { gems: [0] }, mecene: { stars: [-48, 48], plaque: '援' }, soutien: { plaque: '援' }, daimyo: { stars: [-52, 0, 52], plaque: '大名' },
+    'r-collectionneur': { gems: [0] }, 'r-expert': { gems: [0, 120, 240] }, 'r-maitre': { gems: [0], plaque: '名人' },
+    'r-virtuose': { stars: [-50, 50], plaque: '達人' }, 'r-legende': { stars: [-55, 0, 55], plaque: '伝説' }, 'x-mythique': { gems: [0] },
+    'x-pantheon': { stars: [-40, 40], plaque: '神' }, 'x-albums': { plaque: '集' }, 'x-encyclopedie': { plaque: '典' }, 'x-negoce': { plaque: '商' },
+    'e-lancement': { petals: [35, 62, -50] }, 'e-guilde': { stars: [-45, 45], plaque: '団' }, staff: { plaque: '匠' }
+  };
+  const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+  // Same as the site's avatar: picture (or initial) in its frame, with the frame's stars, gems and plaque.
+  function avatarHtml(row, size, sc) {
+    const frame = row.frame === true ? 'gold' : typeof row.frame === 'string' ? row.frame : null;
+    const anim = frame && size >= 64 ? FRAME_ANIM[frame] : null;
+    const orn = frame && size >= 40 ? FRAME_ORN[frame] : null;
+    const color = AVATAR_COLORS[[...String(row.pseudo ?? '')].reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
+    const pic = row.avatar
+      ? `<img alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${sc}" src="${esc(row.avatar)}"/>`
+      : `<span aria-hidden="true" class="${sc}">${esc(row.pseudo ? row.pseudo[0].toUpperCase() : 'キ')}</span>`;
+    let extra = '';
+    if (orn) {
+      extra += (orn.gems ?? []).map((a) => `<i class="orn gem ${sc}" aria-hidden="true" style="--a:${a}deg"></i>`).join('');
+      extra += (orn.stars ?? []).map((a) => `<i class="orn star ${sc}" aria-hidden="true" style="--a:${a}deg">✦</i>`).join('');
+      if (orn.plaque) extra += `<i class="orn plaque ${sc}" aria-hidden="true" style="--a:180deg">${orn.plaque}</i>`;
+    }
+    const cls = ['afr', frame ? `f-${frame}` : '', sc, frame ? 'framed' : '', anim ?? ''].filter(Boolean).join(' ');
+    return `<span class="${cls}" style="width:${size}px;height:${size}px;--rw:${Math.max(3, Math.round(size / 15))}px;--sz:${size}px"><span class="av ${sc}" style="--c:${color};font-size:${Math.round(size * 0.4)}px">${pic}</span>${extra}</span>`;
+  }
+
+  // Same as the site's rank badge (達人 Virtuose…).
+  function rankHtml(rank, size, label, sc) {
+    if (!rank) return '';
+    const small = label !== 'none' ? ` <small class="${sc}">${esc(rank.label)}</small>` : '';
+    return `<span class="rs r-${esc(rank.id)} ${size} l-${label} ${sc}" title="Rang ${esc(rank.label)}"><b class="${sc}"><span class="k ${sc}">${esc(rank.kanji)}</span></b>${small}</span>`;
+  }
+
+  const badgesHtml = (row, n, sc) =>
+    (row.badges ?? [])
+      .slice(0, n)
+      .map((b) => `<span class="bd ${b.frame === 'gold' && !String(b.id).startsWith('membre-') ? 'gold' : ''} ${b.frame === 'staff' ? 'staff' : ''} ${sc}" title="${esc(b.label)}">${esc(b.kanji)}</span>`)
+      .join('');
+
+  async function renderFriends(board, by) {
+    const def = LADDER[by];
+    board.innerHTML = '<p class="kyx-friends-note">Chargement du classement de tes amis…</p>';
+    let ids;
+    try {
+      ids = await friendIds();
+    } catch (e) {
+      board.innerHTML = `<p class="kyx-friends-note">${e?.code === 'no_token' ? 'Connecte-toi pour voir tes amis.' : 'Impossible de charger tes amis.'}</p>`;
+      return;
+    }
+    const { me } = await chrome.storage.local.get('me').catch(() => ({}));
+    if (me?.id && !ids.includes(me.id)) ids.push(me.id);
+    const rows = [];
+    let next = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(4, ids.length) }, async () => {
+        while (next < ids.length) {
+          const row = await ladderRow(by, ids[next++]);
+          if (row) rows.push(row);
+        }
+      })
+    );
+    if (friendsShown !== by || !board.isConnected) return;
+    rows.sort((a, b) => (def.main(b) ?? 0) - (def.main(a) ?? 0) || (a.pos ?? 0) - (b.pos ?? 0));
+    if (rows.length <= (me?.id ? 1 : 0)) {
+      board.innerHTML = '<p class="kyx-friends-note">Tu n’as pas encore d’amis sur Kyara. Ajoute-en depuis la page <a href="/amis">Amis</a>.</p>';
+      return;
+    }
+
+    const sc = siteScope('main#contenu section.head', 'svelte-1s7sfmg');
+    const av = siteScope('main#contenu .afr', 'svelte-112qgxv');
+    const rk = siteScope('main#contenu .rs', 'svelte-1dk01od');
+    const small = matchMedia('(max-width: 520px)').matches;
+    const total = catalog?.size ?? 0;
+    const value = (r) => num(def.main(r) ?? 0);
+    const unit = (r) => def.unit(def.main(r) ?? 0);
+    const isMe = (r) => r.id === me?.id;
+    const general = (r) => `#${num(r.pos ?? 0)} au général`;
+    const MEDALS = ['#F5C518', '#C9C5CE', '#D08A4E'];
+
+    // Podium: 2nd, 1st, 3rd, like the site.
+    const podium = [1, 0, 2]
+      .filter((i) => rows[i])
+      .map((i) => {
+        const r = rows[i];
+        const size = i === 0 ? (small ? 76 : 112) : small ? 60 : 84;
+        const title = `<span class="pod-title ${sc}">${esc(r.title ? `${r.title} · ${general(r)}` : general(r))}</span>`;
+        const badges = r.badges?.length ? `<span class="bdg ${sc}">${badgesHtml(r, 4, sc)}</span>` : '';
+        return `<li class="pod p${i + 1} ${isMe(r) ? 'me' : ''} ${sc}" style="--medal:${MEDALS[i]}">
+          <a class="pod-who ${sc}" href="/profil/${encodeURIComponent(r.id)}">${avatarHtml(r, size, av)} <span class="pod-name ${sc}"${r.nameColor ? ` style="color:${esc(r.nameColor)}"` : ''}>${esc(r.pseudo)}</span> ${title}</a>
+          <span class="pod-rank ${sc}">${rankHtml(r.rank, 'md', 'side', rk)}</span> ${badges}
+          <span class="plinth ${sc}"><span class="pos ${sc}">${i + 1}</span> <span class="pv ${sc}">${value(r)}</span> <span class="pk ${sc}">${unit(r)}</span></span>
+        </li>`;
+      })
+      .join('');
+
+    const list = rows
+      .slice(3)
+      .map((r, j) => {
+        const pct = total && r.owned != null ? Math.min(100, (r.owned / total) * 100) : 0;
+        return `<li class="${isMe(r) ? 'me' : ''} ${sc}">
+          <span class="rank mono ${sc}">${j + 4}</span> ${avatarHtml(r, 44, av)}
+          <span class="who ${sc}"><span class="line ${sc}"><a class="${sc}" href="/profil/${encodeURIComponent(r.id)}"${r.nameColor ? ` style="color:${esc(r.nameColor)}"` : ''}>${esc(r.pseudo)}</a> ${isMe(r) ? `<span class="you ${sc}">toi</span>` : ''} ${badgesHtml(r, 3, sc)}</span>
+          <span class="sub ${sc}"><span class="ttl ${sc}">${esc(r.title ? `${r.title} · ${general(r)}` : general(r))}</span> <span class="bar ${sc}" title="${Math.round(pct)} % du catalogue"><i class="${sc}" style="width:${pct}%"></i></span></span></span>
+          <span class="row-rank ${sc}">${rankHtml(r.rank, 'sm', 'below', rk)}</span>
+          <span class="stat ${sc}"><span class="v ${sc}">${value(r)}</span> <span class="k ${sc}">${unit(r)}</span></span>
+          <span class="stat side ${sc}">${esc(def.side(r))}</span>
+        </li>`;
+      })
+      .join('');
+
+    board.className = `kyx-friends wrap body ${sc}`;
+    board.innerHTML = `
+      <ol class="podium ${sc}" aria-label="Podium de tes amis">${podium}</ol>
+      ${list ? `<ol class="board ${sc}" start="4">${list}</ol>` : ''}
+      <p class="foot mono ${sc}">${rows.length} joueurs · tes amis et toi · « au général » = place au classement de tous les joueurs</p>`;
+  }
+
+  // ---------- "Boosters rentables" page, in the site's "Plus" menu ----------
+
+  // A copy of the menu's own items, after them.
+  function scanMoreMenu() {
+    const menu = document.querySelector('#nav-more');
+    const open = !!document.querySelector('.kyx-view');
+    // While the page is open the site's own item of the current page is not the one shown.
+    menu?.querySelectorAll(':scope > a.on:not(.kyx-more)').forEach((a) => open && a.classList.remove('on'));
+    const mine = menu?.querySelector(':scope > .kyx-more');
+    if (mine) return void mine.classList.toggle('on', open);
+    if (!menu) return;
+    const model = menu.querySelector(':scope > a');
+    if (!model?.querySelector('.dk') || !model.querySelector('.dt b')) return;
+    const item = model.cloneNode(true);
+    item.classList.add('kyx-more');
+    item.classList.toggle('on', open);
+    item.removeAttribute('aria-current');
+    item.href = '#boosters-rentables';
+    item.querySelector('.dk').textContent = '得';
+    item.querySelector('.dt b').textContent = 'Boosters rentables';
+    const hint = item.querySelector('.dt small');
+    if (hint) hint.textContent = 'Le meilleur booster pour une carte';
+    [...item.children].forEach((el) => el.matches('.dk, .dt') || el.remove()); // the model's badges
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.querySelector('button[aria-controls="nav-more"][aria-expanded="true"]')?.click(); // close the menu
+      openBoosters();
+    });
+    menu.appendChild(item);
+  }
+
+  let packsCache = null;
+  const dropCache = new Map(); // id -> { packId: chance per booster }
+
+  // Boosters on sale right now (not the ones only given as rewards).
+  async function loadPacks() {
+    checkBoostersDay();
+    if (packsCache) return packsCache;
+    const now = Date.now();
+    const list = await siteApi('/packs', { auth: false });
+    packsCache = (Array.isArray(list) ? list : []).filter(
+      (p) => !p.grantOnly && (!p.schedule?.start || Date.parse(p.schedule.start) <= now) && (!p.schedule?.end || now < Date.parse(p.schedule.end))
+    );
+    return packsCache;
+  }
+
+  async function dropChances(ids, progress) {
+    let next = 0;
+    let done = 0;
+    const worker = async () => {
+      while (next < ids.length) {
+        const id = ids[next++];
+        if (!dropCache.has(id)) {
+          try {
+            dropCache.set(id, (await siteApi(`/characters/${id}`, { auth: false }))?.dropChance ?? {});
+          } catch {
+            dropCache.set(id, {});
+          }
+        }
+        progress?.(++done, ids.length);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, ids.length) }, worker));
+    return ids.map((id) => dropCache.get(id) ?? {});
+  }
+
+  const pct = (p) => `${num(p * 100, p < 0.1 ? 1 : 0)} %`;
+  const boosters = (n) => `${num(n)} booster${n >= 2 ? 's' : ''}`;
+
+  // rows: [{ pack, hits: wanted cards per booster on average, chance: chance of at least one per booster }],
+  // ranked from the most to the least profitable: free boosters first, then the fewest chakra per wanted card.
+  // what: what is looked for, as in "pour avoir {what}".
+  function renderPacks(page, rows, what) {
+    const list = page.querySelector('.kyx-b-list');
+    const summary = page.querySelector('.kyx-b-summary');
+    rows = rows.filter((r) => r.hits > 0).map((r) => ({ ...r, cost: r.pack.chakraPrice > 0 ? r.pack.chakraPrice / r.hits : 0 }));
+    rows.sort((a, b) => a.cost - b.cost || b.hits - a.hits);
+    list.innerHTML = '';
+    summary.innerHTML = '';
+    if (!rows.length) {
+      list.innerHTML = '<li class="kyx-b-empty">Aucun booster en vente ne contient ça en ce moment.</li>';
+      return;
+    }
+    // How many boosters to open on average for one wanted card, said plainly.
+    const needed = (r) => (r.hits >= 1 ? `≈ ${num(r.hits, 1)} par booster en moyenne` : `≈ ${boosters(Math.max(1, Math.round(1 / r.hits)))} à ouvrir en moyenne`);
+    const free = rows.find((r) => !r.cost);
+    const paid = rows.filter((r) => r.cost);
+    const best = paid[0];
+    const lines = [];
+    if (best) lines.push(`<b>Meilleur achat :</b> <span class="kyx-b-n"></span> · ${needed(best)} pour avoir ${what}, soit ≈ ${chakra(best.cost)} au total.`);
+    if (free) lines.push(`<b>Gratuit :</b> <span class="kyx-b-n"></span> · ${needed(free)}.`);
+    if (paid.length > 1) {
+      const worst = paid[paid.length - 1];
+      lines.push(`<b>À éviter :</b> <span class="kyx-b-n"></span> · ≈ ${chakra(worst.cost)}, ${num(worst.cost / best.cost, 1)} fois plus cher que le meilleur achat.`);
+    }
+    summary.innerHTML = lines.map((l) => `<p>${l}</p>`).join('');
+    const names = summary.querySelectorAll('.kyx-b-n');
+    [best, free, paid.length > 1 ? paid[paid.length - 1] : null].filter(Boolean).forEach((r, i) => (names[i].textContent = r.pack.name));
+
+    rows.forEach((r, i) => {
+      const li = document.createElement('li');
+      const p = r.pack;
+      const price = p.chakraPrice > 0 ? `${chakra(p.chakraPrice)} le booster` : 'booster gratuit';
+      const freeOk = p.usesFreePacks ? '<span class="kyx-b-tag">accepte tes boosters gratuits</span>' : '';
+      const label = i === 0 ? 'Le plus rentable' : i === rows.length - 1 && rows.length > 2 ? 'Le moins rentable' : '';
+      // Profitability against the best paid booster (a free booster has no chakra cost to compare).
+      const score = r.cost ? Math.round((best.cost / r.cost) * 100) : null;
+      li.innerHTML = `
+        <a href="/ouvrir/${encodeURIComponent(p.id)}">
+          <span class="kyx-b-rank">${i + 1}</span>
+          <span class="kyx-b-kanji"></span>
+          <span class="kyx-b-main">
+            <span class="kyx-b-title"><b></b><span class="kyx-b-price">${price}</span>${label ? `<span class="kyx-b-label">${label}</span>` : ''}</span>
+            <span class="kyx-b-line">${needed(r)} pour avoir ${what}</span>
+            <small>${pct(Math.min(r.chance, 1))} de chance à chaque booster${p.sub ? ` · <span class="kyx-b-sub"></span>` : ''}</small>
+            ${freeOk}
+          </span>
+          <span class="kyx-b-num">${r.cost ? `<b>≈ ${chakra(r.cost)}</b><small>dépensés en moyenne</small>` : `<b class="kyx-b-free">Gratuit</b><small>aucun chakra</small>`}</span>
+          ${score != null ? `<span class="kyx-b-bar"><span><i style="width:${Math.max(2, Math.min(100, score))}%"></i></span><small>${score >= 100 ? 'Rentabilité 100 % (la référence)' : `Rentabilité ${score} % du meilleur achat`}</small></span>` : ''}
+        </a>`;
+      li.querySelector('.kyx-b-kanji').textContent = p.kanji ?? '';
+      li.querySelector('.kyx-b-kanji').style.color = p.color ?? '';
+      li.querySelector('.kyx-b-title b').textContent = p.name;
+      const sub = li.querySelector('.kyx-b-sub');
+      if (sub) sub.textContent = p.sub;
+      li.querySelector('a').addEventListener('click', closeBoosters);
+      list.appendChild(li);
+    });
+  }
+
+  // A page of its own: it takes the place of the site's content (header and menu stay) at …#boosters-rentables,
+  // so the back button and a reload work; following any link of the site leaves it.
+  const BOOSTERS_HASH = '#boosters-rentables';
+
+  function closeBoosters() {
+    document.querySelector('.kyx-view')?.remove();
+    const main = document.querySelector('main#contenu');
+    if (main?.dataset.kyxHidden) delete main.dataset.kyxHidden;
+    delete document.documentElement.dataset.kyxView;
+    refreshBoosters = null;
+  }
+
+  // The "Pack du jour" changes at midnight, French time: rankings are computed again then.
+  const parisDay = () => new Date().toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
+  let boostersDay = parisDay();
+  let refreshBoosters = null; // computes the ranking on screen again
+
+  function checkBoostersDay() {
+    const day = parisDay();
+    if (day === boostersDay) return;
+    boostersDay = day;
+    packsCache = null;
+    dropCache.clear();
+    refreshBoosters?.();
+  }
+
+  function onBoostersHash() {
+    if (location.hash === BOOSTERS_HASH) openBoosters();
+    else closeBoosters();
+  }
+
+  function openBoosters() {
+    if (!alive()) return shutdown();
+    if (location.hash !== BOOSTERS_HASH) return void (location.hash = BOOSTERS_HASH); // comes back through hashchange
+    const main = document.querySelector('main#contenu');
+    if (!main || document.querySelector('.kyx-view')) return;
+    document.querySelector('.kyx-modal-back')?.remove();
+    const page = document.createElement('section');
+    page.className = 'kyx-view kyx-page wrap';
+    page.setAttribute('aria-labelledby', 'kyx-view-t');
+    page.innerHTML = `
+        <header class="kyx-page-head">
+          <div><small>Boosters rentables · 得</small><h1 id="kyx-view-t">Quel booster ouvrir ?</h1>
+          <p>Les boosters en vente classés du plus rentable au moins rentable pour obtenir ce que tu cherches.</p></div>
+          <button type="button" class="kyx-page-close">← Retour</button>
+        </header>
+        <div class="kyx-seg" role="group">
+          <button type="button" data-mode="rar" aria-pressed="false">Une rareté</button>
+          <button type="button" data-mode="char" aria-pressed="false">Un personnage</button>
+          <button type="button" data-mode="series" aria-pressed="false">Un univers</button>
+        </div>
+        <div class="kyx-page-query"></div>
+        <p class="kyx-page-note" role="status"></p>
+        <div class="kyx-b-summary"></div>
+        <ol class="kyx-b-list"></ol>
+        <p class="kyx-page-foot">Comment c’est calculé : avec les taux publiés par le site, on compte combien de boosters il faut ouvrir en moyenne pour tomber une fois sur ce que tu cherches, puis combien de chakra ça représente (nombre de boosters × prix du booster). La rentabilité compare chaque booster au meilleur achat : 50 % veut dire qu’il coûte deux fois plus cher pour le même résultat. Ce sont des moyennes, la chance peut faire mieux ou pire. Cliquer sur un booster ouvre sa page, rien n’est acheté.</p>`;
+    main.dataset.kyxHidden = '1';
+    main.after(page);
+    document.documentElement.dataset.kyxView = 'boosters'; // "Plus" underlined in the site's header
+    window.scrollTo(0, 0);
+    const query = page.querySelector('.kyx-page-query');
+    const note = (text) => (page.querySelector('.kyx-page-note').textContent = text);
+    page.querySelector('.kyx-page-close').addEventListener('click', () => (history.length > 1 ? history.back() : (location.hash = '')));
+    let run = 0; // answers of an older search are dropped
+
+    async function forCharacter(card) {
+      const mine = ++run;
+      refreshBoosters = () => forCharacter(card);
+      query.querySelector('input').value = card.n;
+      query.querySelector('.kyx-b-suggest').innerHTML = '';
+      note('Calcul…');
+      const [packs, [drops], listing] = await Promise.all([
+        loadPacks(),
+        dropChances([card.id]),
+        siteApi(`/market/listings?characterId=${card.id}&type=fixed&sort=price_asc&pageSize=1`, { auth: false }).catch(() => null)
+      ]);
+      if (mine !== run) return;
+      const owned = qty(card.id);
+      const market = listing?.items?.[0]?.price;
+      note(
+        [`${card.n} · ${card.s} · ${RARITY_LABEL[card.r] ?? card.r}`, owned ? `tu l’as déjà ×${owned}` : null, market != null ? `au marché dès ${chakra(market)}` : null]
+          .filter(Boolean)
+          .join(' · ')
+      );
+      renderPacks(
+        page,
+        packs.map((pack) => {
+          const hits = Number(drops[pack.id]) || 0;
+          return { pack, hits, chance: hits };
+        }),
+        card.n
+      );
+    }
+
+    async function forRarity(r) {
+      const mine = ++run;
+      refreshBoosters = () => forRarity(r);
+      query.querySelectorAll('[data-r]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.r === r)));
+      note('Calcul…');
+      const packs = await loadPacks();
+      if (mine !== run) return;
+      note(`Pour n’importe quelle carte ${RARITY_LABEL[r]} (même une que tu as déjà).`);
+      renderPacks(
+        page,
+        packs.map((pack) => {
+          const per = pack.rates?.perBooster?.[r];
+          return { pack, hits: Number(per?.expected) || 0, chance: (Number(per?.atLeastOnePct) || 0) / 100 };
+        }),
+        `une ${RARITY_LABEL[r]}`
+      );
+    }
+
+    async function forSeries(name, onlyMissing) {
+      const mine = ++run;
+      refreshBoosters = () => forSeries(name, onlyMissing);
+      const cards = [...(catalog?.values() ?? [])].filter((c) => norm(c.s) === norm(name));
+      const wanted = onlyMissing ? cards.filter((c) => qty(c.id) === 0) : cards;
+      if (!cards.length) return note('Univers inconnu.');
+      if (!wanted.length) {
+        page.querySelector('.kyx-b-list').innerHTML = '';
+        page.querySelector('.kyx-b-summary').innerHTML = '';
+        return note(`Tu as déjà toutes les cartes de ${name} ✔`);
+      }
+      const ids = wanted.slice(0, 150).map((c) => c.id);
+      const [packs, drops] = await Promise.all([loadPacks(), dropChances(ids, (n, t) => mine === run && note(`Calcul… ${n}/${t} persos`))]);
+      if (mine !== run) return;
+      note(`${name} : ${wanted.length} carte${wanted.length > 1 ? 's' : ''} ${onlyMissing ? 'qui te manquent' : 'au total'}${wanted.length > ids.length ? ` (les ${ids.length} premières comptées)` : ''}.`);
+      renderPacks(
+        page,
+        packs.map((pack) => {
+          const hits = drops.reduce((sum, d) => sum + (Number(d[pack.id]) || 0), 0);
+          const chance = 1 - drops.reduce((none, d) => none * (1 - (Number(d[pack.id]) || 0)), 1);
+          return { pack, hits, chance };
+        }),
+        `une carte ${onlyMissing ? 'qui te manque ' : ''}de ${name}`
+      );
+    }
+
+    // A search field like the one of the Collection page; its suggestions open below it, as wide as the field.
+    // items(q) -> [{ img?, title, sub, pick }]
+    function searchField(placeholder, items) {
+      query.insertAdjacentHTML(
+        'afterbegin',
+        `<div class="kyx-search-wrap">
+          <label class="kyx-search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+            <input type="search" autocomplete="off" spellcheck="false" />
+          </label>
+          <ul class="kyx-b-suggest" hidden></ul>
+        </div>`
+      );
+      const input = query.querySelector('.kyx-search input');
+      const suggest = query.querySelector('.kyx-b-suggest');
+      input.placeholder = placeholder;
+      input.setAttribute('aria-label', placeholder);
+      const show = () => {
+        const q = norm(input.value);
+        suggest.innerHTML = '';
+        const found = q.length >= 2 && catalog ? items(q) : [];
+        suggest.hidden = !found.length;
+        for (const it of found) {
+          const li = document.createElement('li');
+          li.innerHTML = '<button type="button"><span><b></b><small></small></span></button>';
+          if (it.img) {
+            const img = Object.assign(document.createElement('img'), { alt: '', referrerPolicy: 'no-referrer', src: it.img });
+            li.querySelector('button').prepend(img);
+          }
+          li.querySelector('b').textContent = it.title;
+          li.querySelector('small').textContent = it.sub;
+          li.querySelector('button').addEventListener('click', () => {
+            input.value = it.title;
+            suggest.hidden = true;
+            it.pick();
+          });
+          suggest.appendChild(li);
+        }
+      };
+      input.addEventListener('input', show);
+      input.addEventListener('focus', show);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') suggest.querySelector('button')?.click();
+        if (e.key === 'Escape') suggest.hidden = true;
+      });
+      // Closes when clicking elsewhere on the page.
+      page.addEventListener('click', (e) => e.target.closest('.kyx-search-wrap') || (suggest.hidden = true));
+      input.focus();
+      if (!catalog) note('Catalogue pas encore chargé, réessaie dans un instant.');
+      return input;
+    }
+
+    function mode(m) {
+      run++;
+      refreshBoosters = null;
+      page.querySelectorAll('.kyx-seg [data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
+      page.querySelector('.kyx-b-list').innerHTML = '';
+      page.querySelector('.kyx-b-summary').innerHTML = '';
+      query.innerHTML = '';
+      note('');
+      if (m === 'char') {
+        searchField('Rechercher un perso ou un univers…', (q) =>
+          [...catalog.values()]
+            .filter((c) => norm(c.n).includes(q) || norm(c.s).includes(q))
+            .slice(0, 10)
+            .map((c) => ({
+              img: `/cards/sm/${c.id}.webp`,
+              title: c.n,
+              sub: `${c.s} · ${RARITY_LABEL[c.r] ?? c.r}${qty(c.id) ? ` · tu l’as ×${qty(c.id)}` : ' · te manque'}`,
+              pick: () => forCharacter(c)
+            }))
+        );
+      } else if (m === 'rar') {
+        query.innerHTML = `<div class="kyx-b-rar">${['C', 'U', 'R', 'E', 'L', 'M'].map((r) => `<button type="button" data-r="${r}" aria-pressed="false">${RARITY_LABEL[r]}</button>`).join('')}</div>`;
+        query.querySelectorAll('[data-r]').forEach((b) => b.addEventListener('click', () => forRarity(b.dataset.r)));
+      } else {
+        const index = seriesIndex();
+        const names = [...new Set([...(catalog?.values() ?? [])].map((c) => c.s))].sort((a, b) => a.localeCompare(b, 'fr'));
+        query.innerHTML = '<label class="kyx-b-check"><input type="checkbox" checked /> Seulement les cartes qui me manquent</label>';
+        const missing = query.querySelector('input[type="checkbox"]');
+        let picked = null;
+        searchField('Rechercher un univers…', (q) =>
+          names
+            .filter((n) => norm(n).includes(q))
+            .slice(0, 10)
+            .map((n) => {
+              const s = index?.get(norm(n));
+              return {
+                title: n,
+                sub: s ? `${s.owned}/${s.total} cartes${s.owned >= s.total ? ' · complet ✔' : ` · ${s.total - s.owned} te manquent`}` : '',
+                pick: () => forSeries((picked = n), missing.checked)
+              };
+            })
+        );
+        missing.addEventListener('change', () => picked && forSeries(picked, missing.checked));
+      }
+    }
+    page.querySelectorAll('.kyx-seg [data-mode]').forEach((b) => b.addEventListener('click', () => mode(b.dataset.mode)));
+    mode('rar');
+    forRarity('M'); // a ranking right away
   }
 
   // ---------- series and price under each card of the trade confirmation ----------
@@ -859,6 +1481,9 @@
     scanCollectionChips();
     scanMissing();
     scanAlbumBar();
+    scanMissions();
+    scanMoreMenu();
+    scanLadder();
     scanConfirm();
   }
 
@@ -870,6 +1495,9 @@
     scanCollectionChips();
     scanMissing();
     scanAlbumBar();
+    scanMissions();
+    scanMoreMenu();
+    scanLadder();
     scanConfirm();
   }
 
@@ -879,7 +1507,8 @@
     stopped = true;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-missing, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg').forEach((el) => el.remove());
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-missing, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab').forEach((el) => el.remove());
+    delete document.documentElement.dataset.kyxView;
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched], [data-kyx-ghost]').forEach((el) => {
       delete el.dataset.kyxHidden;
       delete el.dataset.kyxPos;
@@ -892,6 +1521,8 @@
   const ticker = setInterval(() => {
     if (!alive()) return shutdown();
     syncAuth();
+    if (location.hash !== BOOSTERS_HASH && document.querySelector('.kyx-view')) closeBoosters(); // left through a link of the site
+    checkBoostersDay();
     if (location.pathname !== lastPath) {
       lastPath = location.pathname;
       autoMore = 0;
@@ -905,9 +1536,14 @@
     smartLock = new Set(stored.smartLock ?? []);
     if (partner && Date.now() - (partner.at ?? 0) > 30 * 60e3) partner = null;
     document.querySelectorAll('#kyx-root').forEach((el) => el.remove()); // left by older versions
+    window.addEventListener('hashchange', onBoostersHash);
     syncAuth();
     observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
     refreshAll();
+    if (location.hash === BOOSTERS_HASH) {
+      if (!catalog) await chrome.storage.local.get('catalog').then(applyStorage);
+      openBoosters();
+    }
     if (!catalog || !coll) send({ type: 'ensure-data' });
   })();
 })();

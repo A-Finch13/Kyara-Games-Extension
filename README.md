@@ -7,9 +7,13 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Fonction | Où |
 | --- | --- |
 | Masquer les albums déjà complétés | Page **Collection** du site (bouton en bas à gauche pour les réafficher) et onglet **Albums** de la popup |
-| Masquer les séries de moins de 4 personnages | Bouton à côté de « Masquer les complets » sur la page **Collection**, et case dans l'onglet **Albums** de la popup |
+| Masquer les séries de moins de 5 personnages | Bouton à côté de « Masquer les complets » sur la page **Collection**, et case dans l'onglet **Albums** de la popup |
 | Voir les cartes manquantes au lieu d'un « ? » | Page **Collection** : la carte s'affiche en gris, avec son nom, son numéro et sa rareté en dessous |
 | Placer un ordre d'achat sur une carte manquante | Page **Collection** : bouton **Ordre d'achat** sous chaque carte grise, avec son prix estimé ; il ouvre une fenêtre avec prix et quantité réglables, minimum, prix en vente et médiane |
+| Verrouiller le dernier exemplaire d'une carte mise en vente | Automatique : quand un doublon est en vente et qu'il ne te reste qu'un exemplaire libre, la carte est verrouillée (réglable dans la popup) |
+| Séries complètes condensées | Page **Missions** : la liste garde la hauteur de la carte « Parrainage », les séries à réclamer en premier, et le total dans le titre |
+| Trouver le booster le plus rentable | Menu **Plus** → **Boosters rentables** : une page du site (recalculée à minuit, heure de Paris, pour le Pack du jour) qui classe les boosters en vente du plus rentable au moins rentable (coût moyen en chakra) pour une rareté, un personnage ou un univers (cartes manquantes), avec un lien vers chacun |
+| Se comparer à ses amis | Page **Classement** : filtre **友 Amis** à côté des onglets ; le classement de l'onglet choisi parmi tes amis et toi, avec la place de chacun au classement général |
 | Verrouiller un album sans bloquer ses doublons | Bouton **Bloquer sauf doublons** à côté de « Bloquer l'album » (page **Collection**, un univers choisi) : seules les cartes en un exemplaire sont verrouillées, les doublons restent vendables ; une carte est reverrouillée dès qu'il n'en reste qu'une |
 | Badge « Manquante » sur toute carte que tu n'as pas | Partout sur le site : boutique/marché, échanges, profils, wiki… |
 | Savoir si la carte que tu donnes est en double | Badge **×N** (doublon) ou **Unique** (ton seul exemplaire) sur tes cartes dans les fenêtres d'échange, confirmation comprise |

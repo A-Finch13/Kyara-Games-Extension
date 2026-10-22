@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS = {
   badgeMissing: true,
   badgeDupes: true,
   theirDupes: true,
+  lockLastListed: true,
   notifyBoosters: true,
   notifyTrades: true,
   notifyMarket: true,

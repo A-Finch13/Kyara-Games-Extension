@@ -361,3 +361,424 @@ a.slot:hover .kyx-ghost {
   color: var(--bg, #0b0a0e);
   background: var(--acc2, #ffd84a);
 }
+
+/* Missions: completed series kept to the height of the referral card */
+.kyx-albums {
+  overflow: hidden;
+}
+
+.kyx-albums ul.quests {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.kyx-albums ul.quests > li:not(.claimed) {
+  order: -1;
+}
+
+.kyx-count {
+  margin-left: 8px;
+  color: var(--mut, #8a8592);
+  font-family: var(--mono, monospace);
+  font-size: 0.6em;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+/* "Boosters rentables" page, in place of the site's content */
+.kyx-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 70vh;
+  padding-top: 36px;
+  padding-bottom: 60px;
+  color: var(--fg, #fff);
+}
+
+.kyx-page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.kyx-page-head small {
+  color: var(--fg2, #a9a4b0);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.kyx-page-head h1 {
+  margin: 6px 0 0;
+  font-family: var(--disp, inherit);
+  font-size: clamp(28px, 5vw, 44px);
+  line-height: 1.1;
+}
+
+.kyx-page-head p {
+  margin: 8px 0 0;
+  color: var(--fg2, #a9a4b0);
+  font-size: 15px;
+}
+
+.kyx-page button {
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg, #fff);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kyx-page button:hover {
+  border-color: var(--acc, #ff4d2e);
+}
+
+.kyx-page button[aria-pressed="true"] {
+  border-color: var(--acc, #ff4d2e);
+  background: var(--acc, #ff4d2e);
+  color: var(--bg, #0b0a0e);
+}
+
+.kyx-page-close {
+  height: 38px;
+  padding: 0 16px;
+  flex: none;
+}
+
+.kyx-seg,
+.kyx-b-rar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kyx-seg button,
+.kyx-b-rar button {
+  height: 34px;
+  padding: 0 14px;
+}
+
+/* Search field of the Collection page; suggestions below it, as wide as the field */
+.kyx-search-wrap {
+  position: relative;
+  max-width: 640px;
+}
+
+.kyx-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line2, #2a2731);
+  border-radius: 10px;
+  background: var(--panel2, #121117);
+  color: var(--mut, #8a8592);
+  cursor: text;
+}
+
+.kyx-search:focus-within {
+  border-color: var(--cyan, #4dd8e6);
+}
+
+.kyx-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--fg, #fff);
+  font: inherit;
+  font-size: 14px;
+}
+
+.kyx-page .kyx-b-suggest {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: 420px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--line2, #2a2731);
+  border-radius: 12px;
+  background: var(--panel2, #121117);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+.kyx-page .kyx-b-suggest[hidden] {
+  display: none;
+}
+
+.kyx-b-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--fg2, #a9a4b0);
+  font-size: 13px;
+}
+
+.kyx-b-suggest {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+}
+
+.kyx-page .kyx-b-suggest button {
+  display: flex;
+  height: auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.kyx-page .kyx-b-suggest button:hover,
+.kyx-page .kyx-b-suggest button:focus-visible {
+  background: var(--raise, #1f1d25);
+}
+
+.kyx-b-suggest img {
+  width: 30px;
+  aspect-ratio: 5 / 7;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.kyx-b-suggest span,
+.kyx-b-main,
+.kyx-b-num {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.kyx-b-suggest small,
+.kyx-b-main small,
+.kyx-b-num small {
+  overflow: hidden;
+  color: var(--fg2, #a9a4b0);
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kyx-page-note,
+.kyx-page-foot {
+  margin: 0;
+  color: var(--fg2, #a9a4b0);
+  font-size: 13px;
+}
+
+.kyx-page-note:empty {
+  display: none;
+}
+
+.kyx-page-foot {
+  font-size: 11px;
+}
+
+.kyx-b-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kyx-b-list a {
+  display: grid;
+  grid-template-columns: 26px 40px 1fr auto;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line, #26232d);
+  border-radius: 14px;
+  background: var(--panel, #16141b);
+  color: inherit;
+  text-decoration: none;
+}
+
+.kyx-b-bar {
+  grid-column: 3 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.kyx-b-bar > span {
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--line2, #2a2731);
+}
+
+.kyx-b-bar small {
+  flex: none;
+  color: var(--fg2, #a9a4b0);
+  font-size: 12px;
+}
+
+.kyx-b-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #3fbf7f, #f5c518);
+}
+
+.kyx-b-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.kyx-b-title b {
+  font-size: 16px;
+}
+
+.kyx-b-price {
+  color: var(--fg2, #a9a4b0);
+  font-size: 12px;
+}
+
+.kyx-b-line {
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.kyx-b-main small {
+  white-space: normal;
+}
+
+.kyx-b-free {
+  color: #3fbf7f;
+}
+
+.kyx-b-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid #3fbf7f;
+  border-radius: 14px;
+  background: rgba(63, 191, 127, 0.08);
+  font-size: 14px;
+}
+
+.kyx-b-summary:empty {
+  display: none;
+}
+
+.kyx-b-summary p {
+  margin: 0;
+}
+
+.kyx-b-label {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(63, 191, 127, 0.15);
+  color: #3fbf7f;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.kyx-b-list li:last-child .kyx-b-label {
+  background: rgba(255, 77, 46, 0.15);
+  color: #ff4d2e;
+}
+
+.kyx-b-list a:hover {
+  border-color: var(--acc, #ff4d2e);
+}
+
+.kyx-b-list li:first-child a {
+  border-color: #3fbf7f;
+}
+
+.kyx-b-rank {
+  color: var(--fg2, #a9a4b0);
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+}
+
+.kyx-b-kanji {
+  font-size: 28px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.kyx-b-num {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.kyx-b-tag {
+  align-self: flex-start;
+  margin-top: 3px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(63, 191, 127, 0.15);
+  color: #3fbf7f;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.kyx-b-empty {
+  color: var(--fg2, #a9a4b0);
+  font-size: 13px;
+}
+
+/* "Plus" underlined in the site's header while the "Boosters rentables" page is open */
+html[data-kyx-view] .hdr .navlink.on:not([aria-controls="nav-more"])::after {
+  transform: scaleX(0) !important;
+}
+
+html[data-kyx-view] .hdr .navlink.on:not([aria-controls="nav-more"]) {
+  color: var(--fg2) !important;
+}
+
+html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"] {
+  color: var(--fg) !important;
+}
+
+html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
+  transform: scaleX(1) !important;
+}
+
+/* "Amis" filter of the Classement page */
+.kyx-friends-tab {
+  margin-left: 10px;
+}
+
+.kyx-friends-note {
+  margin: 24px 0 60px;
+  color: var(--fg2, #a9a4b0);
+  font-size: 14px;
+}
+
+.kyx-friends-note a {
+  color: var(--fg, #fff);
+}
