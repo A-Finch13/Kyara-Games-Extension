@@ -1,7 +1,13 @@
 // Kyara Games on kyara.games: card badges, completed and small albums hidden, missing cards greyed out with a buy order,
 // "Bloquer sauf doublons", last copy of a card on sale locked, compact completed series on Missions, "Boosters rentables" page,
 // "Amis" filter on the Classement page, "Possédées" and "Manquantes" chips on Collection and the "Ses doublons" filter in the trade composer.
+// Also built into the userscript version (build.py), where KYX_OWNER and a stand-in for the extension APIs are defined.
 (() => {
+  // A single copy per tab when both the extension and the userscript are installed: the first one to start.
+  const owner = typeof KYX_OWNER === 'string' ? KYX_OWNER : 'extension';
+  if (document.documentElement.dataset.kyxOwner && document.documentElement.dataset.kyxOwner !== owner) return;
+  document.documentElement.dataset.kyxOwner = owner;
+
   const DEFAULTS = {
     hideComplete: true,
     hideSmall: false,
@@ -1622,6 +1628,7 @@
   function shutdown() {
     if (stopped) return;
     stopped = true;
+    if (document.documentElement.dataset.kyxOwner === owner) delete document.documentElement.dataset.kyxOwner;
     clearInterval(ticker);
     observer.disconnect();
     document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab').forEach((el) => el.remove());
