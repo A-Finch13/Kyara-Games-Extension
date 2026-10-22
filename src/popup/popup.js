@@ -4,8 +4,6 @@ import {
 } from '../lib/kyara.js';
 
 const $ = (s) => document.querySelector(s);
-// Firefox for Android opens the popup as a full page: it takes the whole screen.
-if (/Android/i.test(navigator.userAgent)) document.documentElement.classList.add('mobile');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const plural = (n, w) => `${n.toLocaleString('fr-FR')} ${w}${n > 1 ? 's' : ''}`;
 const byRarity = (a, b) => RARITIES.indexOf(a.r) - RARITIES.indexOf(b.r) || a.n.localeCompare(b.n);
@@ -311,7 +309,7 @@ $('#update-go').addEventListener('click', async () => {
   if (res?.error === 'no_updater' || res?.error === 'unknown_extension') {
     updateHelp(
       FIREFOX
-        ? `Firefox installe lui-même un module signé : ${download}. Pour un module chargé depuis un dossier, lance une fois <b>installer-mises-a-jour.bat</b> dans ce dossier.`
+        ? `Sur Firefox, installe plutôt la version script avec Tampermonkey : <a href="#" data-open="https://a-finch13.github.io/Kyara-Games-Extension/">page d’installation</a>.`
         : `Première fois : lance <b>installer-mises-a-jour.bat</b> dans le dossier de l’extension (une seule fois), puis réessaie. Sinon, ${download}.`
     );
   } else {

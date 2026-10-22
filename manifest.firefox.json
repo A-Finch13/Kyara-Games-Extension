@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Kyara Games",
   "short_name": "Kyara Games",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "Compagnon pour kyara.games : albums complets masqués, cartes manquantes, doublons pendant les échanges et notifications.",
   "icons": {
     "16": "icons/icon16.png",
@@ -68,9 +68,6 @@
           "none"
         ]
       }
-    },
-    "gecko_android": {
-      "strict_min_version": "142.0"
     }
   }
 }

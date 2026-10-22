@@ -394,21 +394,3 @@ footer {
   border-top: 1px solid var(--line);
   text-align: center;
 }
-
-/* Firefox for Android: the popup is a full page */
-html.mobile body {
-  width: auto;
-  min-height: 100vh;
-  height: 100dvh;
-  font-size: 15px;
-}
-
-html.mobile .tabs button {
-  padding-top: 12px;
-  padding-bottom: 12px;
-}
-
-html.mobile .switch {
-  padding-top: 6px;
-  padding-bottom: 6px;
-}

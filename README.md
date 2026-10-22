@@ -17,6 +17,7 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Trouver le booster le plus rentable | Menu **Plus** → **Boosters rentables** : une page du site (recalculée à minuit, heure de Paris, pour le Pack du jour) qui classe les boosters en vente par prix (le moins de chakra dépensé) ou par taux de drop (la meilleure chance par booster) (coût moyen en chakra) pour une rareté, un personnage ou un univers (cartes manquantes), avec un lien vers chacun |
 | Se comparer à ses amis | Page **Classement** : filtre **友 Amis** à côté des onglets ; le classement de l'onglet choisi parmi tes amis et toi, avec la place de chacun au classement général |
 | Ouvrir la fiche d'une carte en un clic | Page **Collection** : un clic sur une carte que tu as ouvre directement sa fiche (réglable dans la popup ; Ctrl+clic garde la fenêtre du site) |
+| Œuvres favorites | Étoile ☆ sur chaque album de la page **Collection** (et « Mettre en favori » dans la barre de l'album ouvert) ; dans le **Marché**, la puce **★ Favoris** n'affiche que les offres de tes œuvres favorites (tri, prix fixe ou enchères, seulement tes manquantes), actualisées chaque minute et après chaque achat ou vente |
 | Verrouiller un album sans bloquer ses doublons | Bouton **Bloquer sauf doublons** à côté de « Bloquer l'album » (page **Collection**, un univers choisi) : seules les cartes en un exemplaire sont verrouillées, les doublons restent vendables ; une carte est reverrouillée dès qu'il n'en reste qu'une |
 | Badge « Manquante » sur toute carte que tu n'as pas | Partout sur le site : boutique/marché, échanges, profils, wiki… |
 | Savoir si la carte que tu donnes est en double | Badge **×N** (doublon) ou **Unique** (ton seul exemplaire) sur tes cartes dans les fenêtres d'échange, confirmation comprise |
@@ -25,8 +26,8 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Filtrer ses cartes sur ses doublons | Puce **Ses doublons**, active d'office, dans chaque fenêtre « Proposer un échange » (profil, offres du marché, comptoir), onglet **Cartes de …** ; la désactiver est retenu |
 | Afficher les cartes possédées ou manquantes de la collection | Puces **Possédées** et **Manquantes** à côté de « Toutes » sur la page Collection (un second clic réaffiche tout), et onglet **Manquantes** de la popup |
 | Savoir si les cartes que tu donnes dans un échange en cours sont en double | Badge **×N** ou **Unique** côté « Tu donnes » des échanges en attente, onglet **Échanges** du Marché |
-| Sur téléphone | Android (extension Firefox ou script) et iPhone / iPad (script avec l'app Userscripts) : toutes les fonctions du site, voir **Installation sur téléphone** |
-| Savoir qu'une nouvelle version est installée | Notification « Kyara Games est passé en X » juste après chaque mise à jour (Firefox compris, qui met à jour en silence) ; un clic ouvre les nouveautés. Réglable dans la popup |
+| Sur téléphone | Version script : Android (Firefox ou Edge avec Tampermonkey) et iPhone / iPad (app Userscripts), toutes les fonctions du site, voir **Installation sur téléphone** |
+| Savoir qu'une nouvelle version est installée | Notification « Kyara Games est passé en X » juste après chaque mise à jour ; un clic ouvre les nouveautés. Réglable dans la popup |
 | Être prévenu d'une nouvelle version | Notification et bandeau vert dans la popup quand une nouvelle release sort sur GitHub (vérifié toutes les 15 min), avec un bouton **Mettre à jour** qui installe la nouvelle version (voir plus bas) |
 | Notifications | Boosters gratuits pleins, envies mises en vente au marché, échanges, ventes/achats/enchères, amis, messages de l'équipe |
 
@@ -45,15 +46,7 @@ L'appli Kyara installée depuis le navigateur (PWA) utilise le même profil : l'
 
 La page https://a-finch13.github.io/Kyara-Games-Extension/ montre ces étapes avec les bons boutons pour ton appareil.
 
-Sur téléphone, deux façons d'avoir Kyara Games :
-
-| | Extension | Script |
-| --- | --- | --- |
-| Navigateurs | Firefox pour Android | Firefox ou Edge (Android), Safari (iPhone, iPad) |
-| Fonctions sur le site | Toutes | Toutes |
-| Notifications (boosters pleins, échanges…) | Oui | Non : un script ne tourne que quand une page kyara.games est ouverte |
-| Réglages | Popup : menu ⋮ → Extensions → Kyara Games | Menu du site → 設 Kyara Games |
-| Mises à jour | Automatiques (addons.mozilla.org) | Automatiques (gestionnaire de scripts) |
+Sur téléphone, Kyara Games s'installe en version script : toutes les fonctions du site, réglages dans le menu du site (☰ → 設 Kyara Games), mises à jour automatiques. Pas de notifications : un script ne tourne que quand une page kyara.games est ouverte.
 
 Lien du script (pour les étapes ci-dessous) :
 **https://github.com/A-Finch13/Kyara-Games-Extension/releases/latest/download/kyara-games.user.js**
@@ -62,21 +55,10 @@ Lien du script (pour les étapes ci-dessous) :
 
 ### Android
 
-**Avec l'extension (conseillé : notifications comprises)**
-
-1. Installe **Firefox** depuis le Play Store.
-2. Dans Firefox, ouvre la page de Kyara Games sur [addons.mozilla.org](https://addons.mozilla.org/) et touche **Ajouter à Firefox**, puis **Ajouter**.
-3. Ouvre [kyara.games](https://kyara.games) et connecte-toi une fois : l'extension reprend ta session toute seule.
-4. Les réglages et la popup : menu **⋮** → **Extensions** → **Kyara Games**.
-
-Firefox installe ensuite les nouvelles versions tout seul, en arrière-plan (environ une fois par jour), et une notification « Kyara Games est passé en X » le signale. Pour l'avoir tout de suite : rouvre la page de l'extension sur addons.mozilla.org et réinstalle-la (les réglages sont gardés).
-
-**Avec le script**
-
-1. Installe **Firefox** (ou **Edge**) depuis le Play Store.
-2. Ajoute le gestionnaire de scripts **Tampermonkey** (ou **Violentmonkey**) : menu **⋮** → **Extensions** (Edge : **Extensions**), cherche Tampermonkey et touche **Ajouter**.
+1. Installe **Firefox** (ou **Edge**) depuis le Play Store : Chrome, Brave et Samsung Internet n'acceptent pas Tampermonkey.
+2. Ajoute le gestionnaire de scripts **Tampermonkey** (ou **Violentmonkey**) : menu **⋮** → **Extensions**, cherche Tampermonkey et touche **Ajouter**.
 3. Ouvre le lien du script ci-dessus dans ce navigateur : Tampermonkey affiche le script, touche **Installer**.
-4. Ouvre [kyara.games](https://kyara.games) et connecte-toi une fois.
+4. Ouvre [kyara.games](https://kyara.games) et connecte-toi une fois : le script reprend ta session tout seul.
 5. Les réglages : menu du site (☰) → **設 Kyara Games**.
 
 ### iPhone et iPad
@@ -96,15 +78,11 @@ Userscripts vérifie les mises à jour du script. Pour forcer la dernière versi
 
 Le script marche aussi sur PC avec Tampermonkey ou Violentmonkey, si tu préfères un script à l'extension. Si l'extension et le script sont installés tous les deux, le script se met en retrait pour ne rien afficher en double.
 
-## Installation (Firefox 140+)
+## Firefox
 
-Fabrique d'abord les paquets : `python build.py` (crée le dossier `dist/`).
+Sur Firefox, utilise la version script avec Tampermonkey (voir la [page d'installation](https://a-finch13.github.io/Kyara-Games-Extension/)).
 
-**Pour essayer tout de suite** (l'extension reste jusqu'à la fermeture de Firefox) :
-
-1. Ouvre `about:debugging#/runtime/this-firefox`.
-2. **Charger un module complémentaire temporaire** → choisis `dist/firefox/manifest.json`.
-3. Clique sur l'icône Kyara Games : si elle affiche « Autoriser l'accès », clique dessus puis recharge l'onglet kyara.games.
+Pour essayer l'extension elle-même dans Firefox (elle reste jusqu'à sa fermeture) : `python build.py`, puis `about:debugging#/runtime/this-firefox` → **Charger un module complémentaire temporaire** → `dist/firefox/manifest.json`.
 
 ## Mises à jour en un clic
 
@@ -120,8 +98,8 @@ Au clic sur **Mettre à jour**, l'assistant télécharge la release GitHub et re
 
 `python build.py` génère dans `dist/` :
 
-- `firefox/` : le dossier à charger dans Firefox ;
-- `kyara-games-firefox.xpi` : le paquet Firefox ;
+- `firefox/` : le dossier pour essayer l'extension dans Firefox (`about:debugging`) ;
+- `kyara-games-firefox.xpi` : le même, en paquet ;
 - `kyara-games-chromium.zip` : le paquet pour Brave / Chrome / Edge / Opera (ou pour le Chrome Web Store) ;
 - `kyara-games.user.js` : la version script (Tampermonkey, Violentmonkey, Userscripts), générée à partir du même code ; une copie est aussi écrite à la racine du dépôt.
 
@@ -129,12 +107,9 @@ Au clic sur **Mettre à jour**, l'assistant télécharge la release GitHub et re
 
 ## Publier une nouvelle version
 
-1. Monte le numéro de version, le même dans `manifest.json` et `manifest.firefox.json` (toujours plus haut que le précédent : addons.mozilla.org refuse un numéro déjà envoyé).
+1. Monte le numéro de version, le même dans `manifest.json` et `manifest.firefox.json` (toujours plus haut que le précédent : c'est lui qui déclenche les mises à jour).
 2. `python build.py`.
-3. **GitHub** : crée la release `vX.Y.Z` avec `dist/kyara-games-chromium.zip`, `dist/kyara-games-firefox.xpi` et `dist/kyara-games.user.js`. Brave / Chrome / Edge la voient dans les 15 minutes (bouton **Mettre à jour** de la popup) ; les gestionnaires de scripts récupèrent le script de la dernière release tout seuls.
-4. **addons.mozilla.org** : Developer Hub → Kyara Games → **Envoyer une nouvelle version** → `dist/kyara-games-firefox.xpi`. Sans cet envoi, les utilisateurs Firefox (PC et Android) restent sur l'ancienne version. Une fois la version validée, Firefox l'installe tout seul.
-
-La politique de confidentialité et les notes pour les relecteurs d'addons.mozilla.org sont dans `amo/`.
+3. **GitHub** : crée la release `vX.Y.Z` avec `dist/kyara-games-chromium.zip` et `dist/kyara-games.user.js`. Brave / Chrome / Edge la voient dans les 15 minutes (bouton **Mettre à jour** de la popup) ; les gestionnaires de scripts récupèrent le script de la dernière release tout seuls.
 
 ## Comment ça marche
 
@@ -148,7 +123,7 @@ La politique de confidentialité et les notes pour les relecteurs d'addons.mozil
 | Fichier | Ce qu'il fait |
 | --- | --- |
 | `manifest.json` | Déclaration de l'extension pour Brave / Chrome / Edge / Opera (Manifest V3) : nom, version, autorisations, scripts. |
-| `manifest.firefox.json` | La même déclaration pour Firefox (PC et Android), avec son identifiant et ses versions minimales. |
+| `manifest.firefox.json` | La même déclaration pour Firefox, pour essayer l'extension dans `about:debugging`. |
 | `src/background.js` | Service de fond de l'extension : vérifie régulièrement tes notifications Kyara et les affiche, met à jour le badge de l'icône (boosters gratuits), garde catalogue et collection à jour, cherche les nouvelles versions sur GitHub, lance l'assistant de mise à jour, vide le cache du site après une mise à jour. |
 | `src/lib/kyara.js` | Fonctions partagées : appels à l'API de kyara.games avec ta session, catalogue des cartes (gardé 24 h), collection, réglages par défaut, calculs de progression des albums, recherche de nouvelle version. |
 | `src/content/inject.js` | S'exécute dans la page du site : lit les réponses que le site reçoit déjà (collection, échanges, profils) et les transmet au reste de l'extension, sans jamais modifier une requête ni une réponse. |
@@ -163,7 +138,6 @@ La politique de confidentialité et les notes pour les relecteurs d'addons.mozil
 | `installer-mises-a-jour.bat` | Windows : lance l'installation de l'assistant de mise à jour (une seule fois). |
 | `updater/install.ps1` | Windows : installe l'assistant dans `%LOCALAPPDATA%\KyaraGamesUpdater`, retrouve l'identifiant de l'extension dans Brave/Chrome/Edge et le déclare aux navigateurs ; `-Uninstall` le retire. |
 | `updater/host.ps1` | Windows : l'assistant lui-même, lancé par le navigateur au clic sur **Mettre à jour** : télécharge la release GitHub et remplace les fichiers (ou fait `git pull`), puis vérifie la version installée. |
-| `amo/` | Politique de confidentialité et notes pour les relecteurs d'addons.mozilla.org. |
 | `docs/index.html` | La page d'installation guidée (https://a-finch13.github.io/Kyara-Games-Extension/), publiée par GitHub Pages : Tampermonkey, autorisation des scripts, installation du script, pour PC, Android et iPhone. |
 
 Extension non officielle, non affiliée à Kyara. Si le site change sa structure, certains éléments (masquage des albums) peuvent nécessiter une mise à jour.

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyara Games
 // @namespace    https://github.com/A-Finch13/Kyara-Games-Extension
-// @version      1.5.1
+// @version      1.6.0
 // @description  Compagnon non officiel pour kyara.games : cartes manquantes en gris avec ordre d'achat, albums complets masqués, doublons pendant les échanges, booster le plus rentable, classement entre amis.
 // @author       A-Finch13
 // @license      MIT
@@ -46,7 +46,7 @@
 'use strict';
 if (window.__kyaraGamesUserscript) return;
 window.__kyaraGamesUserscript = true;
-const KYX_VERSION = '1.5.1';
+const KYX_VERSION = '1.6.0';
 
 // ---------- 1. src/userscript/shim.js : stockage et messages, à la place des fonctions d'extension ----------
 // Userscript version: the few extension APIs the page code uses, rebuilt on top of the page itself.
@@ -1422,6 +1422,225 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   color: var(--fg2, #a9a4b0);
   font-size: 12px;
 }
+
+/* Favourite series: star on the album tiles and in the album bar of Collection */
+.kyx-fav {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(14, 13, 18, 0.7);
+  color: var(--fg2, #a9a4b0);
+  font-size: 18px;
+  line-height: 30px;
+  cursor: pointer;
+}
+
+.kyx-fav:hover,
+.kyx-fav[aria-pressed="true"] {
+  color: #f5c518;
+}
+
+.kyx-fav.inline {
+  position: static;
+  width: auto;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 30px;
+}
+
+.kyx-fav.inline[aria-pressed="true"] {
+  border-color: #f5c518;
+}
+
+/* Market: offers of the favourite series */
+.kyx-favmarket {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.kyx-fm-favs,
+.kyx-fm-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.kyx-fm-fav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid #f5c518;
+  border-radius: 999px;
+  color: var(--fg, #fff);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.kyx-fm-fav button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg2, #a9a4b0);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.kyx-fm-fav button:hover {
+  color: var(--fg, #fff);
+  background: var(--raise, #1f1d25);
+}
+
+.kyx-fm-tools select {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line2, #2a2731);
+  border-radius: 10px;
+  background: var(--panel2, #121117);
+  color: var(--fg, #fff);
+  font: inherit;
+  font-size: 14px;
+}
+
+.kyx-fm-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg2, #a9a4b0);
+  font-size: 14px;
+}
+
+.kyx-fm-note {
+  margin: 0;
+  color: var(--fg2, #a9a4b0);
+  font-size: 14px;
+}
+
+.kyx-fm-note a {
+  color: var(--fg, #fff);
+}
+
+.kyx-fm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kyx-fm-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--line, #26232d);
+  border-radius: 14px;
+  background: var(--panel, #16141b);
+  color: inherit;
+  text-decoration: none;
+}
+
+.kyx-fm-tile:hover {
+  border-color: var(--acc, #ff4d2e);
+}
+
+.kyx-fm-tile img {
+  width: 64px;
+  aspect-ratio: 5 / 7;
+  flex: none;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.kyx-fm-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kyx-fm-info b,
+.kyx-fm-info small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kyx-fm-sub {
+  color: var(--r, var(--fg2, #a9a4b0));
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kyx-fm-price {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.kyx-fm-meta {
+  color: var(--fg2, #a9a4b0);
+  font-size: 12px;
+}
+
+.kyx-fm-more {
+  align-self: center;
+  height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg, #fff);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kyx-fm-more:hover {
+  border-color: var(--acc, #ff4d2e);
+}
+
+.kyx-fm-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kyx-fm-refresh {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg, #fff);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kyx-fm-refresh:hover {
+  border-color: var(--acc, #ff4d2e);
+}
 `;
   document.head.appendChild(style);
   // ---------- 5. src/content/content.js : tout ce qui s'affiche sur le site ----------
@@ -1499,6 +1718,12 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     if (area !== 'local') return;
     const picked = {};
     if ('smartLock' in changes) smartLock = new Set(changes.smartLock.newValue ?? []);
+    if ('favSeries' in changes) {
+      favSeries = new Set(changes.favSeries.newValue ?? []);
+      marketShown = '';
+      scanFavStars();
+      scanMarket();
+    }
     for (const k of ['settings', 'collection', 'catalog', 'partner']) if (k in changes) picked[k] = changes[k].newValue;
     if (!Object.keys(picked).length) return;
     applyStorage(picked);
@@ -1526,7 +1751,10 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     // No e.source check: Firefox hands content scripts a wrapped window that never equals e.source.
     if (e.origin !== location.origin || e.data?.__kyaraGames !== 1) return;
     const { kind, path, body } = e.data;
-    if (kind === 'write') return void send({ type: 'collection-stale' });
+    if (kind === 'write') {
+      if (/^\/market\//.test(path)) setTimeout(refreshFavMarket, 1500); // offers just changed
+      return void send({ type: 'collection-stale' });
+    }
     let m;
     if (path === '/me/collection') {
       send({ type: 'collection', items: body });
@@ -1979,6 +2207,285 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     true
   );
 
+  // ---------- favourite series (œuvres) and the "★ Favoris" filter of the market ----------
+
+  const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+  // A star on each album of Collection (and in the bar of the open album) marks a series as a favourite.
+  // In the market, the "★ Favoris" chip lists the offers of those series only: the market is asked for each
+  // of them and the offers are gathered in one list, shown instead of the site's own.
+  let favSeries = new Set();
+  let marketFav = false;
+  let marketShown = '';
+
+  async function toggleFav(name) {
+    if (!alive()) return shutdown();
+    const next = new Set(favSeries);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    // Taken into account at once, so that several stars touched in a row all count.
+    favSeries = new Set([...next].sort((a, b) => a.localeCompare(b, 'fr')));
+    marketShown = '';
+    scanFavStars();
+    scanMarket();
+    await chrome.storage.local.set({ favSeries: [...favSeries] });
+  }
+
+  function favButton(inline) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = inline ? 'kyx-fav inline' : 'kyx-fav';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation(); // the album tile itself opens the album
+      toggleFav(btn.dataset.series);
+    });
+    return btn;
+  }
+
+  function setStar(star, name, inline) {
+    const on = favSeries.has(name);
+    star.dataset.series = name;
+    const text = inline ? (on ? '★ Favori' : '☆ Mettre en favori') : on ? '★' : '☆';
+    if (star.textContent !== text) star.textContent = text;
+    star.setAttribute('aria-pressed', String(on));
+    const title = on ? `Retirer ${name} des favoris` : `Mettre ${name} en favori (filtre « Favoris » du Marché)`;
+    if (star.title !== title) {
+      star.title = title;
+      star.setAttribute('aria-label', title);
+    }
+  }
+
+  function scanFavStars() {
+    if (location.pathname !== '/collection') return;
+    for (const li of document.querySelectorAll('ul.albums > li')) {
+      const name = li.querySelector('.a-name')?.textContent.trim();
+      if (!name) continue;
+      let star = li.querySelector(':scope > .kyx-fav');
+      if (!star) {
+        star = favButton(false);
+        li.dataset.kyxPos = '1';
+        li.appendChild(star);
+      }
+      setStar(star, name, false);
+    }
+    const bar = document.querySelector('.album-bar');
+    const title = bar?.querySelector(':scope > b');
+    const series = title?.textContent.trim();
+    if (!series) return;
+    let star = bar.querySelector(':scope > .kyx-fav');
+    if (!star) {
+      star = favButton(true);
+      title.after(star);
+    }
+    setStar(star, series, true);
+  }
+
+  const RARITY_COLOR = { C: '#B5B1BB', U: '#3FBF7F', R: '#4D9BFF', E: '#B072FF', L: '#F5C518', M: '#FF4D2E' };
+  const MARKET_SORTS = [
+    ['price_asc', 'Prix croissant'],
+    ['price_desc', 'Prix décroissant'],
+    ['ending', 'Fin proche'],
+    ['newest', 'Plus récentes']
+  ];
+
+  function scanMarket() {
+    const filters = location.pathname === '/marche' ? document.querySelector('#mq')?.closest('.filters') : null;
+    const chips = filters?.querySelector('.chips');
+    if (!chips) return void (marketShown = '');
+    let btn = chips.querySelector(':scope > .kyx-fav-chip');
+    if (!btn) {
+      const first = chips.querySelector(':scope > button');
+      if (!first) return;
+      // A copy of the site's "Toutes" chip, right after it.
+      btn = first.cloneNode(true);
+      btn.classList.remove('on');
+      btn.classList.add('kyx-chip', 'kyx-fav-chip');
+      btn.textContent = '★ Favoris';
+      btn.title = 'Seulement les offres de tes œuvres favorites';
+      btn.addEventListener('click', () => {
+        if (!alive()) return shutdown();
+        marketFav = !marketFav;
+        marketShown = '';
+        chrome.storage.local.set({ marketFav });
+        scanMarket();
+      });
+      first.after(btn);
+    }
+    btn.classList.toggle('on', marketFav);
+    btn.setAttribute('aria-pressed', String(marketFav));
+    // The site's offers (all that follows its filters) make way for the favourites while the chip is on.
+    let view = filters.parentElement.querySelector(':scope > .kyx-favmarket');
+    for (let el = filters.nextElementSibling; el; el = el.nextElementSibling) {
+      if (el === view) continue;
+      if (marketFav && el.dataset.kyxHidden !== '1') el.dataset.kyxHidden = '1';
+      else if (!marketFav && el.dataset.kyxHidden) delete el.dataset.kyxHidden;
+    }
+    if (!marketFav) {
+      view?.remove();
+      marketShown = '';
+      return;
+    }
+    if (!view) {
+      view = document.createElement('section');
+      view.className = 'kyx-favmarket';
+      view.kyxState = { type: 'fixed', sort: 'price_asc', missing: false };
+      filters.after(view);
+    }
+    const key = [...favSeries].join('|');
+    if (marketShown === key && view.childElementCount) return;
+    marketShown = key;
+    renderFavMarket(view);
+  }
+
+  function renderFavMarket(view) {
+    const st = view.kyxState;
+    const names = [...favSeries];
+    if (!names.length) {
+      view.innerHTML = '<p class="kyx-fm-note">Aucune œuvre en favori pour l’instant. Sur la page <a href="/collection">Collection</a>, onglet Albums, touche l’étoile ☆ d’un album pour l’ajouter.</p>';
+      return;
+    }
+    view.innerHTML = `
+      <div class="kyx-fm-favs"></div>
+      <div class="kyx-fm-tools">
+        <select class="kyx-fm-type" aria-label="Type d’offre"><option value="fixed">Prix fixe</option><option value="auction">Enchères</option></select>
+        <select class="kyx-fm-sort" aria-label="Trier">${MARKET_SORTS.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>
+        <label class="kyx-fm-check"><input type="checkbox" /> Seulement mes manquantes</label>
+      </div>
+      <div class="kyx-fm-status"><p class="kyx-fm-note" role="status"></p><button type="button" class="kyx-fm-refresh">↻ Actualiser</button></div>
+      <ul class="kyx-fm-grid"></ul>
+      <button type="button" class="kyx-fm-more" hidden>Voir plus d’offres</button>`;
+    const favs = view.querySelector('.kyx-fm-favs');
+    for (const name of names) {
+      const chip = document.createElement('span');
+      chip.className = 'kyx-fm-fav';
+      chip.innerHTML = '<span></span><button type="button">×</button>';
+      chip.firstChild.textContent = `★ ${name}`;
+      chip.querySelector('button').title = `Retirer ${name} des favoris`;
+      chip.querySelector('button').addEventListener('click', () => toggleFav(name));
+      favs.appendChild(chip);
+    }
+    const type = view.querySelector('.kyx-fm-type');
+    const sort = view.querySelector('.kyx-fm-sort');
+    const missing = view.querySelector('.kyx-fm-check input');
+    type.value = st.type;
+    sort.value = st.sort;
+    missing.checked = st.missing;
+    const reload = () => {
+      Object.assign(st, { type: type.value, sort: sort.value, missing: missing.checked });
+      loadFavOffers(view, true);
+    };
+    type.addEventListener('change', reload);
+    sort.addEventListener('change', reload);
+    missing.addEventListener('change', reload);
+    view.querySelector('.kyx-fm-more').addEventListener('click', () => loadFavOffers(view, false));
+    view.querySelector('.kyx-fm-refresh').addEventListener('click', () => loadFavOffers(view, 'refresh'));
+    loadFavOffers(view, true);
+  }
+
+  // The market changes all the time (offers sold, new ones, bids): the list is asked again every minute
+  // while it is on screen, when coming back to the tab and after a purchase or a sale.
+  const FAV_REFRESH = 60e3;
+  function refreshFavMarket() {
+    const view = document.querySelector('.kyx-favmarket');
+    if (view?.kyxState?.offers && !document.hidden) loadFavOffers(view, 'refresh');
+  }
+  setInterval(() => {
+    const view = document.querySelector('.kyx-favmarket');
+    if (view?.kyxLoadedAt && Date.now() - view.kyxLoadedAt >= FAV_REFRESH) refreshFavMarket();
+  }, 5e3);
+  document.addEventListener('visibilitychange', () => {
+    const view = document.querySelector('.kyx-favmarket');
+    if (!document.hidden && view?.kyxLoadedAt && Date.now() - view.kyxLoadedAt >= 15e3) refreshFavMarket();
+  });
+
+  // One request per favourite series (24 offers each), merged and sorted like the site would.
+  async function loadFavOffers(view, mode) {
+    const st = view.kyxState;
+    const run = (view.kyxRun = (view.kyxRun ?? 0) + 1);
+    const names = [...favSeries].slice(0, 30);
+    const refresh = mode === 'refresh' && st.page > 0;
+    if (mode === true || (mode === 'refresh' && !refresh)) {
+      st.page = 0;
+      st.offers = [];
+      st.more = false;
+      view.querySelector('.kyx-fm-grid').innerHTML = '';
+    }
+    // A refresh asks again for every page already shown, all at once.
+    const page = refresh ? 1 : st.page + 1;
+    const size = refresh ? 24 * st.page : 24;
+    const note = view.querySelector('.kyx-fm-note');
+    const more = view.querySelector('.kyx-fm-more');
+    if (!refresh) note.textContent = 'Chargement des offres…';
+    more.hidden = true;
+    const answers = await Promise.all(
+      names.map((series) => {
+        const q = new URLSearchParams({ type: st.type, sort: st.sort, series, page: String(page), pageSize: String(size) });
+        if (st.missing) q.set('missing', '1');
+        return siteApi(`/market/listings?${q}`, { auth: false }).catch(() => null);
+      })
+    );
+    if (run !== view.kyxRun || !view.isConnected) return;
+    if (refresh) st.offers = [];
+    else st.page = page;
+    st.more = answers.some((a) => a && (a.total ?? 0) > st.page * 24);
+    view.kyxLoadedAt = Date.now();
+    const seen = new Set(st.offers.map((o) => o.id));
+    for (const a of answers) for (const o of a?.items ?? []) if (!seen.has(o.id)) st.offers.push(o);
+    const price = (o) => o.currentBid ?? o.price ?? 0;
+    const by = {
+      price_asc: (a, b) => price(a) - price(b),
+      price_desc: (a, b) => price(b) - price(a),
+      ending: (a, b) => Date.parse(a.endsAt) - Date.parse(b.endsAt),
+      newest: (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)
+    }[st.sort];
+    st.offers.sort(by);
+    const total = answers.reduce((n, a) => n + (a?.total ?? 0), 0);
+    const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    note.textContent = st.offers.length
+      ? `${num(st.offers.length)} offre${st.offers.length > 1 ? 's' : ''} affichée${st.offers.length > 1 ? 's' : ''} sur ${num(total)} pour ${names.length} œuvre${names.length > 1 ? 's' : ''} en favori · à jour à ${time}, actualisé chaque minute.`
+      : `Aucune offre en ce moment pour tes œuvres favorites · vérifié à ${time}.`;
+    more.hidden = !st.more;
+    renderFavOffers(view);
+  }
+
+  function renderFavOffers(view) {
+    const grid = view.querySelector('.kyx-fm-grid');
+    grid.innerHTML = '';
+    for (const o of view.kyxState.offers) {
+      const c = o.character ?? {};
+      const url = new URL(location.href);
+      url.searchParams.set('annonce', o.id); // the site's own way to open an offer
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <a class="kyx-fm-tile" href="${esc(url.pathname + url.search)}">
+          <img alt="" loading="lazy" referrerpolicy="no-referrer" />
+          <span class="kyx-fm-info">
+            <b></b>
+            <small class="kyx-fm-sub"></small>
+            <span class="kyx-fm-price"></span>
+            <small class="kyx-fm-meta"></small>
+          </span>
+        </a>`;
+      li.querySelector('img').src = `/cards/sm/${c.id}.webp`;
+      li.querySelector('b').textContent = c.name ?? '?';
+      const sub = li.querySelector('.kyx-fm-sub');
+      sub.textContent = `${c.series ?? ''} · ${RARITY_LABEL[c.rarity] ?? c.rarity ?? ''}`;
+      sub.style.setProperty('--r', RARITY_COLOR[c.rarity] ?? 'inherit');
+      const value = o.currentBid ?? o.price;
+      li.querySelector('.kyx-fm-price').textContent = `${chakra(value ?? 0)}${o.type === 'auction' ? ` · ${o.bidCount ?? 0} enchère${o.bidCount > 1 ? 's' : ''}` : ''}`;
+      const median = o.prices?.median7d;
+      li.querySelector('.kyx-fm-meta').textContent = [
+        median != null ? `médiane 7 j ${chakra(median)}` : null,
+        o.seller?.pseudo ? `par ${o.seller.pseudo}` : null,
+        coll ? (qty(c.id) ? `tu l’as ×${qty(c.id)}` : 'te manque') : null
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      grid.appendChild(li);
+    }
+  }
+
   // ---------- "Bloquer sauf doublons" in the album bar ----------
 
   // The site locks a card with all its copies, so the duplicates of a locked album can't be sold.
@@ -2239,7 +2746,6 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     'x-pantheon': { stars: [-40, 40], plaque: '神' }, 'x-albums': { plaque: '集' }, 'x-encyclopedie': { plaque: '典' }, 'x-negoce': { plaque: '商' },
     'e-lancement': { petals: [35, 62, -50] }, 'e-guilde': { stars: [-45, 45], plaque: '団' }, staff: { plaque: '匠' }
   };
-  const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
   // Same as the site's avatar: picture (or initial) in its frame, with the frame's stars, gems and plaque.
   function avatarHtml(row, size, sc) {
@@ -3033,6 +3539,8 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     scanMoreMenu();
     scanLadder();
     scanMobileNav();
+    scanFavStars();
+    scanMarket();
     scanConfirm();
   }
 
@@ -3048,6 +3556,8 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     scanMoreMenu();
     scanLadder();
     scanMobileNav();
+    scanFavStars();
+    scanMarket();
     scanConfirm();
   }
 
@@ -3058,7 +3568,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     if (document.documentElement.dataset.kyxOwner === owner) delete document.documentElement.dataset.kyxOwner;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab').forEach((el) => el.remove());
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket').forEach((el) => el.remove());
     delete document.documentElement.dataset.kyxView;
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched], [data-kyx-ghost]').forEach((el) => {
       delete el.dataset.kyxHidden;
@@ -3082,9 +3592,11 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   }, 1000);
 
   (async () => {
-    const stored = await chrome.storage.local.get(['settings', 'collection', 'catalog', 'partner', 'smartLock']);
+    const stored = await chrome.storage.local.get(['settings', 'collection', 'catalog', 'partner', 'smartLock', 'favSeries', 'marketFav']);
     applyStorage(stored);
     smartLock = new Set(stored.smartLock ?? []);
+    favSeries = new Set(stored.favSeries ?? []);
+    marketFav = !!stored.marketFav;
     if (partner && Date.now() - (partner.at ?? 0) > 30 * 60e3) partner = null;
     document.querySelectorAll('#kyx-root').forEach((el) => el.remove()); // left by older versions
     window.addEventListener('hashchange', onBoostersHash);

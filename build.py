@@ -3,7 +3,7 @@
     python build.py
 
 dist/firefox/                      folder to load in about:debugging
-dist/kyara-games-firefox.xpi       package for Firefox (to sign on addons.mozilla.org)
+dist/kyara-games-firefox.xpi       package for Firefox (to try it; Firefox users install the userscript)
 dist/kyara-games-chromium.zip      package for Brave / Chrome / Edge / Opera
 dist/kyara-games.user.js           userscript for Tampermonkey / Violentmonkey / Userscripts (phones, iPhone)
 kyara-games.user.js                the same userscript, kept in the repository
@@ -18,7 +18,7 @@ DIST = ROOT / 'dist'
 SHARED = ['src', 'icons', 'updater', 'installer-mises-a-jour.bat', 'README.md']
 
 
-# Firefox installs its updates itself from addons.mozilla.org: no Windows updater in its package.
+# The Windows updater only serves Brave / Chrome / Edge: not in the Firefox package.
 CHROMIUM_ONLY = {'updater', 'installer-mises-a-jour.bat'}
 
 

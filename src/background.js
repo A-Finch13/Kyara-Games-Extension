@@ -35,7 +35,7 @@ async function schedule() {
 
 // A new release on GitHub: one notification per version, and a banner in the popup until it is installed.
 async function lookForUpdate() {
-  if (FIREFOX) return; // Firefox installs the new versions itself from addons.mozilla.org
+  if (FIREFOX) return; // in Firefox the extension is only tried out (about:debugging): Firefox users run the userscript
   // The popup asks too each time it opens: GitHub is asked at most every 10 minutes.
   const { updateCheckedAt } = await chrome.storage.local.get('updateCheckedAt');
   if (Date.now() - (updateCheckedAt ?? 0) < 10 * 60e3) return;
@@ -81,7 +81,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
   if (reason === 'update') announceUpdate(previousVersion);
 });
 
-// Says that a new version was installed (Firefox installs them silently), with a link to what changed.
+// Says that a new version was installed, with a link to what changed.
 // Reloading the same version (an unpacked folder) says nothing.
 async function announceUpdate(previousVersion) {
   const version = chrome.runtime.getManifest().version;
