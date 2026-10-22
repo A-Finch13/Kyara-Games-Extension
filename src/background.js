@@ -71,12 +71,24 @@ async function installUpdate() {
   return { ok: true, version: res.version };
 }
 
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   await chrome.storage.local.remove(['update', 'updateCheckedAt']); // just installed or updated: the banner is stale
   await schedule();
-  loadCatalog().catch(() => {});
+  if (reason === 'update') await refreshSite();
+  loadCatalog(reason === 'update').catch(() => {});
   lookForUpdate();
 });
+
+// After an update: the site's caches are emptied and its open tabs reloaded, so pages and the new extension start fresh.
+// Only the caches go (HTTP cache and the cache of the site's service worker): session, cookies and the service worker
+// itself (the site's push notifications) stay. Firefox can't empty the cache of a single site: the tabs skip it instead.
+async function refreshSite() {
+  try {
+    await chrome.browsingData?.remove({ origins: [ORIGIN] }, { cache: true, cacheStorage: true });
+  } catch {}
+  const tabs = await chrome.tabs.query({ url: `${ORIGIN}/*` }).catch(() => []);
+  for (const tab of tabs) chrome.tabs.reload(tab.id, { bypassCache: true }).catch(() => {});
+}
 chrome.runtime.onStartup.addListener(() => {
   schedule();
   lookForUpdate();

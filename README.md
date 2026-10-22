@@ -51,7 +51,7 @@ Fabrique d'abord les paquets : `python build.py` (crée le dossier `dist/`).
 
 Un navigateur ne laisse jamais une extension réécrire ses propres fichiers. Pour que le bouton **Mettre à jour** de la popup installe la nouvelle version tout seul, lance **une seule fois** `installer-mises-a-jour.bat` (dans le dossier de l'extension, Windows). Il installe un petit assistant dans `%LOCALAPPDATA%\KyaraGamesUpdater` et le déclare à Brave, Chrome, Edge, Vivaldi, Opera et Firefox.
 
-Au clic sur **Mettre à jour**, l'assistant télécharge la release GitHub et remplace les fichiers du dossier (ou fait `git pull` si le dossier est un clone git), puis l'extension redémarre. Recharge ensuite l'onglet kyara.games.
+Au clic sur **Mettre à jour**, l'assistant télécharge la release GitHub et remplace les fichiers du dossier (ou fait `git pull` si le dossier est un clone git), puis l'extension redémarre. Le cache de kyara.games est alors vidé et les onglets du site se rechargent tout seuls (ta session et les notifications du site sont gardées).
 
 - Si tu déplaces le dossier de l'extension, relance `installer-mises-a-jour.bat`.
 - Pour retirer l'assistant : `installer-mises-a-jour.bat -Uninstall`.

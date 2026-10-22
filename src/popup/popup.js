@@ -298,7 +298,7 @@ $('#update-go').addEventListener('click', async () => {
   const res = await chrome.runtime.sendMessage({ type: 'install-update' }).catch(() => null);
   if (res?.ok) {
     btn.textContent = 'Installée ✔';
-    updateHelp(`Version ${esc(res.version)} installée, l’extension redémarre. Recharge ensuite l’onglet kyara.games.`);
+    updateHelp(`Version ${esc(res.version)} installée, l’extension redémarre. Les onglets kyara.games se rechargent tout seuls, cache vidé.`);
     return;
   }
   btn.disabled = false;
