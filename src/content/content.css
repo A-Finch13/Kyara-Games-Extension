@@ -1642,20 +1642,34 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     flex: 1 1 auto;
   }
 
-  /* The bubble is docked at the bottom, the circled element stays visible above it */
+  /* Full width; placed by the script below or above the circled element, docked at the bottom otherwise */
   .kyx-bubble,
   .kyx-bubble[data-state="center"] {
-    top: auto !important;
     right: 8px;
-    bottom: 8px;
     left: 8px !important;
     width: auto;
     max-height: 55vh;
+    padding: 14px;
+    gap: 8px;
     transform: none;
   }
 
+  .kyx-bubble[data-state="center"] {
+    top: auto !important;
+    bottom: 8px;
+  }
+
   .kyx-bubble h2 {
-    font-size: 18px;
+    font-size: 17px;
+  }
+
+  .kyx-b-text {
+    font-size: 13.5px;
+    line-height: 1.45;
+  }
+
+  .kyx-bubble button {
+    height: 34px;
   }
 
   .kyx-b-btns .kyx-b-next {

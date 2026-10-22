@@ -125,6 +125,10 @@ const KYX_TOUR = [
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
   {
+    version: '1.7.2',
+    items: [['Visite guidée : la bulle d’explication ne cache plus jamais l’élément entouré, sur téléphone comme sur PC (elle se place dessous, dessus ou à côté).', 'manquantes']]
+  },
+  {
     version: '1.7.1',
     items: [
       ['Visite guidée de l’extension sur le site (menu Plus → 学 Tutoriel), et ce récapitulatif des nouveautés après chaque mise à jour.', 'fin'],

@@ -2077,7 +2077,7 @@
     const header = document.querySelector('header')?.getBoundingClientRect().bottom ?? 0;
     const r = target.getBoundingClientRect();
     const top = Math.max(0, header) + 12;
-    const bottom = phone() ? innerHeight - tour.bubble.offsetHeight - 24 : innerHeight - 12;
+    const bottom = phone() ? innerHeight - Math.min(tour.bubble.offsetHeight, innerHeight * 0.45) - 24 : innerHeight - 12;
     const shift = phone() || r.height > bottom - top ? r.top - top : r.top + r.height / 2 - (top + bottom) / 2;
     if (r.top >= top && r.bottom <= bottom && (phone() || Math.abs(shift) < 120)) return;
     let box = target.parentElement;
@@ -2126,23 +2126,49 @@
       spot.dataset.on = '';
       if (bubble.dataset.busy) return; // keeps its place while the next step loads
       if (bubble.dataset.state === 'pointing') bubble.dataset.state = 'center';
-      bubble.style.left = bubble.style.top = '';
+      bubble.style.left = bubble.style.top = bubble.style.maxHeight = '';
       return;
     }
     const pad = 6;
     spot.dataset.on = '1';
     Object.assign(spot.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
     if (phone()) {
-      bubble.style.left = bubble.style.top = ''; // docked at the bottom by the style sheet
+      // Full width, below or above the element, never on it: the side with room for the whole bubble,
+      // else the larger side, the bubble then scrolling inside.
+      const gap = 10;
+      const below = innerHeight - (r.bottom + pad) - gap - 8;
+      const above = r.top - pad - gap - 8;
+      bubble.style.left = '';
+      bubble.style.maxHeight = '';
+      let bh = bubble.offsetHeight;
+      let top;
+      if (bh <= below) top = r.bottom + pad + gap;
+      else if (bh <= above) top = r.top - pad - gap - bh;
+      else {
+        const down = below >= above;
+        const room = Math.max(110, down ? below : above);
+        bubble.style.maxHeight = `${room}px`;
+        bh = Math.min(bh, room);
+        top = down ? innerHeight - 8 - bh : 8;
+      }
+      bubble.style.top = `${Math.round(top)}px`;
       return;
     }
+    // Below the element, else above, else beside it (right or left): never on it.
     const bw = bubble.offsetWidth;
     const bh = bubble.offsetHeight;
     const gap = 14;
-    let top = r.bottom + pad + gap;
-    if (top + bh > innerHeight - 8) top = r.top - pad - gap - bh;
-    if (top < 8) top = Math.max(8, innerHeight - bh - 8);
-    const left = Math.max(8, Math.min(innerWidth - bw - 8, r.left + r.width / 2 - bw / 2));
+    const clampTop = (t) => Math.max(8, Math.min(innerHeight - bh - 8, t));
+    let top;
+    let left = Math.max(8, Math.min(innerWidth - bw - 8, r.left + r.width / 2 - bw / 2));
+    if (r.bottom + pad + gap + bh <= innerHeight - 8) top = r.bottom + pad + gap;
+    else if (r.top - pad - gap - bh >= 8) top = r.top - pad - gap - bh;
+    else {
+      top = clampTop(r.top + r.height / 2 - bh / 2);
+      if (r.right + pad + gap + bw <= innerWidth - 8) left = r.right + pad + gap;
+      else if (r.left - pad - gap - bw >= 8) left = r.left - pad - gap - bw;
+      else top = innerHeight - bh - 8; // no free side: at the bottom of the screen
+    }
     bubble.style.left = `${left}px`;
     bubble.style.top = `${top}px`;
   }

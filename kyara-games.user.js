@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyara Games
 // @namespace    https://github.com/A-Finch13/Kyara-Games-Extension
-// @version      1.7.1
+// @version      1.7.2
 // @description  Compagnon non officiel pour kyara.games : cartes manquantes en gris avec ordre d'achat, albums complets masqués, doublons pendant les échanges, booster le plus rentable, classement entre amis.
 // @author       A-Finch13
 // @license      MIT
@@ -46,7 +46,7 @@
 'use strict';
 if (window.__kyaraGamesUserscript) return;
 window.__kyaraGamesUserscript = true;
-const KYX_VERSION = '1.7.1';
+const KYX_VERSION = '1.7.2';
 
 // ---------- 1. src/userscript/shim.js : stockage et messages, à la place des fonctions d'extension ----------
 // Userscript: the extension APIs used by the page code, rebuilt in the page.
@@ -2228,20 +2228,34 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     flex: 1 1 auto;
   }
 
-  /* The bubble is docked at the bottom, the circled element stays visible above it */
+  /* Full width; placed by the script below or above the circled element, docked at the bottom otherwise */
   .kyx-bubble,
   .kyx-bubble[data-state="center"] {
-    top: auto !important;
     right: 8px;
-    bottom: 8px;
     left: 8px !important;
     width: auto;
     max-height: 55vh;
+    padding: 14px;
+    gap: 8px;
     transform: none;
   }
 
+  .kyx-bubble[data-state="center"] {
+    top: auto !important;
+    bottom: 8px;
+  }
+
   .kyx-bubble h2 {
-    font-size: 18px;
+    font-size: 17px;
+  }
+
+  .kyx-b-text {
+    font-size: 13.5px;
+    line-height: 1.45;
+  }
+
+  .kyx-bubble button {
+    height: 34px;
   }
 
   .kyx-b-btns .kyx-b-next {
@@ -2397,6 +2411,10 @@ const KYX_TOUR = [
 
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
+  {
+    version: '1.7.2',
+    items: [['Visite guidée : la bulle d’explication ne cache plus jamais l’élément entouré, sur téléphone comme sur PC (elle se place dessous, dessus ou à côté).', 'manquantes']]
+  },
   {
     version: '1.7.1',
     items: [
@@ -4549,7 +4567,7 @@ const KYX_CHANGES = [
     const header = document.querySelector('header')?.getBoundingClientRect().bottom ?? 0;
     const r = target.getBoundingClientRect();
     const top = Math.max(0, header) + 12;
-    const bottom = phone() ? innerHeight - tour.bubble.offsetHeight - 24 : innerHeight - 12;
+    const bottom = phone() ? innerHeight - Math.min(tour.bubble.offsetHeight, innerHeight * 0.45) - 24 : innerHeight - 12;
     const shift = phone() || r.height > bottom - top ? r.top - top : r.top + r.height / 2 - (top + bottom) / 2;
     if (r.top >= top && r.bottom <= bottom && (phone() || Math.abs(shift) < 120)) return;
     let box = target.parentElement;
@@ -4598,23 +4616,49 @@ const KYX_CHANGES = [
       spot.dataset.on = '';
       if (bubble.dataset.busy) return; // keeps its place while the next step loads
       if (bubble.dataset.state === 'pointing') bubble.dataset.state = 'center';
-      bubble.style.left = bubble.style.top = '';
+      bubble.style.left = bubble.style.top = bubble.style.maxHeight = '';
       return;
     }
     const pad = 6;
     spot.dataset.on = '1';
     Object.assign(spot.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
     if (phone()) {
-      bubble.style.left = bubble.style.top = ''; // docked at the bottom by the style sheet
+      // Full width, below or above the element, never on it: the side with room for the whole bubble,
+      // else the larger side, the bubble then scrolling inside.
+      const gap = 10;
+      const below = innerHeight - (r.bottom + pad) - gap - 8;
+      const above = r.top - pad - gap - 8;
+      bubble.style.left = '';
+      bubble.style.maxHeight = '';
+      let bh = bubble.offsetHeight;
+      let top;
+      if (bh <= below) top = r.bottom + pad + gap;
+      else if (bh <= above) top = r.top - pad - gap - bh;
+      else {
+        const down = below >= above;
+        const room = Math.max(110, down ? below : above);
+        bubble.style.maxHeight = `${room}px`;
+        bh = Math.min(bh, room);
+        top = down ? innerHeight - 8 - bh : 8;
+      }
+      bubble.style.top = `${Math.round(top)}px`;
       return;
     }
+    // Below the element, else above, else beside it (right or left): never on it.
     const bw = bubble.offsetWidth;
     const bh = bubble.offsetHeight;
     const gap = 14;
-    let top = r.bottom + pad + gap;
-    if (top + bh > innerHeight - 8) top = r.top - pad - gap - bh;
-    if (top < 8) top = Math.max(8, innerHeight - bh - 8);
-    const left = Math.max(8, Math.min(innerWidth - bw - 8, r.left + r.width / 2 - bw / 2));
+    const clampTop = (t) => Math.max(8, Math.min(innerHeight - bh - 8, t));
+    let top;
+    let left = Math.max(8, Math.min(innerWidth - bw - 8, r.left + r.width / 2 - bw / 2));
+    if (r.bottom + pad + gap + bh <= innerHeight - 8) top = r.bottom + pad + gap;
+    else if (r.top - pad - gap - bh >= 8) top = r.top - pad - gap - bh;
+    else {
+      top = clampTop(r.top + r.height / 2 - bh / 2);
+      if (r.right + pad + gap + bw <= innerWidth - 8) left = r.right + pad + gap;
+      else if (r.left - pad - gap - bw >= 8) left = r.left - pad - gap - bw;
+      else top = innerHeight - bh - 8; // no free side: at the bottom of the screen
+    }
     bubble.style.left = `${left}px`;
     bubble.style.top = `${top}px`;
   }
