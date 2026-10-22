@@ -23,6 +23,8 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Filtrer ses cartes sur ses doublons | Puce **Ses doublons**, active d'office, dans chaque fenêtre « Proposer un échange » (profil, offres du marché, comptoir), onglet **Cartes de …** ; la désactiver est retenu |
 | Afficher les cartes possédées ou manquantes de la collection | Puces **Possédées** et **Manquantes** à côté de « Toutes » sur la page Collection (un second clic réaffiche tout), et onglet **Manquantes** de la popup |
 | Savoir si les cartes que tu donnes dans un échange en cours sont en double | Badge **×N** ou **Unique** côté « Tu donnes » des échanges en attente, onglet **Échanges** du Marché |
+| Sur téléphone | Firefox pour Android : toutes les fonctions, avec une tuile **Boosters rentables** dans le menu mobile du site et la popup en plein écran |
+| Savoir qu'une nouvelle version est installée | Notification « Kyara Games est passé en X » juste après chaque mise à jour (Firefox compris, qui met à jour en silence) ; un clic ouvre les nouveautés. Réglable dans la popup |
 | Être prévenu d'une nouvelle version | Notification et bandeau vert dans la popup quand une nouvelle release sort sur GitHub (vérifié toutes les 15 min), avec un bouton **Mettre à jour** qui installe la nouvelle version (voir plus bas) |
 | Notifications | Boosters gratuits pleins, envies mises en vente au marché, échanges, ventes/achats/enchères, amis, messages de l'équipe |
 
@@ -37,7 +39,17 @@ Le badge de l'icône affiche le nombre de boosters gratuits (vert quand c'est pl
 
 L'appli Kyara installée depuis le navigateur (PWA) utilise le même profil : l'extension y fonctionne aussi.
 
-## Installation (Firefox 128+)
+## Installation sur téléphone (Firefox pour Android)
+
+Toutes les fonctions du PC marchent aussi sur Firefox pour Android : badges, cartes grisées et ordres d'achat, filtres, Boosters rentables (tuile « 得 » dans le menu du site), filtre Amis, Missions, popup (menu ⋮ → Extensions → Kyara Games) et notifications.
+
+1. Installe **Firefox** depuis le Play Store.
+2. Ouvre la page de l'extension sur [addons.mozilla.org](https://addons.mozilla.org/) et touche **Ajouter à Firefox**.
+3. Ouvre kyara.games et connecte-toi une fois : l'extension reprend ta session toute seule.
+
+Firefox installe ensuite les nouvelles versions tout seul, en arrière-plan (environ une fois par jour), et une notification « Kyara Games est passé en X » le signale. Pour l'avoir tout de suite : rouvrir la page de l'extension sur addons.mozilla.org et la réinstaller (les réglages sont gardés). Seul l'assistant de mise à jour Windows n'existe pas sur téléphone : il n'y en a pas besoin.
+
+## Installation (Firefox 140+)
 
 Fabrique d'abord les paquets : `python build.py` (crée le dossier `dist/`).
 
@@ -67,6 +79,15 @@ Au clic sur **Mettre à jour**, l'assistant télécharge la release GitHub et re
 
 `manifest.json` sert à Brave/Chrome, `manifest.firefox.json` à Firefox : garde le même numéro de version dans les deux.
 
+## Publier une nouvelle version
+
+1. Monte le numéro de version, le même dans `manifest.json` et `manifest.firefox.json` (toujours plus haut que le précédent : addons.mozilla.org refuse un numéro déjà envoyé).
+2. `python build.py`.
+3. **GitHub** : crée la release `vX.Y.Z` avec `dist/kyara-games-chromium.zip` et `dist/kyara-games-firefox.xpi`. Brave / Chrome / Edge la voient dans les 15 minutes (bouton **Mettre à jour** de la popup).
+4. **addons.mozilla.org** : Developer Hub → Kyara Games → **Envoyer une nouvelle version** → `dist/kyara-games-firefox.xpi`. Sans cet envoi, les utilisateurs Firefox (PC et Android) restent sur l'ancienne version. Une fois la version validée, Firefox l'installe tout seul.
+
+Les textes de la fiche addons.mozilla.org sont dans `amo/`.
+
 ## Comment ça marche
 
 - La session (`kyara_token`) est lue dans l'onglet kyara.games et n'est envoyée qu'à `https://kyara.games/api`.
@@ -83,5 +104,6 @@ Au clic sur **Mettre à jour**, l'assistant télécharge la release GitHub et re
 - `src/content/content.js` : badges, albums masqués, cartes manquantes grisées et ordres d'achat, filtre « Ses doublons » sur le site.
 - `src/popup/` : la fenêtre de l'extension.
 - `updater/` et `installer-mises-a-jour.bat` : l'assistant de mise à jour (Windows).
+- `amo/` : textes pour la publication sur addons.mozilla.org (fiche, politique de confidentialité, notes pour les relecteurs).
 
 Extension non officielle, non affiliée à Kyara. Si le site change sa structure, certains éléments (masquage des albums) peuvent nécessiter une mise à jour.

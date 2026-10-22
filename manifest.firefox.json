@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Kyara Games",
   "short_name": "Kyara Games",
-  "version": "1.4.3",
+  "version": "1.5.0",
   "description": "Compagnon pour kyara.games : albums complets masqués, cartes manquantes, doublons pendant les échanges et notifications.",
   "icons": {
     "16": "icons/icon16.png",
@@ -30,7 +30,6 @@
     "unlimitedStorage",
     "alarms",
     "notifications",
-    "nativeMessaging",
     "tabs"
   ],
   "host_permissions": [
@@ -63,12 +62,15 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "kyara-games@extension",
-      "strict_min_version": "128.0",
+      "strict_min_version": "140.0",
       "data_collection_permissions": {
         "required": [
           "none"
         ]
       }
+    },
+    "gecko_android": {
+      "strict_min_version": "142.0"
     }
   }
 }

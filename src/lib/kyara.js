@@ -27,6 +27,7 @@ export const DEFAULT_SETTINGS = {
   notifyWish: true,
   notifyFriends: true,
   notifyOther: true,
+  notifyUpdated: true,
   pollMinutes: 1
 };
 

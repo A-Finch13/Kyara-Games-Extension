@@ -1,7 +1,8 @@
-import { ORIGIN, api, checkUpdate, getSettings, loadCatalog, loadCollection, slimCollection, slimMe } from './lib/kyara.js';
+import { ORIGIN, REPO, api, checkUpdate, getSettings, loadCatalog, loadCollection, slimCollection, slimMe } from './lib/kyara.js';
 
 const ALARM = 'kyara-poll';
 const UPDATE_ALARM = 'kyara-update';
+const FIREFOX = navigator.userAgent.includes('Firefox');
 const ICON = chrome.runtime.getURL('icons/icon128.png');
 const MAX_SEEN = 400;
 
@@ -34,6 +35,7 @@ async function schedule() {
 
 // A new release on GitHub: one notification per version, and a banner in the popup until it is installed.
 async function lookForUpdate() {
+  if (FIREFOX) return; // Firefox installs the new versions itself from addons.mozilla.org
   // The popup asks too each time it opens: GitHub is asked at most every 10 minutes.
   const { updateCheckedAt } = await chrome.storage.local.get('updateCheckedAt');
   if (Date.now() - (updateCheckedAt ?? 0) < 10 * 60e3) return;
@@ -55,7 +57,6 @@ async function lookForUpdate() {
 // A browser never lets an extension rewrite itself: the small updater installed on the computer
 // (installer-mises-a-jour.bat) replaces the files, then the extension reloads on its new version.
 const UPDATER = 'com.kyara_games.updater';
-const FIREFOX = navigator.userAgent.includes('Firefox');
 
 async function installUpdate() {
   const update = (await chrome.storage.local.get('update')).update ?? (await checkUpdate().catch(() => null));
@@ -71,13 +72,27 @@ async function installUpdate() {
   return { ok: true, version: res.version };
 }
 
-chrome.runtime.onInstalled.addListener(async ({ reason }) => {
+chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
   await chrome.storage.local.remove(['update', 'updateCheckedAt']); // just installed or updated: the banner is stale
   await schedule();
   if (reason === 'update') await refreshSite();
   loadCatalog(reason === 'update').catch(() => {});
   lookForUpdate();
+  if (reason === 'update') announceUpdate(previousVersion);
 });
+
+// Says that a new version was installed (Firefox installs them silently), with a link to what changed.
+// Reloading the same version (an unpacked folder) says nothing.
+async function announceUpdate(previousVersion) {
+  const version = chrome.runtime.getManifest().version;
+  if (!previousVersion || previousVersion === version) return;
+  if (!(await getSettings()).notifyUpdated) return;
+  notify('updated', {
+    title: `Kyara Games est passé en ${version}`,
+    message: 'Clique pour voir les nouveautés de cette version.',
+    href: `https://github.com/${REPO}/releases/tag/v${version}`
+  });
+}
 
 // After an update: the site's caches are emptied and its open tabs reloaded, so pages and the new extension start fresh.
 // Only the caches go (HTTP cache and the cache of the site's service worker): session, cookies and the service worker
@@ -225,7 +240,7 @@ async function openSite(href) {
   const [tab] = await chrome.tabs.query({ url: `${ORIGIN}/*` });
   if (tab) {
     await chrome.tabs.update(tab.id, { url, active: true });
-    await chrome.windows.update(tab.windowId, { focused: true });
+    await chrome.windows?.update(tab.windowId, { focused: true }).catch(() => {}); // no windows on Android
   } else {
     await chrome.tabs.create({ url });
   }

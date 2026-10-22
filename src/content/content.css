@@ -842,3 +842,99 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   font-weight: 500;
   opacity: 0.8;
 }
+
+/* ---------- phones (Firefox for Android) and narrow windows ---------- */
+@media (max-width: 640px) {
+  .kyx-toggle {
+    margin: 0 6px 6px 0;
+    padding: 6px 11px;
+    font-size: 12px;
+    white-space: normal;
+    text-align: left;
+  }
+
+  .kyx-order button {
+    padding: 0 8px;
+    font-size: 11px;
+  }
+
+  .kyx-order-form {
+    padding: 18px;
+  }
+
+  .kyx-modal-head img {
+    width: 76px;
+  }
+
+  .kyx-modal-name {
+    font-size: 18px;
+  }
+
+  .kyx-page {
+    padding-top: 20px;
+  }
+
+  .kyx-page-head {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .kyx-page-close {
+    align-self: flex-start;
+  }
+
+  .kyx-seg button,
+  .kyx-b-rar button {
+    flex: 1 1 auto;
+  }
+
+  .kyx-page .kyx-b-sort button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .kyx-b-sort > span {
+    flex-basis: 100%;
+  }
+
+  .kyx-b-list a {
+    grid-template-columns: 20px 30px 1fr;
+    gap: 6px 10px;
+    padding: 12px;
+  }
+
+  .kyx-b-kanji {
+    font-size: 22px;
+  }
+
+  .kyx-b-num {
+    grid-column: 3;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .kyx-b-bar {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .kyx-b-bar > span {
+    flex-basis: 100%;
+  }
+
+  .kyx-b-summary {
+    padding: 12px;
+    font-size: 13px;
+  }
+
+  .kyx-friends-tab {
+    margin-left: 0;
+  }
+
+  .kyx-count {
+    display: block;
+    margin: 4px 0 0;
+    font-size: 0.55em;
+  }
+}

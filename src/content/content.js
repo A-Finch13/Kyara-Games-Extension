@@ -949,6 +949,33 @@
     menu.appendChild(item);
   }
 
+  // On a phone the site's menu is a sheet of tiles (#mobile-nav): the same entry goes there.
+  function scanMobileNav() {
+    const grid = document.querySelector('#mobile-nav .sheet-grid');
+    if (!grid) return;
+    const open = !!document.querySelector('.kyx-view');
+    grid.querySelectorAll(':scope > a.on:not(.kyx-more)').forEach((a) => open && a.classList.remove('on'));
+    let tile = grid.querySelector(':scope > .kyx-more');
+    if (!tile) {
+      const model = grid.querySelector(':scope > a');
+      if (!model?.querySelector('.tk') || !model.querySelector('.tl')) return;
+      tile = model.cloneNode(true);
+      tile.classList.add('kyx-more');
+      tile.removeAttribute('aria-current');
+      tile.href = '#boosters-rentables';
+      tile.querySelector('.tk').textContent = '得';
+      tile.querySelector('.tl').textContent = 'Boosters rentables';
+      [...tile.children].forEach((el) => el.matches('.tk, .tl') || el.remove()); // the model's counters
+      tile.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.querySelector('button.burger[aria-controls="mobile-nav"]')?.click(); // close the sheet
+        openBoosters();
+      });
+      grid.appendChild(tile);
+    }
+    tile.classList.toggle('on', open);
+  }
+
   let packsCache = null;
   const dropCache = new Map(); // id -> { packId: chance per booster }
 
@@ -1572,6 +1599,7 @@
     scanMissions();
     scanMoreMenu();
     scanLadder();
+    scanMobileNav();
     scanConfirm();
   }
 
@@ -1586,6 +1614,7 @@
     scanMissions();
     scanMoreMenu();
     scanLadder();
+    scanMobileNav();
     scanConfirm();
   }
 

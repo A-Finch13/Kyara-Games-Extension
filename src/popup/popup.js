@@ -4,6 +4,8 @@ import {
 } from '../lib/kyara.js';
 
 const $ = (s) => document.querySelector(s);
+// Firefox for Android opens the popup as a full page: it takes the whole screen.
+if (/Android/i.test(navigator.userAgent)) document.documentElement.classList.add('mobile');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const plural = (n, w) => `${n.toLocaleString('fr-FR')} ${w}${n > 1 ? 's' : ''}`;
 const byRarity = (a, b) => RARITIES.indexOf(a.r) - RARITIES.indexOf(b.r) || a.n.localeCompare(b.n);
