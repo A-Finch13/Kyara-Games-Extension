@@ -8,7 +8,8 @@
     ['badgeDupes', 'Badge « ×N » sur mes doublons et « Unique » sur mes cartes en un seul exemplaire'],
     ['theirDupes', 'Filtre « Ses doublons » activé d’office dans les propositions d’échange'],
     ['lockLastListed', 'Verrouiller le dernier exemplaire d’une carte dont un doublon est en vente'],
-    ['cardToWiki', 'Page Collection : un clic sur une carte que j’ai ouvre sa fiche']
+    ['cardToWiki', 'Page Collection : un clic sur une carte que j’ai ouvre sa fiche'],
+    ['notifyUpdated', 'Bandeau « nouvelle version » après une mise à jour du script']
   ];
 
   async function openSettings() {
@@ -69,10 +70,30 @@
     menu.appendChild(entry);
   }
 
+  // Tampermonkey and Userscripts install new versions silently: say it once, at the first visit after an update.
+  // Nothing at the very first install.
+  async function announceUpdate() {
+    const { lastVersion } = await chrome.storage.local.get('lastVersion');
+    if (lastVersion === KYX_VERSION) return;
+    await chrome.storage.local.set({ lastVersion: KYX_VERSION });
+    if (!lastVersion || !(await getSettings()).notifyUpdated) return;
+    const bar = document.createElement('div');
+    bar.className = 'kyx-update-toast';
+    bar.setAttribute('role', 'status');
+    bar.innerHTML = `<span>⬆ Kyara Games est passé en <b>${KYX_VERSION}</b></span>
+      <a href="https://github.com/${REPO}/releases/tag/v${KYX_VERSION}" target="_blank" rel="noopener">Voir les nouveautés</a>
+      <button type="button" aria-label="Fermer">✕</button>`;
+    const close = () => bar.remove();
+    bar.querySelector('a').addEventListener('click', close);
+    bar.querySelector('button').addEventListener('click', close);
+    document.body.appendChild(bar);
+  }
+
   const scan = () => {
     addEntry(document.querySelector('#nav-more'), 'button[aria-controls="nav-more"][aria-expanded="true"]');
     addEntry(document.querySelector('#mobile-nav .sheet-grid'), 'button.burger[aria-controls="mobile-nav"]');
   };
   new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
   scan();
+  announceUpdate();
 })();

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyara Games
 // @namespace    https://github.com/A-Finch13/Kyara-Games-Extension
-// @version      1.6.0
+// @version      1.6.1
 // @description  Compagnon non officiel pour kyara.games : cartes manquantes en gris avec ordre d'achat, albums complets masqués, doublons pendant les échanges, booster le plus rentable, classement entre amis.
 // @author       A-Finch13
 // @license      MIT
@@ -46,7 +46,7 @@
 'use strict';
 if (window.__kyaraGamesUserscript) return;
 window.__kyaraGamesUserscript = true;
-const KYX_VERSION = '1.6.0';
+const KYX_VERSION = '1.6.1';
 
 // ---------- 1. src/userscript/shim.js : stockage et messages, à la place des fonctions d'extension ----------
 // Userscript version: the few extension APIs the page code uses, rebuilt on top of the page itself.
@@ -1482,16 +1482,40 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 .kyx-fm-fav {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 4px 3px 10px;
-  border: 1px solid #f5c518;
+  gap: 2px;
+  padding: 2px 4px 2px 2px;
+  border: 1px solid var(--line3, #3a3642);
   border-radius: 999px;
   color: var(--fg, #fff);
   font-size: 13px;
   font-weight: 700;
 }
 
-.kyx-fm-fav button {
+.kyx-fm-fav.all {
+  padding-right: 2px;
+}
+
+.kyx-fm-fav[aria-pressed="true"] {
+  border-color: #f5c518;
+  background: rgba(245, 197, 24, 0.14);
+}
+
+.kyx-fm-fav .kyx-fm-pick {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.kyx-fm-fav .kyx-fm-pick:hover {
+  color: #f5c518;
+}
+
+.kyx-fm-fav .kyx-fm-del {
   width: 22px;
   height: 22px;
   padding: 0;
@@ -1503,7 +1527,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   cursor: pointer;
 }
 
-.kyx-fm-fav button:hover {
+.kyx-fm-fav .kyx-fm-del:hover {
   color: var(--fg, #fff);
   background: var(--raise, #1f1d25);
 }
@@ -1640,6 +1664,49 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
 .kyx-fm-refresh:hover {
   border-color: var(--acc, #ff4d2e);
+}
+
+/* Userscript version: "new version installed" banner, at the first visit after an update */
+.kyx-update-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 2147483000;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  max-width: calc(100% - 24px);
+  padding: 12px 14px 12px 18px;
+  border: 1px solid #3fbf7f;
+  border-radius: 14px;
+  background: var(--panel, #16141b);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  color: var(--fg, #fff);
+  font-size: 14px;
+  transform: translateX(-50%);
+}
+
+.kyx-update-toast a {
+  color: #3fbf7f;
+  font-weight: 700;
+}
+
+.kyx-update-toast button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg2, #a9a4b0);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.kyx-update-toast button:hover {
+  background: var(--raise, #1f1d25);
+  color: var(--fg, #fff);
 }
 `;
   document.head.appendChild(style);
@@ -2314,6 +2381,21 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     }
     btn.classList.toggle('on', marketFav);
     btn.setAttribute('aria-pressed', String(marketFav));
+    // The site's rarity chips ("Toutes", "Commune"…) filter the favourites as well.
+    if (!chips.dataset.kyxRarity) {
+      chips.dataset.kyxRarity = '1';
+      chips.addEventListener('click', (e) => {
+        if (!marketFav || !e.target.closest('button') || e.target.closest('.kyx-chip')) return;
+        setTimeout(() => {
+          const view = document.querySelector('.kyx-favmarket');
+          if (!view?.kyxState) return;
+          const rarity = siteRarity(chips);
+          if (rarity === view.kyxState.rarity) return;
+          view.kyxState.rarity = rarity;
+          renderFavMarket(view);
+        }, 60);
+      });
+    }
     // The site's offers (all that follows its filters) make way for the favourites while the chip is on.
     let view = filters.parentElement.querySelector(':scope > .kyx-favmarket');
     for (let el = filters.nextElementSibling; el; el = el.nextElementSibling) {
@@ -2329,7 +2411,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     if (!view) {
       view = document.createElement('section');
       view.className = 'kyx-favmarket';
-      view.kyxState = { type: 'fixed', sort: 'price_asc', missing: false };
+      view.kyxState = { type: 'fixed', sort: 'price_asc', missing: false, only: null, rarity: '' };
       filters.after(view);
     }
     const key = [...favSeries].join('|');
@@ -2338,9 +2420,22 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     renderFavMarket(view);
   }
 
+  // Rarity of the site's chip that is on ('' for "Toutes" or none).
+  const RARITY_BY_LABEL = Object.fromEntries(Object.entries(RARITY_LABEL).map(([k, v]) => [norm(v), k]));
+  function siteRarity(chips) {
+    const on = [...(chips?.querySelectorAll(':scope > button.on:not(.kyx-chip)') ?? [])];
+    for (const b of on) {
+      const r = RARITY_BY_LABEL[norm(b.textContent)];
+      if (r) return r;
+    }
+    return '';
+  }
+
   function renderFavMarket(view) {
     const st = view.kyxState;
     const names = [...favSeries];
+    if (st.only && !favSeries.has(st.only)) st.only = null;
+    st.rarity = siteRarity(document.querySelector('#mq')?.closest('.filters')?.querySelector('.chips')) || st.rarity;
     if (!names.length) {
       view.innerHTML = '<p class="kyx-fm-note">Aucune œuvre en favori pour l’instant. Sur la page <a href="/collection">Collection</a>, onglet Albums, touche l’étoile ☆ d’un album pour l’ajouter.</p>';
       return;
@@ -2355,16 +2450,32 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       <div class="kyx-fm-status"><p class="kyx-fm-note" role="status"></p><button type="button" class="kyx-fm-refresh">↻ Actualiser</button></div>
       <ul class="kyx-fm-grid"></ul>
       <button type="button" class="kyx-fm-more" hidden>Voir plus d’offres</button>`;
+    // Choose the series to show: all the favourites, or a single one (× takes it out of the favourites).
     const favs = view.querySelector('.kyx-fm-favs');
+    const pick = (only) => {
+      st.only = only;
+      favs.querySelectorAll('.kyx-fm-fav').forEach((c) => c.setAttribute('aria-pressed', String((c.dataset.series || null) === only)));
+      loadFavOffers(view, true);
+    };
+    const all = document.createElement('span');
+    all.className = 'kyx-fm-fav all';
+    all.dataset.series = '';
+    all.innerHTML = `<button type="button" class="kyx-fm-pick">★ Toutes mes favorites (${names.length})</button>`;
+    all.querySelector('button').addEventListener('click', () => pick(null));
+    favs.appendChild(all);
     for (const name of names) {
       const chip = document.createElement('span');
       chip.className = 'kyx-fm-fav';
-      chip.innerHTML = '<span></span><button type="button">×</button>';
-      chip.firstChild.textContent = `★ ${name}`;
-      chip.querySelector('button').title = `Retirer ${name} des favoris`;
-      chip.querySelector('button').addEventListener('click', () => toggleFav(name));
+      chip.dataset.series = name;
+      chip.innerHTML = '<button type="button" class="kyx-fm-pick"></button><button type="button" class="kyx-fm-del">×</button>';
+      chip.querySelector('.kyx-fm-pick').textContent = name;
+      chip.querySelector('.kyx-fm-pick').title = `Afficher seulement ${name}`;
+      chip.querySelector('.kyx-fm-pick').addEventListener('click', () => pick(st.only === name ? null : name));
+      chip.querySelector('.kyx-fm-del').title = `Retirer ${name} des favoris`;
+      chip.querySelector('.kyx-fm-del').addEventListener('click', () => toggleFav(name));
       favs.appendChild(chip);
     }
+    favs.querySelectorAll('.kyx-fm-fav').forEach((c) => c.setAttribute('aria-pressed', String((c.dataset.series || null) === st.only)));
     const type = view.querySelector('.kyx-fm-type');
     const sort = view.querySelector('.kyx-fm-sort');
     const missing = view.querySelector('.kyx-fm-check input');
@@ -2383,9 +2494,9 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     loadFavOffers(view, true);
   }
 
-  // The market changes all the time (offers sold, new ones, bids): the list is asked again every minute
+  // The market changes all the time (offers sold, new ones, bids): the list is asked again every 15 seconds
   // while it is on screen, when coming back to the tab and after a purchase or a sale.
-  const FAV_REFRESH = 60e3;
+  const FAV_REFRESH = 15e3;
   function refreshFavMarket() {
     const view = document.querySelector('.kyx-favmarket');
     if (view?.kyxState?.offers && !document.hidden) loadFavOffers(view, 'refresh');
@@ -2393,17 +2504,17 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   setInterval(() => {
     const view = document.querySelector('.kyx-favmarket');
     if (view?.kyxLoadedAt && Date.now() - view.kyxLoadedAt >= FAV_REFRESH) refreshFavMarket();
-  }, 5e3);
+  }, 3e3);
   document.addEventListener('visibilitychange', () => {
     const view = document.querySelector('.kyx-favmarket');
-    if (!document.hidden && view?.kyxLoadedAt && Date.now() - view.kyxLoadedAt >= 15e3) refreshFavMarket();
+    if (!document.hidden && view?.kyxLoadedAt && Date.now() - view.kyxLoadedAt >= 5e3) refreshFavMarket();
   });
 
   // One request per favourite series (24 offers each), merged and sorted like the site would.
   async function loadFavOffers(view, mode) {
     const st = view.kyxState;
     const run = (view.kyxRun = (view.kyxRun ?? 0) + 1);
-    const names = [...favSeries].slice(0, 30);
+    const names = st.only ? [st.only] : [...favSeries].slice(0, 30);
     const refresh = mode === 'refresh' && st.page > 0;
     if (mode === true || (mode === 'refresh' && !refresh)) {
       st.page = 0;
@@ -2422,6 +2533,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       names.map((series) => {
         const q = new URLSearchParams({ type: st.type, sort: st.sort, series, page: String(page), pageSize: String(size) });
         if (st.missing) q.set('missing', '1');
+        if (st.rarity) q.set('rarity', st.rarity);
         return siteApi(`/market/listings?${q}`, { auth: false }).catch(() => null);
       })
     );
@@ -2441,10 +2553,11 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     }[st.sort];
     st.offers.sort(by);
     const total = answers.reduce((n, a) => n + (a?.total ?? 0), 0);
-    const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const scope = `${st.only ?? `${names.length} œuvre${names.length > 1 ? 's' : ''} en favori`}${st.rarity ? ` · ${RARITY_LABEL[st.rarity]}` : ''}`;
     note.textContent = st.offers.length
-      ? `${num(st.offers.length)} offre${st.offers.length > 1 ? 's' : ''} affichée${st.offers.length > 1 ? 's' : ''} sur ${num(total)} pour ${names.length} œuvre${names.length > 1 ? 's' : ''} en favori · à jour à ${time}, actualisé chaque minute.`
-      : `Aucune offre en ce moment pour tes œuvres favorites · vérifié à ${time}.`;
+      ? `${num(st.offers.length)} offre${st.offers.length > 1 ? 's' : ''} affichée${st.offers.length > 1 ? 's' : ''} sur ${num(total)} · ${scope} · à jour à ${time}, actualisé toutes les 15 s.`
+      : `Aucune offre en ce moment · ${scope} · vérifié à ${time}.`;
     more.hidden = !st.more;
     renderFavOffers(view);
   }
@@ -3623,7 +3736,8 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     ['badgeDupes', 'Badge « ×N » sur mes doublons et « Unique » sur mes cartes en un seul exemplaire'],
     ['theirDupes', 'Filtre « Ses doublons » activé d’office dans les propositions d’échange'],
     ['lockLastListed', 'Verrouiller le dernier exemplaire d’une carte dont un doublon est en vente'],
-    ['cardToWiki', 'Page Collection : un clic sur une carte que j’ai ouvre sa fiche']
+    ['cardToWiki', 'Page Collection : un clic sur une carte que j’ai ouvre sa fiche'],
+    ['notifyUpdated', 'Bandeau « nouvelle version » après une mise à jour du script']
   ];
 
   async function openSettings() {
@@ -3684,12 +3798,32 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     menu.appendChild(entry);
   }
 
+  // Tampermonkey and Userscripts install new versions silently: say it once, at the first visit after an update.
+  // Nothing at the very first install.
+  async function announceUpdate() {
+    const { lastVersion } = await chrome.storage.local.get('lastVersion');
+    if (lastVersion === KYX_VERSION) return;
+    await chrome.storage.local.set({ lastVersion: KYX_VERSION });
+    if (!lastVersion || !(await getSettings()).notifyUpdated) return;
+    const bar = document.createElement('div');
+    bar.className = 'kyx-update-toast';
+    bar.setAttribute('role', 'status');
+    bar.innerHTML = `<span>⬆ Kyara Games est passé en <b>${KYX_VERSION}</b></span>
+      <a href="https://github.com/${REPO}/releases/tag/v${KYX_VERSION}" target="_blank" rel="noopener">Voir les nouveautés</a>
+      <button type="button" aria-label="Fermer">✕</button>`;
+    const close = () => bar.remove();
+    bar.querySelector('a').addEventListener('click', close);
+    bar.querySelector('button').addEventListener('click', close);
+    document.body.appendChild(bar);
+  }
+
   const scan = () => {
     addEntry(document.querySelector('#nav-more'), 'button[aria-controls="nav-more"][aria-expanded="true"]');
     addEntry(document.querySelector('#mobile-nav .sheet-grid'), 'button.burger[aria-controls="mobile-nav"]');
   };
   new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
   scan();
+  announceUpdate();
 })();
 
   }

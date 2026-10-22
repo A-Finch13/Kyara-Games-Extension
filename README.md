@@ -17,7 +17,7 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Trouver le booster le plus rentable | Menu **Plus** → **Boosters rentables** : une page du site (recalculée à minuit, heure de Paris, pour le Pack du jour) qui classe les boosters en vente par prix (le moins de chakra dépensé) ou par taux de drop (la meilleure chance par booster) (coût moyen en chakra) pour une rareté, un personnage ou un univers (cartes manquantes), avec un lien vers chacun |
 | Se comparer à ses amis | Page **Classement** : filtre **友 Amis** à côté des onglets ; le classement de l'onglet choisi parmi tes amis et toi, avec la place de chacun au classement général |
 | Ouvrir la fiche d'une carte en un clic | Page **Collection** : un clic sur une carte que tu as ouvre directement sa fiche (réglable dans la popup ; Ctrl+clic garde la fenêtre du site) |
-| Œuvres favorites | Étoile ☆ sur chaque album de la page **Collection** (et « Mettre en favori » dans la barre de l'album ouvert) ; dans le **Marché**, la puce **★ Favoris** n'affiche que les offres de tes œuvres favorites (tri, prix fixe ou enchères, seulement tes manquantes), actualisées chaque minute et après chaque achat ou vente |
+| Œuvres favorites | Étoile ☆ sur chaque album de la page **Collection** (et « Mettre en favori » dans la barre de l'album ouvert) ; dans le **Marché**, la puce **★ Favoris** n'affiche que les offres de tes œuvres favorites : toutes ou une seule au choix, avec les puces de rareté du site, le tri, prix fixe ou enchères et « seulement mes manquantes » ; actualisées toutes les 15 secondes et après chaque achat ou vente |
 | Verrouiller un album sans bloquer ses doublons | Bouton **Bloquer sauf doublons** à côté de « Bloquer l'album » (page **Collection**, un univers choisi) : seules les cartes en un exemplaire sont verrouillées, les doublons restent vendables ; une carte est reverrouillée dès qu'il n'en reste qu'une |
 | Badge « Manquante » sur toute carte que tu n'as pas | Partout sur le site : boutique/marché, échanges, profils, wiki… |
 | Savoir si la carte que tu donnes est en double | Badge **×N** (doublon) ou **Unique** (ton seul exemplaire) sur tes cartes dans les fenêtres d'échange, confirmation comprise |
@@ -27,7 +27,7 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Afficher les cartes possédées ou manquantes de la collection | Puces **Possédées** et **Manquantes** à côté de « Toutes » sur la page Collection (un second clic réaffiche tout), et onglet **Manquantes** de la popup |
 | Savoir si les cartes que tu donnes dans un échange en cours sont en double | Badge **×N** ou **Unique** côté « Tu donnes » des échanges en attente, onglet **Échanges** du Marché |
 | Sur téléphone | Version script : Android (Firefox ou Edge avec Tampermonkey) et iPhone / iPad (app Userscripts), toutes les fonctions du site, voir **Installation sur téléphone** |
-| Savoir qu'une nouvelle version est installée | Notification « Kyara Games est passé en X » juste après chaque mise à jour ; un clic ouvre les nouveautés. Réglable dans la popup |
+| Savoir qu'une nouvelle version est installée | Extension : notification « Kyara Games est passé en X » juste après chaque mise à jour. Script : bandeau dans le site à la première visite après la mise à jour. Un clic ouvre les nouveautés ; réglable dans la popup ou le panneau de réglages |
 | Être prévenu d'une nouvelle version | Notification et bandeau vert dans la popup quand une nouvelle release sort sur GitHub (vérifié toutes les 15 min), avec un bouton **Mettre à jour** qui installe la nouvelle version (voir plus bas) |
 | Notifications | Boosters gratuits pleins, envies mises en vente au marché, échanges, ventes/achats/enchères, amis, messages de l'équipe |
 
@@ -46,7 +46,7 @@ L'appli Kyara installée depuis le navigateur (PWA) utilise le même profil : l'
 
 La page https://a-finch13.github.io/Kyara-Games-Extension/ montre ces étapes avec les bons boutons pour ton appareil.
 
-Sur téléphone, Kyara Games s'installe en version script : toutes les fonctions du site, réglages dans le menu du site (☰ → 設 Kyara Games), mises à jour automatiques. Pas de notifications : un script ne tourne que quand une page kyara.games est ouverte.
+Sur téléphone, Kyara Games s'installe en version script : toutes les fonctions du site, réglages dans le menu du site (☰ → 設 Kyara Games), mises à jour automatiques (vérifiées une fois par jour ; un bandeau « Kyara Games est passé en X » le signale à la visite suivante). Pas de notifications : un script ne tourne que quand une page kyara.games est ouverte.
 
 Lien du script (pour les étapes ci-dessous) :
 **https://github.com/A-Finch13/Kyara-Games-Extension/releases/latest/download/kyara-games.user.js**
@@ -71,6 +71,8 @@ Safari n'accepte que les extensions vendues sur l'App Store : sur iPhone et iPad
 4. Touche l'icône des extensions dans la barre d'adresse (**ᴀA** ou la pièce de puzzle) → **Userscripts** : le script est détecté, touche **Installer**.
 5. Ouvre [kyara.games](https://kyara.games) dans Safari et connecte-toi une fois.
 6. Les réglages : menu du site (☰) → **設 Kyara Games**.
+
+**Icône sur l'écran d'accueil** : un site ajouté en « app web » s'ouvre hors de Safari, et iOS n'y charge aucune extension, donc Kyara Games n'y apparaît pas. Pour garder une icône qui marche : dans Safari, sur kyara.games, **Partager** → **Sur l'écran d'accueil**, **désactive « Ouvrir en tant qu'app web »**, puis **Ajouter** ; l'icône ouvrira kyara.games dans Safari. Si l'option n'apparaît pas (iOS plus ancien), ajoute plutôt kyara.games aux Favoris de Safari.
 
 Userscripts vérifie les mises à jour du script. Pour forcer la dernière version, rouvre simplement le lien du script et réinstalle-le.
 

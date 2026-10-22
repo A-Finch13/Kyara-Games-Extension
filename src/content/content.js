@@ -668,6 +668,21 @@
     }
     btn.classList.toggle('on', marketFav);
     btn.setAttribute('aria-pressed', String(marketFav));
+    // The site's rarity chips ("Toutes", "Commune"…) filter the favourites as well.
+    if (!chips.dataset.kyxRarity) {
+      chips.dataset.kyxRarity = '1';
+      chips.addEventListener('click', (e) => {
+        if (!marketFav || !e.target.closest('button') || e.target.closest('.kyx-chip')) return;
+        setTimeout(() => {
+          const view = document.querySelector('.kyx-favmarket');
+          if (!view?.kyxState) return;
+          const rarity = siteRarity(chips);
+          if (rarity === view.kyxState.rarity) return;
+          view.kyxState.rarity = rarity;
+          renderFavMarket(view);
+        }, 60);
+      });
+    }
     // The site's offers (all that follows its filters) make way for the favourites while the chip is on.
     let view = filters.parentElement.querySelector(':scope > .kyx-favmarket');
     for (let el = filters.nextElementSibling; el; el = el.nextElementSibling) {
@@ -683,7 +698,7 @@
     if (!view) {
       view = document.createElement('section');
       view.className = 'kyx-favmarket';
-      view.kyxState = { type: 'fixed', sort: 'price_asc', missing: false };
+      view.kyxState = { type: 'fixed', sort: 'price_asc', missing: false, only: null, rarity: '' };
       filters.after(view);
     }
     const key = [...favSeries].join('|');
@@ -692,9 +707,22 @@
     renderFavMarket(view);
   }
 
+  // Rarity of the site's chip that is on ('' for "Toutes" or none).
+  const RARITY_BY_LABEL = Object.fromEntries(Object.entries(RARITY_LABEL).map(([k, v]) => [norm(v), k]));
+  function siteRarity(chips) {
+    const on = [...(chips?.querySelectorAll(':scope > button.on:not(.kyx-chip)') ?? [])];
+    for (const b of on) {
+      const r = RARITY_BY_LABEL[norm(b.textContent)];
+      if (r) return r;
+    }
+    return '';
+  }
+
   function renderFavMarket(view) {
     const st = view.kyxState;
     const names = [...favSeries];
+    if (st.only && !favSeries.has(st.only)) st.only = null;
+    st.rarity = siteRarity(document.querySelector('#mq')?.closest('.filters')?.querySelector('.chips')) || st.rarity;
     if (!names.length) {
       view.innerHTML = '<p class="kyx-fm-note">Aucune œuvre en favori pour l’instant. Sur la page <a href="/collection">Collection</a>, onglet Albums, touche l’étoile ☆ d’un album pour l’ajouter.</p>';
       return;
@@ -709,16 +737,32 @@
       <div class="kyx-fm-status"><p class="kyx-fm-note" role="status"></p><button type="button" class="kyx-fm-refresh">↻ Actualiser</button></div>
       <ul class="kyx-fm-grid"></ul>
       <button type="button" class="kyx-fm-more" hidden>Voir plus d’offres</button>`;
+    // Choose the series to show: all the favourites, or a single one (× takes it out of the favourites).
     const favs = view.querySelector('.kyx-fm-favs');
+    const pick = (only) => {
+      st.only = only;
+      favs.querySelectorAll('.kyx-fm-fav').forEach((c) => c.setAttribute('aria-pressed', String((c.dataset.series || null) === only)));
+      loadFavOffers(view, true);
+    };
+    const all = document.createElement('span');
+    all.className = 'kyx-fm-fav all';
+    all.dataset.series = '';
+    all.innerHTML = `<button type="button" class="kyx-fm-pick">★ Toutes mes favorites (${names.length})</button>`;
+    all.querySelector('button').addEventListener('click', () => pick(null));
+    favs.appendChild(all);
     for (const name of names) {
       const chip = document.createElement('span');
       chip.className = 'kyx-fm-fav';
-      chip.innerHTML = '<span></span><button type="button">×</button>';
-      chip.firstChild.textContent = `★ ${name}`;
-      chip.querySelector('button').title = `Retirer ${name} des favoris`;
-      chip.querySelector('button').addEventListener('click', () => toggleFav(name));
+      chip.dataset.series = name;
+      chip.innerHTML = '<button type="button" class="kyx-fm-pick"></button><button type="button" class="kyx-fm-del">×</button>';
+      chip.querySelector('.kyx-fm-pick').textContent = name;
+      chip.querySelector('.kyx-fm-pick').title = `Afficher seulement ${name}`;
+      chip.querySelector('.kyx-fm-pick').addEventListener('click', () => pick(st.only === name ? null : name));
+      chip.querySelector('.kyx-fm-del').title = `Retirer ${name} des favoris`;
+      chip.querySelector('.kyx-fm-del').addEventListener('click', () => toggleFav(name));
       favs.appendChild(chip);
     }
+    favs.querySelectorAll('.kyx-fm-fav').forEach((c) => c.setAttribute('aria-pressed', String((c.dataset.series || null) === st.only)));
     const type = view.querySelector('.kyx-fm-type');
     const sort = view.querySelector('.kyx-fm-sort');
     const missing = view.querySelector('.kyx-fm-check input');
@@ -737,9 +781,9 @@
     loadFavOffers(view, true);
   }
 
-  // The market changes all the time (offers sold, new ones, bids): the list is asked again every minute
+  // The market changes all the time (offers sold, new ones, bids): the list is asked again every 15 seconds
   // while it is on screen, when coming back to the tab and after a purchase or a sale.
-  const FAV_REFRESH = 60e3;
+  const FAV_REFRESH = 15e3;
   function refreshFavMarket() {
     const view = document.querySelector('.kyx-favmarket');
     if (view?.kyxState?.offers && !document.hidden) loadFavOffers(view, 'refresh');
@@ -747,17 +791,17 @@
   setInterval(() => {
     const view = document.querySelector('.kyx-favmarket');
     if (view?.kyxLoadedAt && Date.now() - view.kyxLoadedAt >= FAV_REFRESH) refreshFavMarket();
-  }, 5e3);
+  }, 3e3);
   document.addEventListener('visibilitychange', () => {
     const view = document.querySelector('.kyx-favmarket');
-    if (!document.hidden && view?.kyxLoadedAt && Date.now() - view.kyxLoadedAt >= 15e3) refreshFavMarket();
+    if (!document.hidden && view?.kyxLoadedAt && Date.now() - view.kyxLoadedAt >= 5e3) refreshFavMarket();
   });
 
   // One request per favourite series (24 offers each), merged and sorted like the site would.
   async function loadFavOffers(view, mode) {
     const st = view.kyxState;
     const run = (view.kyxRun = (view.kyxRun ?? 0) + 1);
-    const names = [...favSeries].slice(0, 30);
+    const names = st.only ? [st.only] : [...favSeries].slice(0, 30);
     const refresh = mode === 'refresh' && st.page > 0;
     if (mode === true || (mode === 'refresh' && !refresh)) {
       st.page = 0;
@@ -776,6 +820,7 @@
       names.map((series) => {
         const q = new URLSearchParams({ type: st.type, sort: st.sort, series, page: String(page), pageSize: String(size) });
         if (st.missing) q.set('missing', '1');
+        if (st.rarity) q.set('rarity', st.rarity);
         return siteApi(`/market/listings?${q}`, { auth: false }).catch(() => null);
       })
     );
@@ -795,10 +840,11 @@
     }[st.sort];
     st.offers.sort(by);
     const total = answers.reduce((n, a) => n + (a?.total ?? 0), 0);
-    const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const scope = `${st.only ?? `${names.length} œuvre${names.length > 1 ? 's' : ''} en favori`}${st.rarity ? ` · ${RARITY_LABEL[st.rarity]}` : ''}`;
     note.textContent = st.offers.length
-      ? `${num(st.offers.length)} offre${st.offers.length > 1 ? 's' : ''} affichée${st.offers.length > 1 ? 's' : ''} sur ${num(total)} pour ${names.length} œuvre${names.length > 1 ? 's' : ''} en favori · à jour à ${time}, actualisé chaque minute.`
-      : `Aucune offre en ce moment pour tes œuvres favorites · vérifié à ${time}.`;
+      ? `${num(st.offers.length)} offre${st.offers.length > 1 ? 's' : ''} affichée${st.offers.length > 1 ? 's' : ''} sur ${num(total)} · ${scope} · à jour à ${time}, actualisé toutes les 15 s.`
+      : `Aucune offre en ce moment · ${scope} · vérifié à ${time}.`;
     more.hidden = !st.more;
     renderFavOffers(view);
   }

@@ -1043,16 +1043,40 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 .kyx-fm-fav {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 4px 3px 10px;
-  border: 1px solid #f5c518;
+  gap: 2px;
+  padding: 2px 4px 2px 2px;
+  border: 1px solid var(--line3, #3a3642);
   border-radius: 999px;
   color: var(--fg, #fff);
   font-size: 13px;
   font-weight: 700;
 }
 
-.kyx-fm-fav button {
+.kyx-fm-fav.all {
+  padding-right: 2px;
+}
+
+.kyx-fm-fav[aria-pressed="true"] {
+  border-color: #f5c518;
+  background: rgba(245, 197, 24, 0.14);
+}
+
+.kyx-fm-fav .kyx-fm-pick {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.kyx-fm-fav .kyx-fm-pick:hover {
+  color: #f5c518;
+}
+
+.kyx-fm-fav .kyx-fm-del {
   width: 22px;
   height: 22px;
   padding: 0;
@@ -1064,7 +1088,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   cursor: pointer;
 }
 
-.kyx-fm-fav button:hover {
+.kyx-fm-fav .kyx-fm-del:hover {
   color: var(--fg, #fff);
   background: var(--raise, #1f1d25);
 }
@@ -1201,4 +1225,47 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
 .kyx-fm-refresh:hover {
   border-color: var(--acc, #ff4d2e);
+}
+
+/* Userscript version: "new version installed" banner, at the first visit after an update */
+.kyx-update-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 2147483000;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  max-width: calc(100% - 24px);
+  padding: 12px 14px 12px 18px;
+  border: 1px solid #3fbf7f;
+  border-radius: 14px;
+  background: var(--panel, #16141b);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  color: var(--fg, #fff);
+  font-size: 14px;
+  transform: translateX(-50%);
+}
+
+.kyx-update-toast a {
+  color: #3fbf7f;
+  font-weight: 700;
+}
+
+.kyx-update-toast button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg2, #a9a4b0);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.kyx-update-toast button:hover {
+  background: var(--raise, #1f1d25);
+  color: var(--fg, #fff);
 }
