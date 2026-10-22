@@ -9,7 +9,7 @@
     ['theirDupes', 'Filtre « Ses doublons » activé d’office dans les propositions d’échange'],
     ['lockLastListed', 'Verrouiller le dernier exemplaire d’une carte dont un doublon est en vente'],
     ['cardToWiki', 'Page Collection : un clic sur une carte que j’ai ouvre sa fiche'],
-    ['notifyUpdated', 'Bandeau « nouvelle version » après une mise à jour du script']
+    ['notifyUpdated', 'Bandeau « nouvelle version installée » après une mise à jour du script']
   ];
 
   async function openSettings() {
@@ -89,6 +89,50 @@
     document.body.appendChild(bar);
   }
 
+  // Tampermonkey checks for new versions on its own schedule (once a day by default): the script also asks GitHub
+  // every 15 minutes while kyara.games is open, once for all the open tabs, and offers the update.
+  const UPDATE_EVERY = 15 * 60e3;
+  async function lookForUpdate() {
+    const { updateCheckedAt } = await chrome.storage.local.get('updateCheckedAt');
+    if (Date.now() - (updateCheckedAt ?? 0) >= UPDATE_EVERY) {
+      await chrome.storage.local.set({ updateCheckedAt: Date.now() });
+      await checkUpdate().catch(() => null);
+    }
+    offerUpdate();
+  }
+
+  async function offerUpdate() {
+    const { update, updateLater } = await chrome.storage.local.get(['update', 'updateLater']);
+    const shown = document.querySelector('.kyx-update-toast.offer');
+    if (!update?.version || !newer(update.version, KYX_VERSION)) return void shown?.remove();
+    if (updateLater?.version === update.version && Date.now() < updateLater.until) return void shown?.remove();
+    if (shown?.dataset.version === update.version) return;
+    shown?.remove();
+    const bar = document.createElement('div');
+    bar.className = 'kyx-update-toast offer';
+    bar.dataset.version = update.version;
+    bar.setAttribute('role', 'status');
+    bar.innerHTML = `<span>⬆ Kyara Games <b></b> est disponible</span>
+      <a class="kyx-update-go" target="_blank" rel="noopener">Mettre à jour</a>
+      <a class="kyx-update-notes" target="_blank" rel="noopener">Nouveautés</a>
+      <button type="button" aria-label="Plus tard" title="Plus tard">✕</button>`;
+    bar.querySelector('b').textContent = update.version;
+    // The script of that release: Tampermonkey (or Userscripts) recognises it and offers to update.
+    bar.querySelector('.kyx-update-go').href = `https://github.com/${REPO}/releases/download/v${update.version}/kyara-games.user.js`;
+    bar.querySelector('.kyx-update-notes').href = update.url;
+    bar.querySelector('.kyx-update-go').addEventListener('click', () => {
+      bar.querySelector('span').textContent = 'Confirme la mise à jour dans Tampermonkey, puis recharge cette page.';
+      bar.querySelector('.kyx-update-go').remove();
+    });
+    // Later: asked again in 12 hours.
+    bar.querySelector('button').addEventListener('click', () => {
+      bar.remove();
+      chrome.storage.local.set({ updateLater: { version: update.version, until: Date.now() + 12 * 3600e3 } });
+    });
+    document.querySelector('.kyx-update-toast:not(.offer)')?.remove();
+    document.body.appendChild(bar);
+  }
+
   const scan = () => {
     addEntry(document.querySelector('#nav-more'), 'button[aria-controls="nav-more"][aria-expanded="true"]');
     addEntry(document.querySelector('#mobile-nav .sheet-grid'), 'button.burger[aria-controls="mobile-nav"]');
@@ -96,4 +140,7 @@
   new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
   scan();
   announceUpdate();
+  lookForUpdate();
+  setInterval(lookForUpdate, 60e3);
+  chrome.storage.onChanged.addListener((changes) => ('update' in changes || 'updateLater' in changes) && offerUpdate());
 })();

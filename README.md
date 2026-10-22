@@ -27,6 +27,7 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Afficher les cartes possédées ou manquantes de la collection | Puces **Possédées** et **Manquantes** à côté de « Toutes » sur la page Collection (un second clic réaffiche tout), et onglet **Manquantes** de la popup |
 | Savoir si les cartes que tu donnes dans un échange en cours sont en double | Badge **×N** ou **Unique** côté « Tu donnes » des échanges en attente, onglet **Échanges** du Marché |
 | Sur téléphone | Version script : Android (Firefox ou Edge avec Tampermonkey) et iPhone / iPad (app Userscripts), toutes les fonctions du site, voir **Installation sur téléphone** |
+| Être prévenu d'une nouvelle version du script | Le script vérifie toutes les 15 minutes (site ouvert) et affiche un bandeau **Mettre à jour** ; « ✕ » le repousse de 12 h |
 | Savoir qu'une nouvelle version est installée | Extension : notification « Kyara Games est passé en X » juste après chaque mise à jour. Script : bandeau dans le site à la première visite après la mise à jour. Un clic ouvre les nouveautés ; réglable dans la popup ou le panneau de réglages |
 | Être prévenu d'une nouvelle version | Notification et bandeau vert dans la popup quand une nouvelle release sort sur GitHub (vérifié toutes les 15 min), avec un bouton **Mettre à jour** qui installe la nouvelle version (voir plus bas) |
 | Notifications | Boosters gratuits pleins, envies mises en vente au marché, échanges, ventes/achats/enchères, amis, messages de l'équipe |
@@ -46,7 +47,7 @@ L'appli Kyara installée depuis le navigateur (PWA) utilise le même profil : l'
 
 La page https://a-finch13.github.io/Kyara-Games-Extension/ montre ces étapes avec les bons boutons pour ton appareil.
 
-Sur téléphone, Kyara Games s'installe en version script : toutes les fonctions du site, réglages dans le menu du site (☰ → 設 Kyara Games), mises à jour automatiques (vérifiées une fois par jour ; un bandeau « Kyara Games est passé en X » le signale à la visite suivante). Pas de notifications : un script ne tourne que quand une page kyara.games est ouverte.
+Sur téléphone, Kyara Games s'installe en version script : toutes les fonctions du site, réglages dans le menu du site (☰ → 設 Kyara Games), mises à jour automatiques (voir **Mises à jour du script** plus bas). Pas de notifications : un script ne tourne que quand une page kyara.games est ouverte.
 
 Lien du script (pour les étapes ci-dessous) :
 **https://github.com/A-Finch13/Kyara-Games-Extension/releases/latest/download/kyara-games.user.js**
@@ -79,6 +80,12 @@ Userscripts vérifie les mises à jour du script. Pour forcer la dernière versi
 ### Sur PC aussi
 
 Le script marche aussi sur PC avec Tampermonkey ou Violentmonkey, si tu préfères un script à l'extension. Si l'extension et le script sont installés tous les deux, le script se met en retrait pour ne rien afficher en double.
+
+## Mises à jour du script
+
+Tampermonkey vérifie lui-même les mises à jour une fois par jour (par défaut) ; en plus, le script regarde toutes les 15 minutes, tant que kyara.games est ouvert, si une nouvelle version existe et propose un bouton **Mettre à jour** (Tampermonkey demande alors de confirmer). Pour que Tampermonkey vérifie plus souvent de lui-même : tableau de bord de Tampermonkey → **Paramètres** (mode de configuration **Avancé** si l'option n'apparaît pas) → **Mises à jour des scripts** → **Vérifier toutes les…** → la valeur la plus courte.
+
+Après l'installation d'une nouvelle version, un bandeau « Kyara Games est passé en X » le confirme à la visite suivante. Ce bandeau-là se désactive dans les réglages (menu du site → 設 Kyara Games) ; le bouton « ✕ » du bandeau **Mettre à jour** le repousse de 12 heures.
 
 ## Firefox
 
