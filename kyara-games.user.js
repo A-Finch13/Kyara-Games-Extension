@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyara Games
 // @namespace    https://github.com/A-Finch13/Kyara-Games-Extension
-// @version      1.7.0
+// @version      1.7.1
 // @description  Compagnon non officiel pour kyara.games : cartes manquantes en gris avec ordre d'achat, albums complets masqués, doublons pendant les échanges, booster le plus rentable, classement entre amis.
 // @author       A-Finch13
 // @license      MIT
@@ -39,14 +39,14 @@
  *  2. kyara.js   — accès à l'API de kyara.games, catalogue des cartes et collection ;
  *  3. bridge.js  — fait dans la page le travail du service de fond de l'extension ;
  *  4. inject.js  — lit les réponses que le site reçoit déjà (collection, échanges), sans jamais les modifier ;
- *  5. content.js — tout ce qui s'affiche sur le site ;
+ *  5. tutorial.js et content.js — textes du tutoriel et des nouveautés, puis tout ce qui s'affiche sur le site ;
  *  6. panel.js   — panneau de réglages dans le menu du site.
  */
 (() => {
 'use strict';
 if (window.__kyaraGamesUserscript) return;
 window.__kyaraGamesUserscript = true;
-const KYX_VERSION = '1.7.0';
+const KYX_VERSION = '1.7.1';
 
 // ---------- 1. src/userscript/shim.js : stockage et messages, à la place des fonctions d'extension ----------
 // Userscript: the extension APIs used by the page code, rebuilt in the page.
@@ -284,13 +284,14 @@ async function exportCode() {
   const list = seriesList(await loadCatalog());
   const index = new Map(list.map((name, i) => [name, i]));
   const width = Math.max(1, Math.ceil(Math.log2(list.length + 1)));
-  const { settings: saved, favSeries = [], smartLock = [], marketFav } = await chrome.storage.local.get(['settings', 'favSeries', 'smartLock', 'marketFav']);
+  const { settings: saved, favSeries = [], smartLock = [], marketFav, tradeFav } = await chrome.storage.local.get(['settings', 'favSeries', 'smartLock', 'marketFav', 'tradeFav']);
   const settings = { ...DEFAULT_SETTINGS, ...saved };
   const bits = new Bits();
   bits.put(SYNC_VERSION, 4);
   bits.put(catalogCheck(list), 8);
   for (const key of SYNC_FLAGS) bits.put(settings[key] ? 1 : 0, 1);
   bits.put(marketFav ? 1 : 0, 1);
+  bits.put(tradeFav ? 1 : 0, 1);
   bits.put(Math.max(0, SYNC_POLL.indexOf(Number(settings.pollMinutes))), 3);
   bits.putList(favSeries.filter((n) => index.has(n)).map((n) => index.get(n)), width);
   bits.putList(smartLock.filter((n) => index.has(n)).map((n) => index.get(n)), width);
@@ -308,13 +309,14 @@ async function importCode(code) {
     const catalogBits = bits.take(8);
     const flags = Object.fromEntries(SYNC_FLAGS.map((key) => [key, !!bits.take(1)]));
     const marketFav = !!bits.take(1);
+    const tradeFav = !!bits.take(1);
     flags.pollMinutes = SYNC_POLL[bits.take(3)] ?? 0.25;
     const names = (numbers) => numbers.map((i) => list[i]).filter(Boolean);
     const fav = bits.takeList();
     const locked = bits.takeList();
     if (bits.take(8) !== bits.check(bits.pos - 8)) throw new ApiError(0, 'bad_code');
     if (catalogBits !== catalogCheck(list)) throw new ApiError(0, 'other_catalog');
-    return { flags, marketFav, favSeries: names(fav), smartLock: names(locked) };
+    return { flags, marketFav, tradeFav, favSeries: names(fav), smartLock: names(locked) };
   };
   let data;
   try {
@@ -328,7 +330,8 @@ async function importCode(code) {
     settings: { ...settings, ...data.flags },
     favSeries: data.favSeries,
     smartLock: data.smartLock,
-    marketFav: data.marketFav
+    marketFav: data.marketFav,
+    tradeFav: data.tradeFav
   });
   return { favs: data.favSeries.length, locks: data.smartLock.length };
 }
@@ -1927,9 +1930,546 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 .kyx-rec-msg[data-kind="err"] {
   color: #ff4d2e;
 }
+
+/* What's new window */
+.kyx-tuto {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 18px;
+  background: var(--panel, #16141b);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  color: var(--fg, #fff);
+}
+
+.kyx-tuto-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kyx-tuto-head small {
+  color: var(--acc, #ff4d2e);
+  font: 700 12px var(--mono, monospace);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kyx-tuto h2 {
+  margin: 0;
+  font-family: var(--disp, inherit);
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.kyx-tuto-btns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.kyx-tuto-btns > span {
+  flex: 1;
+}
+
+.kyx-tuto button {
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg, #fff);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kyx-tuto .kyx-tuto-next {
+  border-color: var(--acc, #ff4d2e);
+  background: var(--acc, #ff4d2e);
+}
+
+.kyx-tuto .kyx-tuto-x {
+  width: 34px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.kyx-tuto-news {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.kyx-tuto-news h3 {
+  margin: 0 0 4px;
+  color: #f5c518;
+  font-size: 15px;
+}
+
+.kyx-tuto-news ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--fg2, #c9c4d0);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.kyx-push[hidden] {
+  display: none;
+}
+
+.kyx-tuto .kyx-tuto-show {
+  height: 26px;
+  margin-left: 4px;
+  padding: 0 10px;
+  border-color: #f5c518;
+  border-radius: 999px;
+  color: #f5c518;
+  font-size: 12px;
+  vertical-align: 1px;
+}
+
+/* Guided tour: the circled element (the rest of the page darkened) and the bubble beside it */
+.kyx-spot {
+  position: fixed;
+  z-index: 2147483000;
+  display: none;
+  border: 2px solid var(--acc, #ff4d2e);
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(5, 4, 8, 0.66), 0 0 24px rgba(255, 77, 46, 0.55);
+  pointer-events: none;
+}
+
+.kyx-spot[data-on="1"] {
+  display: block;
+  opacity: 0;
+  transition: opacity 0.2s, width 0.2s, height 0.2s;
+}
+
+.kyx-spot[data-on="1"].kyx-spot-in {
+  opacity: 1;
+}
+
+.kyx-bubble {
+  position: fixed;
+  z-index: 2147483001;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(380px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 16px;
+  background: var(--panel, #16141b);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.65);
+  color: var(--fg, #fff);
+}
+
+.kyx-bubble[data-state="center"] {
+  top: 50% !important;
+  left: 50% !important;
+  width: min(460px, calc(100vw - 16px));
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 9999px rgba(5, 4, 8, 0.66), 0 18px 50px rgba(0, 0, 0, 0.65);
+}
+
+.kyx-bubble h2,
+.kyx-b-text {
+  transition: opacity 0.15s;
+}
+
+/* While the next step loads: the bubble stays put, its text dimmed, a line runs along its top */
+.kyx-bubble[data-busy="1"] h2,
+.kyx-bubble[data-busy="1"] .kyx-b-text {
+  opacity: 0.55;
+}
+
+.kyx-bubble[data-busy="1"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 35%;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--acc, #ff4d2e);
+  animation: kyx-busy 0.9s ease-in-out infinite;
+}
+
+@keyframes kyx-busy {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kyx-bubble[data-busy="1"]::before {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
+.kyx-bubble header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kyx-bubble header small {
+  color: var(--acc, #ff4d2e);
+  font: 700 12px var(--mono, monospace);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kyx-bubble h2 {
+  margin: 0;
+  font-family: var(--disp, inherit);
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.kyx-b-text,
+.kyx-b-miss {
+  margin: 0;
+  color: var(--fg2, #c9c4d0);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.kyx-b-miss {
+  color: #f5c518;
+  font-size: 12px;
+}
+
+.kyx-b-btns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.kyx-b-btns > span {
+  flex: 1;
+}
+
+.kyx-bubble button {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg, #fff);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kyx-bubble button[hidden] {
+  display: none;
+}
+
+.kyx-bubble .kyx-b-next {
+  border-color: var(--acc, #ff4d2e);
+  background: var(--acc, #ff4d2e);
+}
+
+.kyx-bubble .kyx-b-x {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.kyx-bubble .kyx-b-skip {
+  padding: 0 4px;
+  border: 0;
+  color: var(--fg2, #a9a4b0);
+  font-weight: 600;
+}
+
+/* ---------- phones: everything takes the width of the screen ---------- */
+@media (max-width: 640px) {
+  .kyx-modal-back {
+    align-items: flex-end;
+    padding: 8px;
+  }
+
+  .kyx-tuto,
+  .kyx-settings,
+  .kyx-order-form {
+    width: 100%;
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+    padding: 18px 16px;
+    border-radius: 16px;
+  }
+
+  .kyx-tuto h2 {
+    font-size: 20px;
+  }
+
+  .kyx-tuto-btns button {
+    flex: 1 1 auto;
+  }
+
+  /* The bubble is docked at the bottom, the circled element stays visible above it */
+  .kyx-bubble,
+  .kyx-bubble[data-state="center"] {
+    top: auto !important;
+    right: 8px;
+    bottom: 8px;
+    left: 8px !important;
+    width: auto;
+    max-height: 55vh;
+    transform: none;
+  }
+
+  .kyx-bubble h2 {
+    font-size: 18px;
+  }
+
+  .kyx-b-btns .kyx-b-next {
+    flex: 1;
+  }
+
+  /* New version banners: the whole width of the screen */
+  .kyx-update-toast {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    max-width: none;
+    transform: none;
+    padding: 12px;
+  }
+
+  .kyx-update-toast > span {
+    flex-basis: 100%;
+  }
+
+  .kyx-update-toast a {
+    flex: 1;
+    padding: 8px 0;
+    text-align: center;
+  }
+}
 `;
   document.head.appendChild(style);
-  // ---------- 5. src/content/content.js : tout ce qui s'affiche sur le site ----------
+  // ---------- 5. src/content/tutorial.js et content.js : tutoriel, puis tout ce qui s'affiche sur le site ----------
+// Text of the guided tour and of the "Nouveautés" window, shown by content.js.
+// Each new version adds its entry at the top of KYX_CHANGES (build.py refuses a version without one).
+
+// Guided tour, one step per feature. Each step can go to a page, open something first and circle an element:
+//   page: path to go to; target: CSS selectors of the element to circle (the first visible one);
+//   prepare: what to open first ("missing", "albums", "album", "recycle", "menu"); only: "extension", "script" or "android".
+// A step whose element can't be found is shown in the middle of the screen.
+const KYX_TOUR = [
+  {
+    id: 'bienvenue',
+    title: 'Bienvenue dans Kyara Games',
+    text: 'L’extension ajoute à kyara.games de quoi compléter ta collection plus vite. La visite t’emmène sur chaque page et te montre où tout se trouve. Tu peux la quitter à tout moment.'
+  },
+  {
+    id: 'manquantes',
+    title: 'Les cartes manquantes, visibles',
+    text: 'Les cartes que tu n’as pas s’affichent en gris avec leur nom. Sous chacune : son prix estimé et un bouton « Ordre d’achat » pour la commander au marché.',
+    page: '/collection',
+    prepare: 'missing',
+    target: '.cell:has(.kyx-order), a.slot > .miss[data-kyx-ghost]'
+  },
+  {
+    id: 'puces',
+    title: 'Possédées ou manquantes',
+    text: 'Ces deux puces filtrent ta collection en un clic. Un clic sur une carte que tu as ouvre directement sa fiche.',
+    page: '/collection',
+    target: '.chips:has(> .kyx-missing)'
+  },
+  {
+    id: 'recyclage',
+    title: 'Recycler au nombre près',
+    text: 'Choisis combien de doublons recycler par rareté. Ton dernier exemplaire, les cartes verrouillées et celles en vente ne sont jamais touchés. Rien n’est recyclé tant que tu ne confirmes pas.',
+    page: '/collection',
+    prepare: 'recycle',
+    target: '.kyx-rec, .rec-box'
+  },
+  {
+    id: 'albums',
+    title: 'Des albums plus clairs',
+    text: 'Masque les séries complètes et celles de moins de 5 persos.',
+    page: '/collection',
+    prepare: 'albums',
+    target: '.al-tools:has(.kyx-toggle)'
+  },
+  {
+    id: 'favoris',
+    title: 'Tes œuvres favorites',
+    text: 'Touche l’étoile ☆ d’un album pour mettre l’œuvre en favori. Ses offres apparaîtront dans le filtre « ★ Favoris » du marché.',
+    page: '/collection',
+    prepare: 'albums',
+    target: 'ul.albums > li:has(.kyx-fav)'
+  },
+  {
+    id: 'verrous',
+    title: 'Des verrous plus malins',
+    text: 'Dans un album ouvert, « Bloquer sauf doublons » verrouille seulement les cartes que tu as en un exemplaire : tes doublons restent vendables. Et quand un doublon est en vente, ton dernier exemplaire est verrouillé tout seul.',
+    page: '/collection',
+    prepare: 'album',
+    target: '.kyx-smart'
+  },
+  {
+    id: 'marche',
+    title: 'Tes favoris au marché',
+    text: '« ★ Favoris » n’affiche que les offres de tes œuvres favorites, toutes ou une seule, avec tous les filtres du site. La liste s’actualise toutes les 15 secondes.',
+    page: '/marche',
+    target: '.kyx-fav-chip'
+  },
+  {
+    id: 'echanges',
+    title: 'Échanger sans te tromper',
+    text: 'Pendant un échange : badges ×N (doublon) et « Unique » (ton dernier exemplaire) sur tes cartes, filtres « Ses doublons » et « ★ Favoris » (les cartes de tes œuvres favorites), et à la confirmation la série, le prix de chaque carte et l’écart de valeur entre les deux côtés.'
+  },
+  {
+    id: 'boosters',
+    title: 'Le booster le plus rentable',
+    text: 'Dans le menu : « Boosters rentables » classe les boosters par prix ou par taux de drop, pour une rareté, un perso ou une carte qui te manque.',
+    prepare: 'menu',
+    target: '#nav-more .kyx-more, #mobile-nav .kyx-more'
+  },
+  {
+    id: 'amis',
+    title: 'Te comparer à tes amis',
+    text: 'Le filtre « 友 Amis » affiche le classement de tes amis, avec le même podium que le site.',
+    page: '/classement',
+    target: '.kyx-friends-tab'
+  },
+  {
+    id: 'missions',
+    title: 'Missions plus lisibles',
+    text: 'La liste des séries complètes est condensée à la hauteur de la carte Parrainage, avec leur total.',
+    page: '/missions',
+    target: 'section.kyx-albums'
+  },
+  {
+    id: 'reglages',
+    only: 'extension',
+    title: 'Réglages et autre appareil',
+    text: 'Clique sur l’icône Kyara Games de ton navigateur : onglets Albums, Manquantes, Échange et Réglages. Dans Réglages, active ou coupe chaque fonction et les notifications, et « Autre appareil » te donne un code court pour retrouver tes réglages sur ton téléphone.'
+  },
+  {
+    id: 'reglages',
+    only: 'script',
+    title: 'Réglages et autre appareil',
+    text: 'Ici : active ou coupe chaque fonction, et « Autre appareil » te donne un code court pour retrouver tes réglages et tes favoris sur un autre appareil.',
+    prepare: 'menu',
+    target: '#nav-more .kyx-settings-entry, #mobile-nav .kyx-settings-entry'
+  },
+  {
+    id: 'notifications',
+    only: 'android',
+    title: 'Les notifications sur ton téléphone',
+    text: 'Dans ces réglages, « Activer les notifications de Kyara » te fait recevoir les notifications du site (boosters pleins, marché, échanges, amis), même site fermé.',
+    prepare: 'menu',
+    target: '#nav-more .kyx-settings-entry, #mobile-nav .kyx-settings-entry'
+  },
+  {
+    id: 'fin',
+    title: 'C’est tout !',
+    text: 'Tu retrouves cette visite ici, à tout moment. Après chaque mise à jour, les nouveautés te sont présentées, avec un bouton « Montre-moi ».',
+    prepare: 'menu',
+    target: '#nav-more .kyx-tuto-entry, #mobile-nav .kyx-tuto-entry'
+  }
+];
+
+// What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
+const KYX_CHANGES = [
+  {
+    version: '1.7.1',
+    items: [
+      ['Visite guidée de l’extension sur le site (menu Plus → 学 Tutoriel), et ce récapitulatif des nouveautés après chaque mise à jour.', 'fin'],
+      'Fenêtre de l’extension plus large et plus lisible : albums sur deux colonnes, noms et compteurs toujours visibles.',
+      ['Script sur Android : Réglages → « Activer les notifications de Kyara » pour recevoir les notifications du site, même site fermé.', 'notifications'],
+      'Sur téléphone, le tutoriel et les bandeaux de mise à jour s’adaptent à la largeur de l’écran.',
+      ['Échanges : filtre « ★ Favoris » pour ne voir que les cartes de tes œuvres favorites, de ton côté comme de celui de l’autre joueur.', 'echanges']
+    ]
+  },
+  {
+    version: '1.7.0',
+    items: [
+      'Code court pour retrouver tes réglages et tes œuvres favorites sur un autre appareil (Réglages → Autre appareil).',
+      ['Marché : liste ★ Favoris à la place de « Univers », avec tous les filtres du site.', 'marche'],
+      ['Collection : choisis combien de doublons recycler par rareté.', 'recyclage'],
+      'Notifications vérifiées toutes les 15 secondes (extension).'
+    ]
+  },
+  {
+    version: '1.6.3',
+    items: ['Mises à jour : toujours vers la version la plus récente.']
+  },
+  {
+    version: '1.6.2',
+    items: ['Script : une nouvelle version est proposée dans les 15 minutes, avec un bouton « Mettre à jour ».']
+  },
+  {
+    version: '1.6.1',
+    items: [
+      'Marché → ★ Favoris : choix d’une seule œuvre, filtres de rareté, actualisation toutes les 15 secondes.',
+      'iPhone : comment garder une icône sur l’écran d’accueil qui marche avec Kyara Games.'
+    ]
+  },
+  {
+    version: '1.6.0',
+    items: [['Œuvres favorites (étoile sur les albums) et puce « ★ Favoris » au Marché.', 'favoris']]
+  },
+  {
+    version: '1.5.1',
+    items: ['Version script pour Tampermonkey, Violentmonkey et Userscripts (iPhone, Android), avec une page d’installation guidée.']
+  },
+  {
+    version: '1.5.0',
+    items: ['Affichage adapté aux téléphones.']
+  },
+  {
+    version: '1.4.2',
+    items: ['Boosters rentables : classement par prix ou par taux de drop.']
+  },
+  {
+    version: '1.4.1',
+    items: ['Chances précises des boosters, puce « Possédées », fiche d’une carte en un clic.']
+  },
+  {
+    version: '1.4.0',
+    items: [
+      ['Page « Boosters rentables » (menu Plus).', 'boosters'],
+      ['Classement : filtre « Amis ».', 'amis'],
+      ['Missions : séries complètes condensées.', 'missions'],
+      'Dernier exemplaire verrouillé quand un doublon est en vente.'
+    ]
+  },
+  {
+    version: '1.3.0',
+    items: [
+      ['Cartes manquantes en gris avec un bouton « Ordre d’achat ».', 'manquantes'],
+      'Masquer les séries de moins de 5 persos.',
+      '« Bloquer sauf doublons » dans les albums.'
+    ]
+  }
+];
+
 // Kyara Games: everything the extension adds to the pages of kyara.games.
 // Also built into the userscript (build.py), which defines KYX_OWNER and stand-ins for the extension APIs.
 (() => {
@@ -2007,12 +2547,14 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     const picked = {};
     if ('smartLock' in changes) smartLock = new Set(changes.smartLock.newValue ?? []);
     if ('marketFav' in changes) marketFav = !!changes.marketFav.newValue;
+    if ('tradeFav' in changes) tradeFav = !!changes.tradeFav.newValue;
     if ('favSeries' in changes || 'marketFav' in changes) {
       if ('favSeries' in changes) favSeries = new Set(changes.favSeries.newValue ?? []);
       marketShown = '';
       scanFavStars();
       scanMarket();
     }
+    if ('favSeries' in changes || 'tradeFav' in changes) scanComposer();
     for (const k of ['settings', 'collection', 'catalog', 'partner']) if (k in changes) picked[k] = changes[k].newValue;
     if (!Object.keys(picked).length) return;
     applyStorage(picked);
@@ -2506,6 +3048,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   // A star on each album of Collection marks a series as a favourite; the market's "★ Favoris" chip shows their offers.
   let favSeries = new Set();
   let marketFav = false;
+  let tradeFav = false; // "★ Favoris" of the trade composer
   let marketShown = '';
 
   // Adds or removes a favourite series.
@@ -3827,6 +4370,348 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     forRarity('M');
   }
 
+  // ---------- guided tour and what's new ----------
+
+  const TUTO_HASH = '#kyx-tutoriel';
+  const NEWS_HASH = '#kyx-nouveautes';
+  const phone = () => innerWidth <= 640;
+
+  // True when version a is newer than version b.
+  const versionNewer = (a, b) => {
+    const pa = String(a).split('.').map(Number);
+    const pb = String(b).split('.').map(Number);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+    return false;
+  };
+
+  // Follows a link of the site through its own navigation.
+  function goTo(href) {
+    if (href.includes('#boosters-rentables')) return openBoosters();
+    const link = Object.assign(document.createElement('a'), { href });
+    link.hidden = true;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  // The tour steps for this device: extension or script, Android or not.
+  function tourSteps() {
+    const android = /Android/i.test(navigator.userAgent);
+    const kind = owner === 'userscript' ? 'script' : owner;
+    return KYX_TOUR.filter((t) => !t.only || t.only === kind || (t.only === 'android' && android && kind === 'script'));
+  }
+
+  // First visible element of a list of selectors.
+  function visibleTarget(selectors) {
+    if (!selectors) return null;
+    for (const sel of selectors.split(',')) {
+      let list = [];
+      try {
+        list = document.querySelectorAll(sel.trim());
+      } catch {} // a selector the browser doesn't know
+      for (const el of list) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) return el;
+      }
+    }
+    return null;
+  }
+
+  // Waits for an element while the page is still changing: gives up once it has settled without it, or after max ms.
+  async function waitTarget(selectors, max = 2500) {
+    const start = Date.now();
+    for (;;) {
+      const el = visibleTarget(selectors);
+      if (el || !selectors) return el;
+      const now = Date.now();
+      if (now - start > max || (now - start > 300 && now - lastMutation > 400)) return null;
+      await wait(60);
+    }
+  }
+
+  // Waits for the site to show the page of a path (its own navigation), at most max ms.
+  async function waitPath(path, max = 2500) {
+    const start = Date.now();
+    while (location.pathname !== path && Date.now() - start < max) await wait(40);
+  }
+
+  // A button of the page by its text (not one of ours).
+  const siteButton = (re, root = document) =>
+    [...root.querySelectorAll('main button, header button')].find((b) => re.test(b.textContent) && !b.closest('[class*="kyx-"]'));
+
+  // Opens what a step needs; returns what puts it back as it was.
+  async function prepareStep(what) {
+    if (what === 'album') {
+      // The first album loaded on Collection, opened so that its bar (and "Bloquer sauf doublons") shows.
+      if (document.querySelector('.album-bar')) return null;
+      siteButton(/^\s*Albums\s*$/)?.click();
+      const album = await waitTarget('ul.albums > li button.album', 3000);
+      album?.click();
+      return null;
+    }
+    if (what === 'missing') {
+      const chip = document.querySelector('.kyx-missing');
+      if (chip && !chip.classList.contains('on')) {
+        chip.click();
+        return () => chip.isConnected && chip.classList.contains('on') && chip.click();
+      }
+    } else if (what === 'albums') {
+      const btn = siteButton(/^\s*Albums\s*$/);
+      if (btn && !document.querySelector('ul.albums')) btn.click();
+    } else if (what === 'recycle') {
+      if (!document.querySelector('.rec-box')) {
+        siteButton(/Recycler les doublons/)?.click(); // only opens the site's box: nothing is recycled
+        return () => document.querySelector('.rec-box .rec-a button:last-child')?.click();
+      }
+    } else if (what === 'menu') {
+      const burger = document.querySelector('button.burger[aria-controls="mobile-nav"]');
+      const more = document.querySelector('button[aria-controls="nav-more"]');
+      const toggler = burger && burger.getBoundingClientRect().width > 0 ? burger : more;
+      if (toggler && toggler.getAttribute('aria-expanded') !== 'true' && !(toggler === burger && document.querySelector('#mobile-nav'))) {
+        toggler.click();
+        return () => (toggler.getAttribute('aria-expanded') === 'true' || (toggler === burger && document.querySelector('#mobile-nav'))) && toggler.click();
+      }
+    }
+    return null;
+  }
+
+  // Guided tour: each step goes to its page, opens what it needs and circles the element, with a bubble beside it
+  // (at the bottom of the screen on a phone). Without the element, the bubble is shown in the middle.
+  let tour = null;
+  async function startTour(at = 0) {
+    if (typeof KYX_TOUR === 'undefined') return;
+    endTour();
+    document.querySelector('.kyx-tuto-back')?.remove();
+    const steps = tourSteps();
+    const index = typeof at === 'string' ? Math.max(0, steps.findIndex((t) => t.id === at)) : at;
+    const spot = Object.assign(document.createElement('div'), { className: 'kyx-spot' });
+    const bubble = Object.assign(document.createElement('section'), { className: 'kyx-bubble' });
+    bubble.setAttribute('role', 'dialog');
+    bubble.setAttribute('aria-live', 'polite');
+    document.body.append(spot, bubble);
+    const onKey = (e) => {
+      if (e.key === 'Escape') endTour();
+      else if (e.key === 'ArrowRight') showStep(tour.index + 1);
+      else if (e.key === 'ArrowLeft') showStep(tour.index - 1);
+    };
+    document.addEventListener('keydown', onKey, true);
+    bubble.dataset.state = 'center';
+    tour = { steps, index: 0, spot, bubble, target: null, undo: null, run: 0, onKey };
+    const follow = () => {
+      if (!tour) return;
+      placeTour();
+      (window.requestAnimationFrame ?? ((f) => setTimeout(f, 50)))(follow);
+    };
+    follow();
+    showStep(index);
+  }
+
+  function endTour() {
+    if (!tour) return;
+    tour.undo?.();
+    tour.spot.remove();
+    tour.bubble.remove();
+    document.removeEventListener('keydown', tour.onKey, true);
+    tour = null;
+    if (location.hash === TUTO_HASH) history.replaceState(history.state, '', location.pathname + location.search);
+  }
+
+  async function showStep(i) {
+    if (!tour) return;
+    const { steps } = tour;
+    const index = Math.max(0, Math.min(steps.length - 1, i));
+    const step = steps[index];
+    const run = ++tour.run;
+    tour.undo?.();
+    tour.undo = null;
+    tour.index = index;
+    tour.target = null;
+    renderBubble(step, index, steps.length, true); // the new step at once, while its page and element load
+    const path = step.page?.split('?')[0];
+    if (path && location.pathname !== path) {
+      goTo(step.page);
+      await waitPath(path);
+    }
+    await wait(0); // after the click on "Suivant", which the site would take as a click outside its menu
+    if (!tour || run !== tour.run) return;
+    tour.undo = step.prepare ? await prepareStep(step.prepare) : null;
+    if (!tour || run !== tour.run) return;
+    const target = await waitTarget(step.target);
+    if (!tour || run !== tour.run) return;
+    tour.target = target;
+    if (target) revealTarget(target);
+    renderBubble(step, index, steps.length);
+  }
+
+  // Scrolls the element (in its menu or in the page) into the free space: below the site's header, above the bubble
+  // on a phone, in the middle of the screen on a computer.
+  function revealTarget(target) {
+    const header = document.querySelector('header')?.getBoundingClientRect().bottom ?? 0;
+    const r = target.getBoundingClientRect();
+    const top = Math.max(0, header) + 12;
+    const bottom = phone() ? innerHeight - tour.bubble.offsetHeight - 24 : innerHeight - 12;
+    const shift = phone() || r.height > bottom - top ? r.top - top : r.top + r.height / 2 - (top + bottom) / 2;
+    if (r.top >= top && r.bottom <= bottom && (phone() || Math.abs(shift) < 120)) return;
+    let box = target.parentElement;
+    while (box && box !== document.body && !(box.scrollHeight > box.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(box).overflowY))) box = box.parentElement;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    (box && box !== document.body ? box : window).scrollBy({ top: shift, behavior: reduce ? 'auto' : 'smooth' });
+  }
+
+  function renderBubble(step, index, count, loading = false) {
+    const b = tour.bubble;
+    const last = index === count - 1;
+    if (loading) b.dataset.busy = '1';
+    else {
+      delete b.dataset.busy;
+      b.dataset.state = tour.target ? 'pointing' : 'center';
+    }
+    if (!b.dataset.state) b.dataset.state = 'center';
+    b.innerHTML = `
+      <header><small>学 Tutoriel · ${index + 1}/${count}</small><button type="button" class="kyx-b-x" aria-label="Quitter la visite">✕</button></header>
+      <h2></h2>
+      <p class="kyx-b-text"></p>
+      <p class="kyx-b-miss" hidden>Cet élément n’est pas visible ici pour le moment (page pas encore chargée, rien à afficher, ou pas connecté).</p>
+      <div class="kyx-b-btns">
+        <button type="button" class="kyx-b-skip">${index ? 'Quitter' : 'Plus tard'}</button>
+        <span></span>
+        <button type="button" class="kyx-b-prev"${index ? '' : ' hidden'}>Précédent</button>
+        <button type="button" class="kyx-b-next">${index ? (last ? 'Terminer' : 'Suivant') : 'Commencer la visite'}</button>
+      </div>`;
+    b.querySelector('h2').textContent = step.title;
+    b.querySelector('.kyx-b-text').textContent = step.text;
+    b.querySelector('.kyx-b-miss').hidden = loading || !step.target || !!tour.target;
+    tour.spot.classList.toggle('kyx-spot-in', !!tour.target && !loading);
+    b.querySelector('.kyx-b-x').addEventListener('click', endTour);
+    b.querySelector('.kyx-b-skip').addEventListener('click', endTour);
+    b.querySelector('.kyx-b-prev').addEventListener('click', () => showStep(index - 1));
+    b.querySelector('.kyx-b-next').addEventListener('click', () => (last ? endTour() : showStep(index + 1)));
+    placeTour();
+    b.querySelector('.kyx-b-next').focus({ preventScroll: true });
+  }
+
+  // Keeps the circle on the element and the bubble beside it, as the page scrolls or resizes.
+  function placeTour() {
+    const { spot, bubble, target } = tour;
+    const r = target?.isConnected ? target.getBoundingClientRect() : null;
+    if (!r || !r.width) {
+      spot.dataset.on = '';
+      if (bubble.dataset.busy) return; // keeps its place while the next step loads
+      if (bubble.dataset.state === 'pointing') bubble.dataset.state = 'center';
+      bubble.style.left = bubble.style.top = '';
+      return;
+    }
+    const pad = 6;
+    spot.dataset.on = '1';
+    Object.assign(spot.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
+    if (phone()) {
+      bubble.style.left = bubble.style.top = ''; // docked at the bottom by the style sheet
+      return;
+    }
+    const bw = bubble.offsetWidth;
+    const bh = bubble.offsetHeight;
+    const gap = 14;
+    let top = r.bottom + pad + gap;
+    if (top + bh > innerHeight - 8) top = r.top - pad - gap - bh;
+    if (top < 8) top = Math.max(8, innerHeight - bh - 8);
+    const left = Math.max(8, Math.min(innerWidth - bw - 8, r.left + r.width / 2 - bw / 2));
+    bubble.style.left = `${left}px`;
+    bubble.style.top = `${top}px`;
+  }
+
+  // "Nouveautés" window: what's new since a version (or in every version), with "Montre-moi" for each new feature.
+  function openNews(since = null) {
+    if (typeof KYX_CHANGES === 'undefined') return;
+    endTour();
+    document.querySelector('.kyx-tuto-back')?.remove();
+    const back = document.createElement('div');
+    back.className = 'kyx-modal-back kyx-tuto-back';
+    back.innerHTML = '<section class="kyx-modal kyx-tuto" role="dialog" aria-modal="true" aria-label="Nouveautés de Kyara Games"></section>';
+    const box = back.firstElementChild;
+    const ids = new Set(tourSteps().map((t) => t.id));
+    const list = KYX_CHANGES.filter((c) => !since || versionNewer(c.version, since));
+    box.innerHTML = `
+      <header class="kyx-tuto-head"><small>Kyara Games ${esc(chrome.runtime.getManifest().version)}</small><button type="button" class="kyx-tuto-x" aria-label="Fermer">✕</button></header>
+      <h2>${since ? 'Nouveautés depuis ta dernière visite' : 'Nouveautés de chaque version'}</h2>
+      <div class="kyx-tuto-news"></div>
+      <div class="kyx-tuto-btns"><button type="button" class="kyx-tuto-tour">Visite guidée</button><span></span><button type="button" class="kyx-tuto-next">Fermer</button></div>`;
+    const close = () => {
+      back.remove();
+      document.removeEventListener('keydown', onKey, true);
+      if (location.hash === NEWS_HASH) history.replaceState(history.state, '', location.pathname + location.search);
+    };
+    const onKey = (e) => e.key === 'Escape' && close();
+    const host = box.querySelector('.kyx-tuto-news');
+    for (const c of list.length ? list : KYX_CHANGES.slice(0, 1)) {
+      const part = document.createElement('section');
+      part.innerHTML = '<h3></h3><ul></ul>';
+      part.querySelector('h3').textContent = `Version ${c.version}`;
+      for (const item of c.items) {
+        const [text, id] = Array.isArray(item) ? item : [item, null];
+        const li = document.createElement('li');
+        li.append(text);
+        if (id && ids.has(id)) {
+          const show = Object.assign(document.createElement('button'), { type: 'button', className: 'kyx-tuto-show', textContent: 'Montre-moi' });
+          show.addEventListener('click', () => (close(), startTour(id)));
+          li.append(' ', show);
+        }
+        part.querySelector('ul').appendChild(li);
+      }
+      host.appendChild(part);
+    }
+    box.querySelector('.kyx-tuto-tour').addEventListener('click', () => (close(), startTour(0)));
+    box.querySelector('.kyx-tuto-next').addEventListener('click', close);
+    box.querySelector('.kyx-tuto-x').addEventListener('click', close);
+    back.addEventListener('click', (e) => e.target === back && close());
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(back);
+  }
+
+  // Once per version: the tour the first time, then what's new after each update ("notifyUpdated" setting).
+  async function showTutorialOnce() {
+    if (location.hash === TUTO_HASH || location.hash === NEWS_HASH) return;
+    const version = chrome.runtime.getManifest().version;
+    const { seenVersion } = await chrome.storage.local.get('seenVersion');
+    if (seenVersion === version) return;
+    await chrome.storage.local.set({ seenVersion: version });
+    if (!seenVersion) startTour(0);
+    else if (settings.notifyUpdated !== false && versionNewer(version, seenVersion)) openNews(seenVersion);
+  }
+
+  // Opens the tour or what's new from the address (#kyx-tutoriel, #kyx-nouveautes), used by the popup and the notifications.
+  function onTutorialHash() {
+    if (location.hash === TUTO_HASH && !tour) startTour(0);
+    else if (location.hash === NEWS_HASH && !document.querySelector('.kyx-tuto-back')) openNews();
+  }
+
+  // "学 Tutoriel" entry in the site's menus ("Plus" on a computer, the menu sheet on a phone).
+  function scanTutoMenu() {
+    const add = (menu, kanjiSel, titleSel, closer) => {
+      if (!menu || menu.querySelector(':scope > .kyx-tuto-entry')) return;
+      const model = menu.querySelector(':scope > a:not(.kyx-more):not(.kyx-settings-entry)');
+      if (!model?.querySelector(kanjiSel) || !model.querySelector(titleSel)) return;
+      const item = model.cloneNode(true);
+      item.classList.remove('on');
+      item.classList.add('kyx-tuto-entry');
+      item.removeAttribute('aria-current');
+      item.href = TUTO_HASH;
+      item.querySelector(kanjiSel).textContent = '学';
+      item.querySelector(titleSel).textContent = 'Tutoriel';
+      const hint = item.querySelector('.dt small');
+      if (hint) hint.textContent = 'Visite guidée de Kyara Games';
+      [...item.children].forEach((el) => el.matches(`${kanjiSel}, .dt, .tl`) || el.remove());
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (tour) return; // already in the tour (its last step circles this entry)
+        document.querySelector(closer)?.click();
+        startTour(0);
+      });
+      menu.appendChild(item);
+    };
+    add(document.querySelector('#nav-more'), '.dk', '.dt b', 'button[aria-controls="nav-more"][aria-expanded="true"]');
+    add(document.querySelector('#mobile-nav .sheet-grid'), '.tk', '.tl', 'button.burger[aria-controls="mobile-nav"]');
+  }
+
   // ---------- series and price under each card of the trade confirmation ----------
 
   // Series and fair price under each card of "Confirmer l'échange", and the value gap between both sides.
@@ -3961,6 +4846,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   // ---------- "Ses doublons" filter in the trade composer ----------
 
   // Keeps only the cards the partner holds twice or more; on by default, turning it off is remembered.
+  // Next to it, "★ Favoris" keeps the cards of the favourite series, on both tabs.
   let composerMore = 0;
 
   // True when the partner holds the card twice or more, null when unknown.
@@ -3985,7 +4871,9 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     }
     const tabs = shelf.querySelectorAll('.tabs [role="tab"]');
     const theirs = tabs[1]?.getAttribute('aria-selected') === 'true';
-    const active = theirs && settings.theirDupes;
+    const dupes = theirs && settings.theirDupes;
+    const favs = tradeFav && favSeries.size > 0;
+    const active = dupes || favs;
     let btn = chips.querySelector(':scope > .kyx-only');
     if (!btn) {
       btn = document.createElement('button');
@@ -4009,15 +4897,42 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     }
     if (theirs) delete btn.dataset.kyxHidden;
     else btn.dataset.kyxHidden = '1';
-    btn.classList.toggle('on', active);
-    btn.setAttribute('aria-pressed', String(active));
+    btn.classList.toggle('on', dupes);
+    btn.setAttribute('aria-pressed', String(dupes));
+
+    // "★ Favoris": only the cards of the favourite series, on both sides of the trade; remembered.
+    let fav = chips.querySelector(':scope > .kyx-favtrade');
+    if (!fav) {
+      fav = btn.cloneNode(false);
+      fav.classList.remove('kyx-only', 'on');
+      fav.classList.add('kyx-favtrade');
+      fav.textContent = '★ Favoris';
+      delete fav.dataset.kyxHidden;
+      fav.addEventListener('click', () => {
+        if (!alive()) return shutdown();
+        if (!favSeries.size) return;
+        composerMore = 0;
+        tradeFav = !tradeFav;
+        scanComposer();
+        chrome.storage.local.set({ tradeFav });
+      });
+      btn.after(fav);
+    }
+    fav.classList.toggle('on', favs);
+    fav.setAttribute('aria-pressed', String(favs));
+    fav.disabled = !favSeries.size;
+    fav.title = favSeries.size
+      ? `Seulement les cartes de tes ${favSeries.size} œuvre${favSeries.size > 1 ? 's' : ''} favorite${favSeries.size > 1 ? 's' : ''}`
+      : 'Aucune œuvre en favori : mets-en avec l’étoile ☆ des albums, page Collection';
 
     const grid = shelf.querySelector('ul.grid');
     if (!grid) return;
     let visible = 0;
     for (const li of grid.children) {
       const m = CARD_SRC.exec(li.querySelector('img')?.getAttribute('src') || '');
-      const hide = active && !!m && theirDupe(Number(m[1])) === false;
+      const id = m ? Number(m[1]) : null;
+      const series = id ? catalog?.get(id)?.s : null;
+      const hide = !!id && ((dupes && theirDupe(id) === false) || (favs && !!series && !favSeries.has(series)));
       if (hide) {
         if (li.dataset.kyxHidden !== '1') li.dataset.kyxHidden = '1';
       } else {
@@ -4025,7 +4940,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
         if (li.dataset.kyxHidden) delete li.dataset.kyxHidden;
       }
     }
-    // Loads the site's next cards until a full page of duplicates shows.
+    // Loads the site's next cards until a full page of matching cards shows.
     const more = grid.parentElement?.querySelector(':scope > button.more');
     if (active && visible < PAGE && more && composerMore < 40) {
       composerMore++;
@@ -4039,7 +4954,9 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
   let queued = new Set();
   let frame = 0;
+  let lastMutation = Date.now(); // when the page last changed (the tour waits for it to settle)
   const observer = new MutationObserver((records) => {
+    lastMutation = Date.now();
     for (const r of records) {
       if (r.type === 'attributes') queued.add(r.target);
       else r.addedNodes.forEach((n) => n.nodeType === 1 && queued.add(n));
@@ -4066,6 +4983,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     scanFavStars();
     scanMarket();
     scanRecycle();
+    scanTutoMenu();
     scanConfirm();
   }
 
@@ -4085,6 +5003,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     scanFavStars();
     scanMarket();
     scanRecycle();
+    scanTutoMenu();
     scanConfirm();
   }
 
@@ -4096,7 +5015,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     if (document.documentElement.dataset.kyxOwner === owner) delete document.documentElement.dataset.kyxOwner;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket, .kyx-fav-pick, .kyx-rec').forEach((el) => el.remove());
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-favtrade, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket, .kyx-fav-pick, .kyx-rec, .kyx-tuto-back, .kyx-tuto-entry, .kyx-spot, .kyx-bubble').forEach((el) => el.remove());
     delete document.documentElement.dataset.kyxView;
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched], [data-kyx-ghost]').forEach((el) => {
       delete el.dataset.kyxHidden;
@@ -4120,17 +5039,21 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   }, 1000);
 
   (async () => {
-    const stored = await chrome.storage.local.get(['settings', 'collection', 'catalog', 'partner', 'smartLock', 'favSeries', 'marketFav']);
+    const stored = await chrome.storage.local.get(['settings', 'collection', 'catalog', 'partner', 'smartLock', 'favSeries', 'marketFav', 'tradeFav']);
     applyStorage(stored);
     smartLock = new Set(stored.smartLock ?? []);
     favSeries = new Set(stored.favSeries ?? []);
     marketFav = !!stored.marketFav;
+    tradeFav = !!stored.tradeFav;
     if (partner && Date.now() - (partner.at ?? 0) > 30 * 60e3) partner = null;
     document.querySelectorAll('#kyx-root').forEach((el) => el.remove()); // left by older versions
     window.addEventListener('hashchange', onBoostersHash);
+    window.addEventListener('hashchange', onTutorialHash);
     syncAuth();
     observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
     refreshAll();
+    onTutorialHash();
+    showTutorialOnce();
     if (location.hash === BOOSTERS_HASH) {
       if (!catalog) await chrome.storage.local.get('catalog').then(applyStorage);
       openBoosters();
@@ -4152,7 +5075,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     ['theirDupes', 'Filtre « Ses doublons » activé d’office dans les propositions d’échange'],
     ['lockLastListed', 'Verrouiller le dernier exemplaire d’une carte dont un doublon est en vente'],
     ['cardToWiki', 'Page Collection : un clic sur une carte que j’ai ouvre sa fiche'],
-    ['notifyUpdated', 'Bandeau « nouvelle version installée » après une mise à jour du script']
+    ['notifyUpdated', 'Afficher les nouveautés après une mise à jour du script']
   ];
 
   // Settings panel: checkboxes and the code for another device.
@@ -4173,7 +5096,13 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
           <div class="kyx-order-btns"><button type="button" class="kyx-sync-import">Importer ce code</button></div>
           <p class="kyx-settings-note kyx-sync-msg" role="status"></p>
         </div>
-        <p class="kyx-settings-note">Les mises à jour du script s’installent toutes seules par ton gestionnaire de scripts. Les notifications ne sont disponibles qu’avec l’extension.</p>
+        <div class="kyx-sync kyx-push">
+          <b>Notifications sur cet appareil</b>
+          <p class="kyx-settings-note">Le script ne peut pas envoyer de notifications, mais Kyara a les siennes, qui arrivent même site fermé : boosters gratuits pleins, marché et envies, échanges, amis, compte.</p>
+          <div class="kyx-order-btns"><button type="button" class="kyx-push-go">Activer les notifications de Kyara</button></div>
+          <p class="kyx-settings-note kyx-push-msg" role="status"></p>
+        </div>
+        <p class="kyx-settings-note">Les mises à jour du script s’installent toutes seules par ton gestionnaire de scripts.</p>
         <div class="kyx-order-btns"><button type="button" class="kyx-settings-close">Fermer</button></div>
       </section>`;
     const list = back.querySelector('.kyx-settings-list');
@@ -4210,6 +5139,22 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       document.removeEventListener('keydown', onKey, true);
     };
     const onKey = (e) => e.key === 'Escape' && close();
+    // Opens the site's own push settings: its bell, then "Notifications sur cet appareil" (not on iPhone and iPad).
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+    back.querySelector('.kyx-push').hidden = ios;
+    back.querySelector('.kyx-push-go').addEventListener('click', () => {
+      const bell = document.querySelector('button.bell');
+      if (!bell) {
+        back.querySelector('.kyx-push-msg').textContent = 'Connecte-toi sur kyara.games, puis touche la cloche 🔔 en haut du site → « Notifications sur cet appareil ».';
+        return;
+      }
+      close();
+      if (bell.getAttribute('aria-expanded') !== 'true') bell.click();
+      setTimeout(() => {
+        const cfg = document.querySelector('button.cfg');
+        if (cfg) cfg.click();
+      }, 150);
+    });
     document.addEventListener('keydown', onKey, true);
     back.addEventListener('click', (e) => e.target === back && close());
     back.querySelector('.kyx-settings-close').addEventListener('click', close);
@@ -4239,24 +5184,6 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
       openSettings();
     });
     menu.appendChild(entry);
-  }
-
-  // "Kyara Games est passé en X" once, at the first visit after an update (not after the first install).
-  async function announceUpdate() {
-    const { lastVersion } = await chrome.storage.local.get('lastVersion');
-    if (lastVersion === KYX_VERSION) return;
-    await chrome.storage.local.set({ lastVersion: KYX_VERSION });
-    if (!lastVersion || !(await getSettings()).notifyUpdated) return;
-    const bar = document.createElement('div');
-    bar.className = 'kyx-update-toast';
-    bar.setAttribute('role', 'status');
-    bar.innerHTML = `<span>⬆ Kyara Games est passé en <b>${KYX_VERSION}</b></span>
-      <a href="https://github.com/${REPO}/releases/tag/v${KYX_VERSION}" target="_blank" rel="noopener">Voir les nouveautés</a>
-      <button type="button" aria-label="Fermer">✕</button>`;
-    const close = () => bar.remove();
-    bar.querySelector('a').addEventListener('click', close);
-    bar.querySelector('button').addEventListener('click', close);
-    document.body.appendChild(bar);
   }
 
   // Asks GitHub for a new version every 15 minutes while kyara.games is open, once for all the open tabs.
@@ -4310,7 +5237,6 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   };
   new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
   scan();
-  announceUpdate();
   lookForUpdate();
   setInterval(() => lookForUpdate(), 60e3);
   chrome.storage.onChanged.addListener((changes) => ('update' in changes || 'updateLater' in changes) && offerUpdate());

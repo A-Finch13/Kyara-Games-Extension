@@ -20,12 +20,14 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Œuvres favorites | Étoile ☆ sur chaque album de la page **Collection** (et « Mettre en favori » dans la barre de l'album ouvert) ; dans le **Marché**, la puce **★ Favoris** n'affiche que les offres de tes œuvres favorites ; la liste **★ Favoris** (à la place de « Univers ») choisit toutes les œuvres ou une seule, et tous les autres filtres du site s'appliquent (recherche, rareté, tri, prix, « Que je n'ai pas », « Que je cherche », onglet Enchères) ; actualisées toutes les 15 secondes et après chaque achat ou vente |
 | Retrouver ses réglages sur un autre appareil | Réglages (popup de l'extension, ou menu du site → 設 Kyara Games pour le script) → **Autre appareil** : « Copier mon code » sur le premier appareil (un code court de lettres et de chiffres, par exemple `1A2B-3C4D-…`, environ 35 caractères avec une quinzaine d'œuvres favorites), « Importer ce code » sur l'autre. Réglages, œuvres favorites et albums « Bloquer sauf doublons » ; verrous et envies sont déjà gardés par Kyara sur le compte |
 | Recycler une partie de ses doublons | Page **Collection**, bouton « Recycler les doublons » du site : en plus des raretés à cocher, choisis **combien** de doublons recycler par rareté (les cartes avec le plus d'exemplaires en trop d'abord ; jamais le dernier exemplaire, ni les cartes verrouillées ou en vente) |
+| Tutoriel et nouveautés | Menu **Plus** → **学 Tutoriel** (ou la popup) : le tour de tout ce que l'extension ajoute. Au premier lancement le tutoriel s'ouvre tout seul ; après chaque mise à jour, une fenêtre récapitule les nouveautés depuis ta dernière version |
 | Verrouiller un album sans bloquer ses doublons | Bouton **Bloquer sauf doublons** à côté de « Bloquer l'album » (page **Collection**, un univers choisi) : seules les cartes en un exemplaire sont verrouillées, les doublons restent vendables ; une carte est reverrouillée dès qu'il n'en reste qu'une |
 | Badge « Manquante » sur toute carte que tu n'as pas | Partout sur le site : boutique/marché, échanges, profils, wiki… |
 | Savoir si la carte que tu donnes est en double | Badge **×N** (doublon) ou **Unique** (ton seul exemplaire) sur tes cartes dans les fenêtres d'échange, confirmation comprise |
 | Voir la série et le prix des cartes à la confirmation d'un échange | Sous la rareté, dans la fenêtre « Confirmer l'échange » (nom complet de la série au survol), avec l'écart de valeur entre les deux côtés et s'il est équilibré selon la règle du site |
 | Voir les doublons du joueur avec qui tu échanges | Onglet **Échange** de la popup, avec la liste de tes amis |
 | Filtrer ses cartes sur ses doublons | Puce **Ses doublons**, active d'office, dans chaque fenêtre « Proposer un échange » (profil, offres du marché, comptoir), onglet **Cartes de …** ; la désactiver est retenu |
+| Filtrer un échange sur ses œuvres favorites | Puce **★ Favoris** à côté de « Ses doublons », dans les deux onglets de la fenêtre d'échange : seulement les cartes de tes œuvres favorites ; retenu |
 | Afficher les cartes possédées ou manquantes de la collection | Puces **Possédées** et **Manquantes** à côté de « Toutes » sur la page Collection (un second clic réaffiche tout), et onglet **Manquantes** de la popup |
 | Savoir si les cartes que tu donnes dans un échange en cours sont en double | Badge **×N** ou **Unique** côté « Tu donnes » des échanges en attente, onglet **Échanges** du Marché |
 | Sur téléphone | Version script : Android (Firefox ou Edge avec Tampermonkey) et iPhone / iPad (app Userscripts), toutes les fonctions du site, voir **Installation sur téléphone** |
@@ -49,7 +51,7 @@ L'appli Kyara installée depuis le navigateur (PWA) utilise le même profil : l'
 
 La page https://a-finch13.github.io/Kyara-Games-Extension/ montre ces étapes avec les bons boutons pour ton appareil.
 
-Sur téléphone, Kyara Games s'installe en version script : toutes les fonctions du site, réglages dans le menu du site (☰ → 設 Kyara Games), mises à jour automatiques (voir **Mises à jour du script** plus bas). Pas de notifications : un script ne tourne que quand une page kyara.games est ouverte.
+Sur téléphone, Kyara Games s'installe en version script : toutes les fonctions du site, réglages dans le menu du site (☰ → 設 Kyara Games), mises à jour automatiques (voir **Mises à jour du script** plus bas). **Notifications** : le script ne peut pas en envoyer, mais Kyara a les siennes, qui arrivent même site fermé (boosters pleins, marché, échanges, amis, compte) : menu du site → 設 Kyara Games → **Activer les notifications de Kyara**, ou la cloche 🔔 du site → « Notifications sur cet appareil ». Sur iPhone et iPad, Kyara Games s'utilise sans notifications.
 
 Lien du script (pour les étapes ci-dessous) :
 **https://github.com/A-Finch13/Kyara-Games-Extension/releases/latest/download/kyara-games.user.js**
@@ -119,8 +121,9 @@ Au clic sur **Mettre à jour**, l'assistant télécharge la release GitHub et re
 ## Publier une nouvelle version
 
 1. Monte le numéro de version, le même dans `manifest.json` et `manifest.firefox.json` (toujours plus haut que le précédent : c'est lui qui déclenche les mises à jour).
-2. `python build.py`.
-3. **GitHub** : crée la release `vX.Y.Z` avec `dist/kyara-games-chromium.zip` et `dist/kyara-games.user.js`. Brave / Chrome / Edge la voient dans les 15 minutes (bouton **Mettre à jour** de la popup) ; les gestionnaires de scripts récupèrent le script de la dernière release tout seuls.
+2. Ajoute les nouveautés de la version en tête de `KYX_CHANGES` dans `src/content/tutorial.js` (et une étape à `KYX_TOUR` pour une nouvelle fonction) : `build.py` refuse une version sans nouveautés.
+3. `python build.py`.
+4. **GitHub** : crée la release `vX.Y.Z` avec `dist/kyara-games-chromium.zip` et `dist/kyara-games.user.js`. Brave / Chrome / Edge la voient dans les 15 minutes (bouton **Mettre à jour** de la popup) ; les gestionnaires de scripts récupèrent le script de la dernière release tout seuls.
 
 ## Comment ça marche
 
@@ -138,6 +141,7 @@ Au clic sur **Mettre à jour**, l'assistant télécharge la release GitHub et re
 | `src/background.js` | Service de fond de l'extension : vérifie régulièrement tes notifications Kyara et les affiche, met à jour le badge de l'icône (boosters gratuits), garde catalogue et collection à jour, cherche les nouvelles versions sur GitHub, lance l'assistant de mise à jour, vide le cache du site après une mise à jour. |
 | `src/lib/kyara.js` | Fonctions partagées : appels à l'API de kyara.games avec ta session, catalogue des cartes (gardé 24 h), collection, réglages par défaut, calculs de progression des albums, recherche de nouvelle version. |
 | `src/content/inject.js` | S'exécute dans la page du site : lit les réponses que le site reçoit déjà (collection, échanges, profils) et les transmet au reste de l'extension, sans jamais modifier une requête ni une réponse. |
+| `src/content/tutorial.js` | Les textes du tutoriel (`KYX_TOUR`, une étape par fonction) et des nouveautés de chaque version (`KYX_CHANGES`). |
 | `src/content/content.js` | Tout ce qui s'affiche sur le site : badges, cartes manquantes grisées et ordres d'achat, puces et filtres, albums masqués, verrouillages, Boosters rentables, filtre Amis, Missions, fenêtre de confirmation d'échange. |
 | `src/content/content.css` | Le style de tout ce qu'ajoute `content.js`, y compris pour les petits écrans. |
 | `src/popup/` | La popup de l'extension (`popup.html`, `popup.js`, `popup.css`) : albums, cartes manquantes, doublons d'un joueur, réglages, bouton **Mettre à jour**. |

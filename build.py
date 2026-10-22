@@ -95,7 +95,7 @@ def userscript(version):
  *  2. kyara.js   — accès à l'API de kyara.games, catalogue des cartes et collection ;
  *  3. bridge.js  — fait dans la page le travail du service de fond de l'extension ;
  *  4. inject.js  — lit les réponses que le site reçoit déjà (collection, échanges), sans jamais les modifier ;
- *  5. content.js — tout ce qui s'affiche sur le site ;
+ *  5. tutorial.js et content.js — textes du tutoriel et des nouveautés, puis tout ce qui s'affiche sur le site ;
  *  6. panel.js   — panneau de réglages dans le menu du site.
  */
 """
@@ -118,7 +118,8 @@ const start = () => {{
   style.id = 'kyx-style';
   style.textContent = `{css}`;
   document.head.appendChild(style);
-  // ---------- 5. src/content/content.js : tout ce qui s'affiche sur le site ----------
+  // ---------- 5. src/content/tutorial.js et content.js : tutoriel, puis tout ce qui s'affiche sur le site ----------
+{read('content/tutorial.js')}
 {read('content/content.js')}
   // ---------- 6. src/userscript/panel.js : panneau de réglages ----------
   if (document.documentElement.dataset.kyxOwner === KYX_OWNER) {{
@@ -141,6 +142,9 @@ def main():
     version = json.loads(chromium)['version']
     if json.loads(firefox)['version'] != version:
         raise SystemExit('manifest.json et manifest.firefox.json n’ont pas la même version')
+    changes = (ROOT / 'src' / 'content' / 'tutorial.js').read_text(encoding='utf-8')
+    if f"version: '{version}'" not in changes:
+        raise SystemExit(f'Ajoute les nouveautés de la version {version} en tête de KYX_CHANGES (src/content/tutorial.js)')
 
     folder = DIST / 'firefox'
     for f in files(firefox=True):

@@ -7,7 +7,7 @@ const $ = (s) => document.querySelector(s);
 // Text made safe for HTML.
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 // "3 cartes".
-const plural = (n, w) => `${n.toLocaleString('fr-FR')} ${w}${n > 1 ? 's' : ''}`;
+const plural = (n, w) => `${n.toLocaleString('fr-FR')} ${n > 1 ? w.replace(/(\S+)/g, '$1s') : w}`;
 // Rarest first, then by name.
 const byRarity = (a, b) => RARITIES.indexOf(a.r) - RARITIES.indexOf(b.r) || a.n.localeCompare(b.n);
 
@@ -75,7 +75,7 @@ function renderAlbums() {
     );
   $('#albums').innerHTML = list.slice(0, 300).map((s) => `
     <li class="${s.complete ? 'done' : ''}" data-serie="${esc(s.name)}">
-      <div class="a-top"><b>${esc(s.name)}</b><span>${s.owned}/${s.total}</span></div>
+      <div class="a-top"><b title="${esc(s.name)}">${esc(s.name)}</b><span>${s.owned}/${s.total}</span></div>
       <div class="bar"><i style="width:${(s.pct * 100).toFixed(1)}%"></i></div>
       ${s.complete ? '<small>Complet ✔</small>' : `<small>${plural(s.total - s.owned, 'manquante')}</small>`}
     </li>`).join('') || '<li class="empty">Aucun album à afficher.</li>';

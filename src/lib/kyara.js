@@ -138,13 +138,14 @@ export async function exportCode() {
   const list = seriesList(await loadCatalog());
   const index = new Map(list.map((name, i) => [name, i]));
   const width = Math.max(1, Math.ceil(Math.log2(list.length + 1)));
-  const { settings: saved, favSeries = [], smartLock = [], marketFav } = await chrome.storage.local.get(['settings', 'favSeries', 'smartLock', 'marketFav']);
+  const { settings: saved, favSeries = [], smartLock = [], marketFav, tradeFav } = await chrome.storage.local.get(['settings', 'favSeries', 'smartLock', 'marketFav', 'tradeFav']);
   const settings = { ...DEFAULT_SETTINGS, ...saved };
   const bits = new Bits();
   bits.put(SYNC_VERSION, 4);
   bits.put(catalogCheck(list), 8);
   for (const key of SYNC_FLAGS) bits.put(settings[key] ? 1 : 0, 1);
   bits.put(marketFav ? 1 : 0, 1);
+  bits.put(tradeFav ? 1 : 0, 1);
   bits.put(Math.max(0, SYNC_POLL.indexOf(Number(settings.pollMinutes))), 3);
   bits.putList(favSeries.filter((n) => index.has(n)).map((n) => index.get(n)), width);
   bits.putList(smartLock.filter((n) => index.has(n)).map((n) => index.get(n)), width);
@@ -162,13 +163,14 @@ export async function importCode(code) {
     const catalogBits = bits.take(8);
     const flags = Object.fromEntries(SYNC_FLAGS.map((key) => [key, !!bits.take(1)]));
     const marketFav = !!bits.take(1);
+    const tradeFav = !!bits.take(1);
     flags.pollMinutes = SYNC_POLL[bits.take(3)] ?? 0.25;
     const names = (numbers) => numbers.map((i) => list[i]).filter(Boolean);
     const fav = bits.takeList();
     const locked = bits.takeList();
     if (bits.take(8) !== bits.check(bits.pos - 8)) throw new ApiError(0, 'bad_code');
     if (catalogBits !== catalogCheck(list)) throw new ApiError(0, 'other_catalog');
-    return { flags, marketFav, favSeries: names(fav), smartLock: names(locked) };
+    return { flags, marketFav, tradeFav, favSeries: names(fav), smartLock: names(locked) };
   };
   let data;
   try {
@@ -182,7 +184,8 @@ export async function importCode(code) {
     settings: { ...settings, ...data.flags },
     favSeries: data.favSeries,
     smartLock: data.smartLock,
-    marketFav: data.marketFav
+    marketFav: data.marketFav,
+    tradeFav: data.tradeFav
   });
   return { favs: data.favSeries.length, locks: data.smartLock.length };
 }

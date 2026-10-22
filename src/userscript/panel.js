@@ -9,7 +9,7 @@
     ['theirDupes', 'Filtre « Ses doublons » activé d’office dans les propositions d’échange'],
     ['lockLastListed', 'Verrouiller le dernier exemplaire d’une carte dont un doublon est en vente'],
     ['cardToWiki', 'Page Collection : un clic sur une carte que j’ai ouvre sa fiche'],
-    ['notifyUpdated', 'Bandeau « nouvelle version installée » après une mise à jour du script']
+    ['notifyUpdated', 'Afficher les nouveautés après une mise à jour du script']
   ];
 
   // Settings panel: checkboxes and the code for another device.
@@ -30,7 +30,13 @@
           <div class="kyx-order-btns"><button type="button" class="kyx-sync-import">Importer ce code</button></div>
           <p class="kyx-settings-note kyx-sync-msg" role="status"></p>
         </div>
-        <p class="kyx-settings-note">Les mises à jour du script s’installent toutes seules par ton gestionnaire de scripts. Les notifications ne sont disponibles qu’avec l’extension.</p>
+        <div class="kyx-sync kyx-push">
+          <b>Notifications sur cet appareil</b>
+          <p class="kyx-settings-note">Le script ne peut pas envoyer de notifications, mais Kyara a les siennes, qui arrivent même site fermé : boosters gratuits pleins, marché et envies, échanges, amis, compte.</p>
+          <div class="kyx-order-btns"><button type="button" class="kyx-push-go">Activer les notifications de Kyara</button></div>
+          <p class="kyx-settings-note kyx-push-msg" role="status"></p>
+        </div>
+        <p class="kyx-settings-note">Les mises à jour du script s’installent toutes seules par ton gestionnaire de scripts.</p>
         <div class="kyx-order-btns"><button type="button" class="kyx-settings-close">Fermer</button></div>
       </section>`;
     const list = back.querySelector('.kyx-settings-list');
@@ -67,6 +73,22 @@
       document.removeEventListener('keydown', onKey, true);
     };
     const onKey = (e) => e.key === 'Escape' && close();
+    // Opens the site's own push settings: its bell, then "Notifications sur cet appareil" (not on iPhone and iPad).
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+    back.querySelector('.kyx-push').hidden = ios;
+    back.querySelector('.kyx-push-go').addEventListener('click', () => {
+      const bell = document.querySelector('button.bell');
+      if (!bell) {
+        back.querySelector('.kyx-push-msg').textContent = 'Connecte-toi sur kyara.games, puis touche la cloche 🔔 en haut du site → « Notifications sur cet appareil ».';
+        return;
+      }
+      close();
+      if (bell.getAttribute('aria-expanded') !== 'true') bell.click();
+      setTimeout(() => {
+        const cfg = document.querySelector('button.cfg');
+        if (cfg) cfg.click();
+      }, 150);
+    });
     document.addEventListener('keydown', onKey, true);
     back.addEventListener('click', (e) => e.target === back && close());
     back.querySelector('.kyx-settings-close').addEventListener('click', close);
@@ -96,24 +118,6 @@
       openSettings();
     });
     menu.appendChild(entry);
-  }
-
-  // "Kyara Games est passé en X" once, at the first visit after an update (not after the first install).
-  async function announceUpdate() {
-    const { lastVersion } = await chrome.storage.local.get('lastVersion');
-    if (lastVersion === KYX_VERSION) return;
-    await chrome.storage.local.set({ lastVersion: KYX_VERSION });
-    if (!lastVersion || !(await getSettings()).notifyUpdated) return;
-    const bar = document.createElement('div');
-    bar.className = 'kyx-update-toast';
-    bar.setAttribute('role', 'status');
-    bar.innerHTML = `<span>⬆ Kyara Games est passé en <b>${KYX_VERSION}</b></span>
-      <a href="https://github.com/${REPO}/releases/tag/v${KYX_VERSION}" target="_blank" rel="noopener">Voir les nouveautés</a>
-      <button type="button" aria-label="Fermer">✕</button>`;
-    const close = () => bar.remove();
-    bar.querySelector('a').addEventListener('click', close);
-    bar.querySelector('button').addEventListener('click', close);
-    document.body.appendChild(bar);
   }
 
   // Asks GitHub for a new version every 15 minutes while kyara.games is open, once for all the open tabs.
@@ -167,7 +171,6 @@
   };
   new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
   scan();
-  announceUpdate();
   lookForUpdate();
   setInterval(() => lookForUpdate(), 60e3);
   chrome.storage.onChanged.addListener((changes) => ('update' in changes || 'updateLater' in changes) && offerUpdate());

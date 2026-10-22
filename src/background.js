@@ -99,7 +99,7 @@ async function announceUpdate(previousVersion) {
   notify('updated', {
     title: `Kyara Games est passé en ${version}`,
     message: 'Clique pour voir les nouveautés de cette version.',
-    href: `https://github.com/${REPO}/releases/tag/v${version}`
+    href: '/#kyx-nouveautes'
   });
 }
 

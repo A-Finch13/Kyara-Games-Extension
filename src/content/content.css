@@ -1344,3 +1344,341 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 .kyx-rec-msg[data-kind="err"] {
   color: #ff4d2e;
 }
+
+/* What's new window */
+.kyx-tuto {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 18px;
+  background: var(--panel, #16141b);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  color: var(--fg, #fff);
+}
+
+.kyx-tuto-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kyx-tuto-head small {
+  color: var(--acc, #ff4d2e);
+  font: 700 12px var(--mono, monospace);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kyx-tuto h2 {
+  margin: 0;
+  font-family: var(--disp, inherit);
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.kyx-tuto-btns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.kyx-tuto-btns > span {
+  flex: 1;
+}
+
+.kyx-tuto button {
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg, #fff);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kyx-tuto .kyx-tuto-next {
+  border-color: var(--acc, #ff4d2e);
+  background: var(--acc, #ff4d2e);
+}
+
+.kyx-tuto .kyx-tuto-x {
+  width: 34px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.kyx-tuto-news {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.kyx-tuto-news h3 {
+  margin: 0 0 4px;
+  color: #f5c518;
+  font-size: 15px;
+}
+
+.kyx-tuto-news ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--fg2, #c9c4d0);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.kyx-push[hidden] {
+  display: none;
+}
+
+.kyx-tuto .kyx-tuto-show {
+  height: 26px;
+  margin-left: 4px;
+  padding: 0 10px;
+  border-color: #f5c518;
+  border-radius: 999px;
+  color: #f5c518;
+  font-size: 12px;
+  vertical-align: 1px;
+}
+
+/* Guided tour: the circled element (the rest of the page darkened) and the bubble beside it */
+.kyx-spot {
+  position: fixed;
+  z-index: 2147483000;
+  display: none;
+  border: 2px solid var(--acc, #ff4d2e);
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(5, 4, 8, 0.66), 0 0 24px rgba(255, 77, 46, 0.55);
+  pointer-events: none;
+}
+
+.kyx-spot[data-on="1"] {
+  display: block;
+  opacity: 0;
+  transition: opacity 0.2s, width 0.2s, height 0.2s;
+}
+
+.kyx-spot[data-on="1"].kyx-spot-in {
+  opacity: 1;
+}
+
+.kyx-bubble {
+  position: fixed;
+  z-index: 2147483001;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(380px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 16px;
+  background: var(--panel, #16141b);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.65);
+  color: var(--fg, #fff);
+}
+
+.kyx-bubble[data-state="center"] {
+  top: 50% !important;
+  left: 50% !important;
+  width: min(460px, calc(100vw - 16px));
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 9999px rgba(5, 4, 8, 0.66), 0 18px 50px rgba(0, 0, 0, 0.65);
+}
+
+.kyx-bubble h2,
+.kyx-b-text {
+  transition: opacity 0.15s;
+}
+
+/* While the next step loads: the bubble stays put, its text dimmed, a line runs along its top */
+.kyx-bubble[data-busy="1"] h2,
+.kyx-bubble[data-busy="1"] .kyx-b-text {
+  opacity: 0.55;
+}
+
+.kyx-bubble[data-busy="1"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 35%;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--acc, #ff4d2e);
+  animation: kyx-busy 0.9s ease-in-out infinite;
+}
+
+@keyframes kyx-busy {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kyx-bubble[data-busy="1"]::before {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
+.kyx-bubble header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kyx-bubble header small {
+  color: var(--acc, #ff4d2e);
+  font: 700 12px var(--mono, monospace);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kyx-bubble h2 {
+  margin: 0;
+  font-family: var(--disp, inherit);
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.kyx-b-text,
+.kyx-b-miss {
+  margin: 0;
+  color: var(--fg2, #c9c4d0);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.kyx-b-miss {
+  color: #f5c518;
+  font-size: 12px;
+}
+
+.kyx-b-btns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.kyx-b-btns > span {
+  flex: 1;
+}
+
+.kyx-bubble button {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg, #fff);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kyx-bubble button[hidden] {
+  display: none;
+}
+
+.kyx-bubble .kyx-b-next {
+  border-color: var(--acc, #ff4d2e);
+  background: var(--acc, #ff4d2e);
+}
+
+.kyx-bubble .kyx-b-x {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.kyx-bubble .kyx-b-skip {
+  padding: 0 4px;
+  border: 0;
+  color: var(--fg2, #a9a4b0);
+  font-weight: 600;
+}
+
+/* ---------- phones: everything takes the width of the screen ---------- */
+@media (max-width: 640px) {
+  .kyx-modal-back {
+    align-items: flex-end;
+    padding: 8px;
+  }
+
+  .kyx-tuto,
+  .kyx-settings,
+  .kyx-order-form {
+    width: 100%;
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+    padding: 18px 16px;
+    border-radius: 16px;
+  }
+
+  .kyx-tuto h2 {
+    font-size: 20px;
+  }
+
+  .kyx-tuto-btns button {
+    flex: 1 1 auto;
+  }
+
+  /* The bubble is docked at the bottom, the circled element stays visible above it */
+  .kyx-bubble,
+  .kyx-bubble[data-state="center"] {
+    top: auto !important;
+    right: 8px;
+    bottom: 8px;
+    left: 8px !important;
+    width: auto;
+    max-height: 55vh;
+    transform: none;
+  }
+
+  .kyx-bubble h2 {
+    font-size: 18px;
+  }
+
+  .kyx-b-btns .kyx-b-next {
+    flex: 1;
+  }
+
+  /* New version banners: the whole width of the screen */
+  .kyx-update-toast {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    max-width: none;
+    transform: none;
+    padding: 12px;
+  }
+
+  .kyx-update-toast > span {
+    flex-basis: 100%;
+  }
+
+  .kyx-update-toast a {
+    flex: 1;
+    padding: 8px 0;
+    text-align: center;
+  }
+}

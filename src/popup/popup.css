@@ -15,13 +15,13 @@
 
 body {
   margin: 0;
-  width: 400px;
-  height: 580px;
+  width: 620px;
+  height: 600px;
   display: flex;
   flex-direction: column;
   background: var(--bg);
   color: var(--text);
-  font: 13px/1.45 system-ui, 'Segoe UI', sans-serif;
+  font: 14px/1.5 system-ui, 'Segoe UI', sans-serif;
 }
 
 a {
@@ -108,7 +108,8 @@ h1 {
 
 main {
   flex: 1;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 12px 14px;
 }
 
@@ -208,6 +209,7 @@ input[type='search'] {
 }
 
 .switch input {
+  flex: none;
   accent-color: var(--accent);
   width: 15px;
   height: 15px;
@@ -216,12 +218,12 @@ input[type='search'] {
 .summary,
 .hint {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   margin: 6px 0 10px;
 }
 
 h2 {
-  font-size: 13px;
+  font-size: 14px;
   margin: 14px 0 6px;
   color: var(--muted);
   text-transform: uppercase;
@@ -233,7 +235,8 @@ h2 {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .albums li {
@@ -260,12 +263,14 @@ h2 {
 }
 
 .a-top b {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .a-top span {
+  flex: none;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
@@ -294,7 +299,7 @@ h2 {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 7px;
 }
 
