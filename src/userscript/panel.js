@@ -92,9 +92,9 @@
   // Tampermonkey checks for new versions on its own schedule (once a day by default): the script also asks GitHub
   // every 15 minutes while kyara.games is open, once for all the open tabs, and offers the update.
   const UPDATE_EVERY = 15 * 60e3;
-  async function lookForUpdate() {
+  async function lookForUpdate(maxAge = UPDATE_EVERY) {
     const { updateCheckedAt } = await chrome.storage.local.get('updateCheckedAt');
-    if (Date.now() - (updateCheckedAt ?? 0) >= UPDATE_EVERY) {
+    if (Date.now() - (updateCheckedAt ?? 0) >= maxAge) {
       await chrome.storage.local.set({ updateCheckedAt: Date.now() });
       await checkUpdate().catch(() => null);
     }
@@ -117,9 +117,9 @@
       <a class="kyx-update-notes" target="_blank" rel="noopener">Nouveautés</a>
       <button type="button" aria-label="Plus tard" title="Plus tard">✕</button>`;
     bar.querySelector('b').textContent = update.version;
-    // The script of that release: Tampermonkey (or Userscripts) recognises it and offers to update.
-    bar.querySelector('.kyx-update-go').href = `https://github.com/${REPO}/releases/download/v${update.version}/kyara-games.user.js`;
-    bar.querySelector('.kyx-update-notes').href = update.url;
+    // The script of the latest release (never an in-between one): Tampermonkey (or Userscripts) recognises it and offers to update.
+    bar.querySelector('.kyx-update-go').href = `https://github.com/${REPO}/releases/latest/download/kyara-games.user.js`;
+    bar.querySelector('.kyx-update-notes').href = `https://github.com/${REPO}/releases/latest`;
     bar.querySelector('.kyx-update-go').addEventListener('click', () => {
       bar.querySelector('span').textContent = 'Confirme la mise à jour dans Tampermonkey, puis recharge cette page.';
       bar.querySelector('.kyx-update-go').remove();
@@ -141,6 +141,6 @@
   scan();
   announceUpdate();
   lookForUpdate();
-  setInterval(lookForUpdate, 60e3);
+  setInterval(() => lookForUpdate(), 60e3);
   chrome.storage.onChanged.addListener((changes) => ('update' in changes || 'updateLater' in changes) && offerUpdate());
 })();

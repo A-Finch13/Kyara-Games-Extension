@@ -1,4 +1,4 @@
-import { ORIGIN, REPO, api, checkUpdate, getSettings, loadCatalog, loadCollection, slimCollection, slimMe } from './lib/kyara.js';
+import { ORIGIN, REPO, api, checkUpdate, newer, getSettings, loadCatalog, loadCollection, slimCollection, slimMe } from './lib/kyara.js';
 
 const ALARM = 'kyara-poll';
 const UPDATE_ALARM = 'kyara-update';
@@ -34,11 +34,12 @@ async function schedule() {
 }
 
 // A new release on GitHub: one notification per version, and a banner in the popup until it is installed.
-async function lookForUpdate() {
+// Always the latest release: someone on 1.6.1 while 1.6.2 and 1.6.3 came out is offered 1.6.3 straight away.
+async function lookForUpdate(maxAge = 10 * 60e3) {
   if (FIREFOX) return; // in Firefox the extension is only tried out (about:debugging): Firefox users run the userscript
-  // The popup asks too each time it opens: GitHub is asked at most every 10 minutes.
+  // The alarm asks every 15 minutes; the popup asks each time it opens, for an answer a minute old at most.
   const { updateCheckedAt } = await chrome.storage.local.get('updateCheckedAt');
-  if (Date.now() - (updateCheckedAt ?? 0) < 10 * 60e3) return;
+  if (Date.now() - (updateCheckedAt ?? 0) < maxAge) return;
   await chrome.storage.local.set({ updateCheckedAt: Date.now() });
   try {
     const update = await checkUpdate();
@@ -49,7 +50,7 @@ async function lookForUpdate() {
     notify('update', {
       title: `Kyara Games ${update.version} est disponible`,
       message: 'Ouvre la popup Kyara Games et clique sur « Mettre à jour ».',
-      href: update.url
+      href: `https://github.com/${REPO}/releases/latest`
     });
   } catch {}
 }
@@ -59,7 +60,8 @@ async function lookForUpdate() {
 const UPDATER = 'com.kyara_games.updater';
 
 async function installUpdate() {
-  const update = (await chrome.storage.local.get('update')).update ?? (await checkUpdate().catch(() => null));
+  // Ask GitHub again: a newer release may have come out since the banner was shown.
+  const update = (await checkUpdate().catch(() => null)) ?? (await chrome.storage.local.get('update')).update;
   if (!update) return { error: 'no_update' };
   let res;
   try {
@@ -67,9 +69,11 @@ async function installUpdate() {
   } catch {
     return { error: 'no_updater', update };
   }
+  // An older updater refuses a folder already newer than the version asked for: that is a success too.
+  if (res?.error === 'version_mismatch' && res.detail && !newer(update.version, res.detail)) res = { ok: true, version: res.detail };
   if (!res?.ok) return { error: res?.error ?? 'failed', detail: res?.detail, update };
   setTimeout(() => chrome.runtime.reload(), 800);
-  return { ok: true, version: res.version };
+  return { ok: true, version: res.version, update };
 }
 
 chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
@@ -310,7 +314,7 @@ async function handle(msg) {
     case 'install-update':
       return installUpdate();
     case 'check-update':
-      await lookForUpdate();
+      await lookForUpdate(60e3);
       return { ok: true };
     case 'ensure-data':
       await Promise.allSettled([loadCatalog(), loadCollection()]);

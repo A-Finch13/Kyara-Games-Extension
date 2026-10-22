@@ -161,7 +161,7 @@ export const asList = (x, ...keys) => {
 
 // ---------- new versions published on GitHub ----------
 
-const newer = (a, b) => {
+export const newer = (a, b) => {
   const pa = String(a).replace(/^v/, '').split('.').map(Number);
   const pb = String(b).replace(/^v/, '').split('.').map(Number);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {

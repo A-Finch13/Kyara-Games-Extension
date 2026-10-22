@@ -296,6 +296,7 @@ $('#update-go').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = 'Mise à jour…';
   const res = await chrome.runtime.sendMessage({ type: 'install-update' }).catch(() => null);
+  if (res?.update) renderUpdate(res.update);
   if (res?.ok) {
     btn.textContent = 'Installée ✔';
     updateHelp(`Version ${esc(res.version)} installée, l’extension redémarre. Les onglets kyara.games se rechargent tout seuls, cache vidé.`);
@@ -304,7 +305,7 @@ $('#update-go').addEventListener('click', async () => {
   btn.disabled = false;
   btn.textContent = 'Réessayer';
   const update = res?.update ?? shownUpdate;
-  const file = (FIREFOX ? update?.xpi : update?.zip) ?? update?.url ?? '';
+  const file = FIREFOX ? 'https://a-finch13.github.io/Kyara-Games-Extension/' : 'https://github.com/A-Finch13/Kyara-Games-Extension/releases/latest/download/kyara-games-chromium.zip';
   const download = `<a href="#" data-open="${esc(file)}">télécharger la mise à jour</a>`;
   if (res?.error === 'no_updater' || res?.error === 'unknown_extension') {
     updateHelp(

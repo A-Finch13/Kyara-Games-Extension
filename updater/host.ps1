@@ -47,6 +47,18 @@ function Invoke-Quiet($file, $arguments) {
   return @{ code = $p.ExitCode; text = ($out.Result + $err).Trim() }
 }
 
+# -1, 0 or 1, like 1.6.1 against 1.6.2.
+function Compare-Version($a, $b) {
+  $pa = @($a -split '\.' | ForEach-Object { [int]$_ })
+  $pb = @($b -split '\.' | ForEach-Object { [int]$_ })
+  for ($i = 0; $i -lt [Math]::Max($pa.Count, $pb.Count); $i++) {
+    $x = if ($i -lt $pa.Count) { $pa[$i] } else { 0 }
+    $y = if ($i -lt $pb.Count) { $pb[$i] } else { 0 }
+    if ($x -ne $y) { return [Math]::Sign($x - $y) }
+  }
+  return 0
+}
+
 function Get-Version($dir) {
   return [string]((Get-Content -LiteralPath (Join-Path $dir 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version)
 }
@@ -76,7 +88,8 @@ function Update-Extension($dir, $msg) {
   $fresh = Join-Path $dir 'updater\host.ps1'
   if (Test-Path -LiteralPath $fresh) { Copy-Item -LiteralPath $fresh -Destination (Join-Path $here 'host.ps1') -Force -ErrorAction SilentlyContinue }
   $now = Get-Version $dir
-  if ($msg.version -and $now -ne [string]$msg.version) { return @{ error = 'version_mismatch'; detail = $now } }
+  # A newer version than the one asked for (a release came out meanwhile) is fine too.
+  if ($msg.version -and (Compare-Version $now ([string]$msg.version)) -lt 0) { return @{ error = 'version_mismatch'; detail = $now } }
   return @{ ok = $true; version = $now }
 }
 
