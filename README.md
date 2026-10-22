@@ -86,7 +86,7 @@ Au clic sur **Mettre à jour**, l'assistant télécharge la release GitHub et re
 3. **GitHub** : crée la release `vX.Y.Z` avec `dist/kyara-games-chromium.zip` et `dist/kyara-games-firefox.xpi`. Brave / Chrome / Edge la voient dans les 15 minutes (bouton **Mettre à jour** de la popup).
 4. **addons.mozilla.org** : Developer Hub → Kyara Games → **Envoyer une nouvelle version** → `dist/kyara-games-firefox.xpi`. Sans cet envoi, les utilisateurs Firefox (PC et Android) restent sur l'ancienne version. Une fois la version validée, Firefox l'installe tout seul.
 
-Les textes de la fiche addons.mozilla.org sont dans `amo/`.
+La politique de confidentialité et les notes pour les relecteurs d'addons.mozilla.org sont dans `amo/`.
 
 ## Comment ça marche
 
@@ -104,6 +104,6 @@ Les textes de la fiche addons.mozilla.org sont dans `amo/`.
 - `src/content/content.js` : badges, albums masqués, cartes manquantes grisées et ordres d'achat, filtre « Ses doublons » sur le site.
 - `src/popup/` : la fenêtre de l'extension.
 - `updater/` et `installer-mises-a-jour.bat` : l'assistant de mise à jour (Windows).
-- `amo/` : textes pour la publication sur addons.mozilla.org (fiche, politique de confidentialité, notes pour les relecteurs).
+- `amo/` : politique de confidentialité et notes pour les relecteurs d'addons.mozilla.org.
 
 Extension non officielle, non affiliée à Kyara. Si le site change sa structure, certains éléments (masquage des albums) peuvent nécessiter une mise à jour.
