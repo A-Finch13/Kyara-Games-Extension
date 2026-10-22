@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS = {
   badgeDupes: true,
   theirDupes: true,
   lockLastListed: true,
+  cardToWiki: true,
   notifyBoosters: true,
   notifyTrades: true,
   notifyMarket: true,

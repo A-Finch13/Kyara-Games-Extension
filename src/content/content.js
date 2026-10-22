@@ -1,6 +1,6 @@
 // Kyara Games on kyara.games: card badges, completed and small albums hidden, missing cards greyed out with a buy order,
 // "Bloquer sauf doublons", last copy of a card on sale locked, compact completed series on Missions, "Boosters rentables" page,
-// "Amis" filter on the Classement page, "Manquantes" chip on Collection and the "Ses doublons" filter in the trade composer.
+// "Amis" filter on the Classement page, "Possédées" and "Manquantes" chips on Collection and the "Ses doublons" filter in the trade composer.
 (() => {
   const DEFAULTS = {
     hideComplete: true,
@@ -8,7 +8,8 @@
     badgeMissing: true,
     badgeDupes: true,
     theirDupes: true,
-    lockLastListed: true
+    lockLastListed: true,
+    cardToWiki: true
   };
   const CARD_SRC = /\/cards\/[a-z0-9]+\/(\d+)\.webp/i;
 
@@ -522,6 +523,29 @@
     });
   }
 
+  // ---------- an owned card of the Collection grid opens its wiki page ----------
+
+  // The site opens a window when an owned card is clicked; its link already leads to the card's wiki page.
+  // The click is stopped before the site sees it and the same link is followed through the site's own navigation.
+  window.addEventListener(
+    'click',
+    (e) => {
+      if (stopped || !settings.cardToWiki || location.pathname !== '/collection') return;
+      if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      const slot = e.target.closest?.('a.slot');
+      const href = slot?.getAttribute('href');
+      if (!href?.startsWith('/wiki/') || slot.querySelector(':scope > .miss')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const link = Object.assign(document.createElement('a'), { href });
+      link.hidden = true;
+      document.body.appendChild(link);
+      link.click(); // handled by the site's router like any other link
+      link.remove();
+    },
+    true
+  );
+
   // ---------- "Bloquer sauf doublons" in the album bar ----------
 
   // The site locks a card with all its copies, so the duplicates of a locked album can't be sold.
@@ -960,7 +984,12 @@
     return ids.map((id) => dropCache.get(id) ?? {});
   }
 
-  const pct = (p) => `${num(p * 100, p < 0.1 ? 1 : 0)} %`;
+  // Chance per booster, precise even when tiny: "8,5 %", "0,031 % (1 chance sur 3 298)".
+  const pct = (p) => {
+    if (!(p > 0)) return '0 %';
+    const percent = (p * 100).toLocaleString('fr-FR', p >= 0.1 ? { maximumFractionDigits: 0 } : { maximumSignificantDigits: 2 });
+    return p >= 0.01 ? `${percent} %` : `${percent} % (1 chance sur ${num(Math.round(1 / p))})`;
+  };
   const boosters = (n) => `${num(n)} booster${n >= 2 ? 's' : ''}`;
 
   // rows: [{ pack, hits: wanted cards per booster on average, chance: chance of at least one per booster }],
@@ -1350,34 +1379,45 @@
   // ---------- "Manquantes" chip on the Collection page ----------
 
   // The site's card filter (all / owned / missing / dupes…) sits in a select: this chip, next to the rarity chips, drives it.
+  // "Possédées" and "Manquantes", in this order right after the site's "Toutes" chip.
+  const CARD_CHIPS = [
+    { value: 'owned', label: 'Possédées', cls: 'kyx-owned' },
+    { value: 'missing', label: 'Manquantes', cls: 'kyx-missing' }
+  ];
+
   function scanCollectionChips() {
     if (location.pathname !== '/collection') return;
     for (const select of document.querySelectorAll('select')) {
       if (!select.querySelector('option[value="missing"]')) continue;
       const chips = select.closest('.row2')?.querySelector('.chips');
-      if (!chips) continue;
-      let btn = chips.querySelector(':scope > .kyx-missing');
-      const first = chips.querySelector(':scope > button:not(.kyx-missing)');
-      if (!btn && first) {
-        // A copy of the site's "Toutes" chip (same dot and style), placed right after it.
-        btn = first.cloneNode(true);
-        btn.classList.add('kyx-missing');
-        btn.lastChild.textContent = ' Manquantes';
-        btn.addEventListener('click', () => {
-          select.value = select.value === 'missing' ? 'all' : 'missing';
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-          scanCollectionChips();
-        });
-        first.after(btn);
+      const first = chips?.querySelector(':scope > button:not(.kyx-chip)');
+      if (!first) continue;
+      let after = first;
+      for (const chip of CARD_CHIPS) {
+        if (!select.querySelector(`option[value="${chip.value}"]`)) continue;
+        let btn = chips.querySelector(`:scope > .${chip.cls}`);
+        if (!btn) {
+          // A copy of the site's "Toutes" chip (same dot and style); clicking it again shows every card.
+          btn = first.cloneNode(true);
+          btn.classList.remove('on');
+          btn.classList.add('kyx-chip', chip.cls);
+          btn.lastChild.textContent = ` ${chip.label}`;
+          btn.addEventListener('click', () => {
+            select.value = select.value === chip.value ? 'all' : chip.value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            scanCollectionChips();
+          });
+          after.after(btn);
+        }
+        after = btn;
+        const on = select.value === chip.value;
+        btn.classList.toggle('on', on);
+        btn.setAttribute('aria-pressed', String(on));
       }
-      if (!btn) continue;
       if (!select.dataset.kyxWatched) {
         select.dataset.kyxWatched = '1';
         select.addEventListener('change', () => scanCollectionChips());
       }
-      const on = select.value === 'missing';
-      btn.classList.toggle('on', on);
-      btn.setAttribute('aria-pressed', String(on));
     }
   }
 
@@ -1507,7 +1547,7 @@
     stopped = true;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-missing, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab').forEach((el) => el.remove());
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab').forEach((el) => el.remove());
     delete document.documentElement.dataset.kyxView;
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched], [data-kyx-ghost]').forEach((el) => {
       delete el.dataset.kyxHidden;

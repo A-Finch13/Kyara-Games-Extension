@@ -14,13 +14,14 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Séries complètes condensées | Page **Missions** : la liste garde la hauteur de la carte « Parrainage », les séries à réclamer en premier, et le total dans le titre |
 | Trouver le booster le plus rentable | Menu **Plus** → **Boosters rentables** : une page du site (recalculée à minuit, heure de Paris, pour le Pack du jour) qui classe les boosters en vente du plus rentable au moins rentable (coût moyen en chakra) pour une rareté, un personnage ou un univers (cartes manquantes), avec un lien vers chacun |
 | Se comparer à ses amis | Page **Classement** : filtre **友 Amis** à côté des onglets ; le classement de l'onglet choisi parmi tes amis et toi, avec la place de chacun au classement général |
+| Ouvrir la fiche d'une carte en un clic | Page **Collection** : un clic sur une carte que tu as ouvre directement sa fiche (réglable dans la popup ; Ctrl+clic garde la fenêtre du site) |
 | Verrouiller un album sans bloquer ses doublons | Bouton **Bloquer sauf doublons** à côté de « Bloquer l'album » (page **Collection**, un univers choisi) : seules les cartes en un exemplaire sont verrouillées, les doublons restent vendables ; une carte est reverrouillée dès qu'il n'en reste qu'une |
 | Badge « Manquante » sur toute carte que tu n'as pas | Partout sur le site : boutique/marché, échanges, profils, wiki… |
 | Savoir si la carte que tu donnes est en double | Badge **×N** (doublon) ou **Unique** (ton seul exemplaire) sur tes cartes dans les fenêtres d'échange, confirmation comprise |
 | Voir la série et le prix des cartes à la confirmation d'un échange | Sous la rareté, dans la fenêtre « Confirmer l'échange » (nom complet de la série au survol), avec l'écart de valeur entre les deux côtés et s'il est équilibré selon la règle du site |
 | Voir les doublons du joueur avec qui tu échanges | Onglet **Échange** de la popup, avec la liste de tes amis |
 | Filtrer ses cartes sur ses doublons | Puce **Ses doublons**, active d'office, dans chaque fenêtre « Proposer un échange » (profil, offres du marché, comptoir), onglet **Cartes de …** ; la désactiver est retenu |
-| Afficher les cartes manquantes de la collection | Puce **Manquantes** à côté des raretés sur la page Collection, et onglet **Manquantes** de la popup |
+| Afficher les cartes possédées ou manquantes de la collection | Puces **Possédées** et **Manquantes** à côté de « Toutes » sur la page Collection (un second clic réaffiche tout), et onglet **Manquantes** de la popup |
 | Savoir si les cartes que tu donnes dans un échange en cours sont en double | Badge **×N** ou **Unique** côté « Tu donnes » des échanges en attente, onglet **Échanges** du Marché |
 | Être prévenu d'une nouvelle version | Notification et bandeau vert dans la popup quand une nouvelle release sort sur GitHub (vérifié toutes les 15 min), avec un bouton **Mettre à jour** qui installe la nouvelle version (voir plus bas) |
 | Notifications | Boosters gratuits pleins, envies mises en vente au marché, échanges, ventes/achats/enchères, amis, messages de l'équipe |
@@ -46,14 +47,6 @@ Fabrique d'abord les paquets : `python build.py` (crée le dossier `dist/`).
 2. **Charger un module complémentaire temporaire** → choisis `dist/firefox/manifest.json`.
 3. Clique sur l'icône Kyara Games : si elle affiche « Autoriser l'accès », clique dessus puis recharge l'onglet kyara.games.
 
-**Pour l'installer pour de bon**, Firefox exige une signature de Mozilla (gratuite) :
-
-1. Crée un compte sur [addons.mozilla.org](https://addons.mozilla.org/developers/).
-2. **Soumettre un module** → choisis « Sur votre propre site » (non listé) → envoie `dist/kyara-games-firefox.xpi`.
-3. La signature est automatique (quelques minutes). Télécharge le `.xpi` signé et ouvre-le dans Firefox.
-
-(Firefox Developer Edition et Nightly acceptent aussi le `.xpi` non signé si `xpinstall.signatures.required` est mis à `false` dans `about:config`.)
-
 ## Mises à jour en un clic
 
 Un navigateur ne laisse jamais une extension réécrire ses propres fichiers. Pour que le bouton **Mettre à jour** de la popup installe la nouvelle version tout seul, lance **une seule fois** `installer-mises-a-jour.bat` (dans le dossier de l'extension, Windows). Il installe un petit assistant dans `%LOCALAPPDATA%\KyaraGamesUpdater` et le déclare à Brave, Chrome, Edge, Vivaldi, Opera et Firefox.
@@ -69,7 +62,7 @@ Au clic sur **Mettre à jour**, l'assistant télécharge la release GitHub et re
 `python build.py` génère dans `dist/` :
 
 - `firefox/` : le dossier à charger dans Firefox ;
-- `kyara-games-firefox.xpi` : le paquet Firefox à signer ;
+- `kyara-games-firefox.xpi` : le paquet Firefox ;
 - `kyara-games-chromium.zip` : le paquet pour Brave / Chrome / Edge / Opera (ou pour le Chrome Web Store).
 
 `manifest.json` sert à Brave/Chrome, `manifest.firefox.json` à Firefox : garde le même numéro de version dans les deux.

@@ -222,11 +222,11 @@ a.slot:hover .kyx-ghost {
 .kyx-order-form {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  width: min(360px, 100%);
+  gap: 14px;
+  width: min(520px, 100%);
   max-height: calc(100vh - 32px);
   overflow: auto;
-  padding: 18px;
+  padding: 26px;
   border: 1px solid var(--line3, #3a3642);
   border-radius: 18px;
   background: var(--panel, #16141b);
@@ -240,8 +240,12 @@ a.slot:hover .kyx-ghost {
   gap: 12px;
 }
 
+.kyx-modal-head {
+  gap: 16px;
+}
+
 .kyx-modal-head img {
-  width: 64px;
+  width: 110px;
   aspect-ratio: 5 / 7;
   border-radius: 8px;
   object-fit: cover;
@@ -263,12 +267,37 @@ a.slot:hover .kyx-ghost {
 }
 
 .kyx-modal-name {
-  font-size: 17px;
+  font-size: 22px;
 }
 
 .kyx-modal-sub {
   color: var(--fg2, #a9a4b0);
-  font-size: 12px;
+  font-size: 14px;
+}
+
+.kyx-modal .kyx-order-facts,
+.kyx-modal .kyx-order-msg {
+  font-size: 14px;
+}
+
+.kyx-modal .kyx-order-fields label {
+  gap: 4px;
+  font-size: 13px;
+}
+
+.kyx-modal .kyx-order-fields label:last-child {
+  width: 96px;
+}
+
+.kyx-modal .kyx-order-fields input {
+  height: 46px;
+  font-size: 16px;
+}
+
+.kyx-modal button {
+  height: 40px;
+  padding: 0 18px;
+  font-size: 14px;
 }
 
 /* "Bloquer sauf doublons" in the album bar */
