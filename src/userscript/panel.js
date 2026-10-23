@@ -131,6 +131,9 @@
     offerUpdate();
   }
 
+  // iPhone and iPad: Userscripts updates from its Safari window, which a page cannot open.
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+
   // "Kyara Games X est disponible" banner with the "Mettre à jour" button.
   async function offerUpdate() {
     const { update, updateLater } = await chrome.storage.local.get(['update', 'updateLater']);
@@ -148,12 +151,21 @@
       <a class="kyx-update-notes" target="_blank" rel="noopener">Nouveautés</a>
       <button type="button" aria-label="Plus tard" title="Plus tard">✕</button>`;
     bar.querySelector('b').textContent = update.version;
-    // The script of the latest release: Tampermonkey (or Userscripts) offers to update.
-    bar.querySelector('.kyx-update-go').href = `https://github.com/${REPO}/releases/latest/download/kyara-games.user.js`;
+    // Elsewhere, the script of the latest release: Tampermonkey offers to update.
+    bar.querySelector('.kyx-update-go').href = IOS ? '#' : `https://github.com/${REPO}/releases/latest/download/kyara-games.user.js`;
     bar.querySelector('.kyx-update-notes').href = `https://github.com/${REPO}/releases/latest`;
-    bar.querySelector('.kyx-update-go').addEventListener('click', () => {
+    bar.querySelector('.kyx-update-go').addEventListener('click', (e) => {
+      const go = bar.querySelector('.kyx-update-go');
+      if (IOS) {
+        // Userscripts updates the script from its own Safari window: the way there, nothing to download.
+        e.preventDefault();
+        bar.classList.add('steps');
+        bar.querySelector('span').innerHTML = '<b>Pour mettre à jour :</b><ol class="kyx-update-steps"><li>Touche <b>ᴀA</b> (ou la pièce de puzzle) à côté de l’adresse, puis <b>Userscripts</b>.</li><li>En haut, touche l’icône des mises à jour (deux flèches en rond).</li><li>Kyara Games n’est pas dans la liste ? Touche <b>Check Updates</b>.</li><li>Touche <b>Update</b> à côté de Kyara Games, puis recharge cette page.</li></ol>';
+        go.remove();
+        return;
+      }
       bar.querySelector('span').textContent = 'Dernière étape : dans la page qui vient de s’ouvrir, clique sur « Mettre à jour » (ou « Installer »), puis reviens ici et recharge la page.';
-      bar.querySelector('.kyx-update-go').remove();
+      go.remove();
     });
     // Later: asked again in 12 hours.
     bar.querySelector('button').addEventListener('click', () => {

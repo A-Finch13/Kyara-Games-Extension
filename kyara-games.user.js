@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyara Games
 // @namespace    https://github.com/A-Finch13/Kyara-Games-Extension
-// @version      1.7.3
+// @version      1.7.4
 // @description  Compagnon non officiel pour kyara.games : cartes manquantes en gris avec ordre d'achat, albums complets masqués, doublons pendant les échanges, booster le plus rentable, classement entre amis.
 // @author       A-Finch13
 // @license      MIT
@@ -46,7 +46,7 @@
 'use strict';
 if (window.__kyaraGamesUserscript) return;
 window.__kyaraGamesUserscript = true;
-const KYX_VERSION = '1.7.3';
+const KYX_VERSION = '1.7.4';
 
 // ---------- 1. src/userscript/shim.js : stockage et messages, à la place des fonctions d'extension ----------
 // Userscript: the extension APIs used by the page code, rebuilt in the page.
@@ -1859,6 +1859,21 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   color: var(--fg, #fff);
 }
 
+/* iPhone and iPad: the steps to the updates of Userscripts */
+.kyx-update-toast.steps > span {
+  flex: 1 1 100%;
+  line-height: 1.45;
+}
+
+.kyx-update-steps {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.kyx-update-steps li {
+  margin: 3px 0;
+}
+
 /* Userscript settings: moving the settings to another device */
 .kyx-sync {
   display: flex;
@@ -2494,6 +2509,10 @@ const KYX_TOUR = [
 
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
+  {
+    version: '1.7.4',
+    items: ['iPhone et iPad : le bouton « Mettre à jour » du bandeau montre le chemin vers les mises à jour de Userscripts (ᴀA → Userscripts → mises à jour → Update), sans rien télécharger.']
+  },
   {
     version: '1.7.3',
     items: [
@@ -5498,6 +5517,9 @@ const KYX_CHANGES = [
     offerUpdate();
   }
 
+  // iPhone and iPad: Userscripts updates from its Safari window, which a page cannot open.
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+
   // "Kyara Games X est disponible" banner with the "Mettre à jour" button.
   async function offerUpdate() {
     const { update, updateLater } = await chrome.storage.local.get(['update', 'updateLater']);
@@ -5515,12 +5537,21 @@ const KYX_CHANGES = [
       <a class="kyx-update-notes" target="_blank" rel="noopener">Nouveautés</a>
       <button type="button" aria-label="Plus tard" title="Plus tard">✕</button>`;
     bar.querySelector('b').textContent = update.version;
-    // The script of the latest release: Tampermonkey (or Userscripts) offers to update.
-    bar.querySelector('.kyx-update-go').href = `https://github.com/${REPO}/releases/latest/download/kyara-games.user.js`;
+    // Elsewhere, the script of the latest release: Tampermonkey offers to update.
+    bar.querySelector('.kyx-update-go').href = IOS ? '#' : `https://github.com/${REPO}/releases/latest/download/kyara-games.user.js`;
     bar.querySelector('.kyx-update-notes').href = `https://github.com/${REPO}/releases/latest`;
-    bar.querySelector('.kyx-update-go').addEventListener('click', () => {
+    bar.querySelector('.kyx-update-go').addEventListener('click', (e) => {
+      const go = bar.querySelector('.kyx-update-go');
+      if (IOS) {
+        // Userscripts updates the script from its own Safari window: the way there, nothing to download.
+        e.preventDefault();
+        bar.classList.add('steps');
+        bar.querySelector('span').innerHTML = '<b>Pour mettre à jour :</b><ol class="kyx-update-steps"><li>Touche <b>ᴀA</b> (ou la pièce de puzzle) à côté de l’adresse, puis <b>Userscripts</b>.</li><li>En haut, touche l’icône des mises à jour (deux flèches en rond).</li><li>Kyara Games n’est pas dans la liste ? Touche <b>Check Updates</b>.</li><li>Touche <b>Update</b> à côté de Kyara Games, puis recharge cette page.</li></ol>';
+        go.remove();
+        return;
+      }
       bar.querySelector('span').textContent = 'Dernière étape : dans la page qui vient de s’ouvrir, clique sur « Mettre à jour » (ou « Installer »), puis reviens ici et recharge la page.';
-      bar.querySelector('.kyx-update-go').remove();
+      go.remove();
     });
     // Later: asked again in 12 hours.
     bar.querySelector('button').addEventListener('click', () => {

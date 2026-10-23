@@ -1224,6 +1224,21 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   color: var(--fg, #fff);
 }
 
+/* iPhone and iPad: the steps to the updates of Userscripts */
+.kyx-update-toast.steps > span {
+  flex: 1 1 100%;
+  line-height: 1.45;
+}
+
+.kyx-update-steps {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.kyx-update-steps li {
+  margin: 3px 0;
+}
+
 /* Userscript settings: moving the settings to another device */
 .kyx-sync {
   display: flex;

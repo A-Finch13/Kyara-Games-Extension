@@ -131,7 +131,7 @@ Tu n'as presque rien à faire :
 2. Clique sur **Mettre à jour** dans ce bandeau.
 3. Une page s'ouvre :
    - avec **Tampermonkey** (PC, Android), clique sur **Mettre à jour** ;
-   - avec **Userscripts** (iPhone), touche **ᴀA** → **Userscripts** → **Installer**.
+   - avec **Userscripts** (iPhone, iPad), le bandeau montre le chemin : **ᴀA** → **Userscripts** → icône des mises à jour (deux flèches en rond) → **Check Updates** si Kyara Games n'est pas listé → **Update**. Rien à télécharger : Userscripts met le script à jour lui-même. Pas besoin d'attendre le bandeau, ce chemin marche à tout moment.
 4. Reviens sur kyara.games et recharge la page. Une fenêtre te montre les nouveautés : c'est fini.
 
 Le « ✕ » du bandeau le cache pendant 12 heures. Tampermonkey installe aussi la nouvelle version tout seul, environ une fois par jour. Pour qu'il vérifie plus souvent : tableau de bord de Tampermonkey → **Paramètres** (mode **Avancé**) → **Mises à jour des scripts** → **Vérifier toutes les…** → la valeur la plus courte.

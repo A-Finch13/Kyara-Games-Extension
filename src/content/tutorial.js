@@ -125,6 +125,10 @@ const KYX_TOUR = [
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
   {
+    version: '1.7.4',
+    items: ['iPhone et iPad : le bouton « Mettre à jour » du bandeau montre le chemin vers les mises à jour de Userscripts (ᴀA → Userscripts → mises à jour → Update), sans rien télécharger.']
+  },
+  {
     version: '1.7.3',
     items: [
       ['Échanges en attente : les cartes que tu reçois indiquent si tu les as déjà (« Possédée », « Possédée ×N ») ou non (« Manquante »).', 'echanges'],
