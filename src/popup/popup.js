@@ -338,7 +338,7 @@ $('#update-go').addEventListener('click', async () => {
   if (res?.update) renderUpdate(res.update);
   if (res?.ok) {
     btn.textContent = 'Installée ✔';
-    updateHelp(`Version ${esc(res.version)} installée, l’extension redémarre. Les onglets kyara.games se rechargent tout seuls, cache vidé.`);
+    updateHelp(`Version ${esc(res.version)} installée ✔. L’extension redémarre et les onglets kyara.games se rechargent tout seuls : tu n’as rien d’autre à faire.`);
     return;
   }
   btn.disabled = false;
@@ -349,12 +349,12 @@ $('#update-go').addEventListener('click', async () => {
   if (res?.error === 'no_updater' || res?.error === 'unknown_extension') {
     updateHelp(
       FIREFOX
-        ? `Sur Firefox, installe plutôt la version script avec Tampermonkey : <a href="#" data-open="https://a-finch13.github.io/Kyara-Games-Extension/">page d’installation</a>.`
-        : `Première fois : lance <b>installer-mises-a-jour.bat</b> dans le dossier de l’extension (une seule fois), puis réessaie. Sinon, ${download}.`
+        ? `Sur Firefox, utilise plutôt la version script (2 minutes) : suis la <a href="#" data-open="https://a-finch13.github.io/Kyara-Games-Extension/">page d’installation</a>.`
+        : `Pour que ce bouton installe tout seul, il faut le préparer <b>une seule fois</b> : ouvre le dossier de l’extension, double-clique sur <b>installer-mises-a-jour.bat</b>, puis clique ici sur « Réessayer ».<br>Ou bien ${download}, décompresse-la et copie son contenu dans le dossier de l’extension, en remplaçant les anciens fichiers, puis clique sur la flèche ⟳ de Kyara Games dans la page des extensions (<code>chrome://extensions</code>).`
     );
   } else {
     const detail = res?.detail ? ` (${esc(String(res.detail).slice(0, 200))})` : '';
-    updateHelp(`La mise à jour a échoué : ${esc(res?.error ?? 'pas de réponse')}${detail}. Tu peux ${download}.`);
+    updateHelp(`La mise à jour n’a pas marché (${esc(res?.error ?? 'pas de réponse')}${detail}). Clique sur « Réessayer ». Si ça ne marche toujours pas, ${download}, décompresse-la et copie son contenu dans le dossier de l’extension, en remplaçant les anciens fichiers, puis clique sur la flèche ⟳ de Kyara Games dans la page des extensions (<code>chrome://extensions</code>).`);
   }
 });
 

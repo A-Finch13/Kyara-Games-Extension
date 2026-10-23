@@ -94,7 +94,7 @@ def userscript(version):
  *  1. shim.js    — remplace les fonctions propres aux extensions (stockage, messages) ;
  *  2. kyara.js   — accès à l'API de kyara.games, catalogue des cartes et collection ;
  *  3. bridge.js  — fait dans la page le travail du service de fond de l'extension ;
- *  4. inject.js  — lit les réponses que le site reçoit déjà (collection, échanges), sans jamais les modifier ;
+ *  4. inject.js  — lit les réponses que le site reçoit déjà (collection, échanges), et resserre la recherche d’offres d’échange sur les œuvres favorites quand « ★ Favoris » est actif ;
  *  5. tutorial.js et content.js — textes du tutoriel et des nouveautés, puis tout ce qui s'affiche sur le site ;
  *  6. panel.js   — panneau de réglages dans le menu du site.
  */

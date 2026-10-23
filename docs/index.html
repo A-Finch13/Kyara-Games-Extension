@@ -218,6 +218,106 @@
         background: var(--acc2);
       }
 
+      .intro {
+        margin: -4px 0 16px;
+        color: var(--fg2);
+      }
+
+      .sub {
+        margin: 6px 0 8px;
+        padding-left: 22px;
+        color: var(--fg2);
+      }
+
+      .sub li {
+        margin: 4px 0;
+        padding-left: 4px;
+      }
+
+      .sub li::marker {
+        color: var(--fg);
+        font-weight: 800;
+      }
+
+      .copy {
+        margin-left: 4px;
+        padding: 3px 10px;
+        border: 1px solid var(--line2);
+        border-radius: 8px;
+        background: var(--panel2);
+        color: var(--fg);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .copy.done {
+        border-color: var(--ok);
+        color: var(--ok);
+      }
+
+      .step p.skip {
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: rgba(63, 191, 127, 0.12);
+        color: var(--ok);
+        font-weight: 700;
+      }
+
+      .check,
+      .update,
+      .help {
+        margin: 18px 0 0;
+        padding: 16px 20px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--panel);
+        color: var(--fg2);
+      }
+
+      .check {
+        border-color: rgba(63, 191, 127, 0.5);
+      }
+
+      .update {
+        border-color: rgba(245, 197, 24, 0.5);
+      }
+
+      .check h3,
+      .update h3 {
+        margin: 0 0 6px;
+        color: var(--fg);
+        font-size: 18px;
+      }
+
+      .check p,
+      .update p,
+      .help p {
+        margin: 0 0 8px;
+      }
+
+      .check p:last-child,
+      .update p:last-child,
+      .help p:last-child {
+        margin-bottom: 0;
+      }
+
+      .help summary {
+        color: var(--fg);
+        font-size: 16px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .help[open] summary {
+        margin-bottom: 10px;
+      }
+
+      .small {
+        font-size: 13px;
+      }
+
       .note {
         margin: 18px 0 0;
         padding: 14px 18px;
@@ -293,12 +393,18 @@
 
       <main>
         <section data-panel="pc">
-          <h2>Installation (2 minutes, une seule fois)</h2>
+          <h2>Installer sur PC</h2>
+          <p class="intro">Ça prend 2 minutes et ça se fait une seule fois. Fais les étapes dans l'ordre et garde cette page ouverte jusqu'à la fin.</p>
           <ol class="steps">
             <li class="step">
               <div>
-                <h3>Installe l'extension Tampermonkey</h3>
-                <p>C'est elle qui fait tourner le script Kyara Games et qui le met à jour.</p>
+                <h3>Ajoute Tampermonkey à ton navigateur</h3>
+                <p>Tampermonkey est une extension gratuite. C'est elle qui fait marcher Kyara Games.</p>
+                <ol class="sub">
+                  <li>Clique sur le bouton de ton navigateur ci-dessous. Le bon est marqué en vert « ton navigateur ».</li>
+                  <li>Une page s'ouvre : clique sur le bouton <b>Ajouter à Chrome</b> (ou <b>Obtenir</b>, ou <b>Ajouter à Firefox</b>).</li>
+                  <li>Une petite fenêtre te demande de confirmer : clique sur <b>Ajouter l'extension</b>.</li>
+                </ol>
                 <div class="buttons">
                   <a class="btn" data-browser="chrome" href="https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo">Chrome / Opera / Brave</a>
                   <a class="btn" data-browser="firefox" href="https://addons.mozilla.org/firefox/addon/tampermonkey/">Firefox</a>
@@ -308,106 +414,226 @@
             </li>
             <li class="step">
               <div>
-                <h3>Chrome, Edge, Brave : autorise les scripts</h3>
-                <p>Va dans <code>chrome://extensions</code> (ou <code>edge://extensions</code>, <code>brave://extensions</code>), clique sur <b>Détails</b> sous Tampermonkey et active <b>Autoriser les scripts utilisateur</b>. Si cette option n'existe pas, active plutôt le <b>Mode développeur</b> en haut à droite.</p>
-                <p class="small">Firefox : rien à faire.</p>
+                <h3>Autorise Tampermonkey</h3>
+                <p class="skip" data-only="firefox" hidden>Tu es sur Firefox : tu n'as rien à faire ici, passe à l'étape 3.</p>
+                <p>Chrome, Edge, Brave et Opera demandent une autorisation en plus.</p>
+                <ol class="sub">
+                  <li>Copie cette adresse : <code class="ext-url">chrome://extensions</code> <button type="button" class="copy" data-copy=".ext-url">Copier</button></li>
+                  <li>Ouvre un nouvel onglet (touches <b>Ctrl</b> + <b>T</b>), colle l'adresse dans la barre du haut (<b>Ctrl</b> + <b>V</b>) et appuie sur <b>Entrée</b>.</li>
+                  <li>Dans la liste, trouve <b>Tampermonkey</b> et clique sur <b>Détails</b>.</li>
+                  <li>Active l'interrupteur <b>Autoriser les scripts utilisateur</b>.</li>
+                </ol>
+                <p class="small">Tu ne trouves pas « Autoriser les scripts utilisateur » ? Active plutôt l'interrupteur <b>Mode développeur</b>, en haut à droite de la page des extensions.</p>
               </div>
             </li>
             <li class="step main">
               <div>
                 <h3>Installe Kyara Games</h3>
-                <p>Tampermonkey ouvre le script : clique sur <b>Installer</b>.</p>
+                <ol class="sub">
+                  <li>Clique sur le gros bouton rouge ci-dessous.</li>
+                  <li>Une page Tampermonkey s'ouvre avec écrit « Kyara Games » : clique sur <b>Installer</b>.</li>
+                </ol>
                 <div class="buttons">
                   <a class="btn big" href="https://github.com/A-Finch13/Kyara-Games-Extension/releases/latest/download/kyara-games.user.js">Installer Kyara Games</a>
                 </div>
+                <p class="small">Tu vois une page pleine de texte et de code au lieu de Tampermonkey ? Tampermonkey n'est pas encore installé ou pas autorisé : refais les étapes 1 et 2, puis reclique sur le bouton rouge.</p>
               </div>
             </li>
             <li class="step">
               <div>
                 <h3>Ouvre kyara.games et connecte-toi</h3>
-                <p>Une seule fois : le script reprend ta session tout seul. Les réglages sont dans le menu du site, <b>Plus → 設 Kyara Games</b>.</p>
+                <p>Connecte-toi comme d'habitude. Kyara Games démarre tout seul et une visite guidée te montre ce qu'il ajoute.</p>
                 <div class="buttons"><a class="btn" href="https://kyara.games/collection">Aller sur kyara.games</a></div>
               </div>
             </li>
           </ol>
-          <p class="note">Les mises à jour arrivent toutes seules par Tampermonkey. En plus, le script vérifie toutes les 15 minutes quand kyara.games est ouvert et affiche un bouton <b>Mettre à jour</b> dès qu'une nouvelle version sort. Pour que Tampermonkey vérifie plus souvent de lui-même : son tableau de bord → <b>Paramètres</b> (mode <b>Avancé</b>) → <b>Mises à jour des scripts</b> → la fréquence la plus courte. Tu veux aussi les <b>notifications</b> (boosters gratuits pleins, échanges, ventes…) et la fenêtre de l'extension ? Installe plutôt l'<a href="https://github.com/A-Finch13/Kyara-Games-Extension#installation-brave-chrome-edge-opera-vivaldi">extension complète</a>.</p>
+
+          <div class="check">
+            <h3>✔ Comment savoir que ça marche ?</h3>
+            <p>Sur kyara.games, ouvre le menu <b>Plus</b> : tu dois y voir <b>設 Kyara Games</b> (les réglages) et <b>学 Tutoriel</b>. Sur la page <b>Collection</b>, les cartes que tu n'as pas s'affichent en gris au lieu d'un « ? ».</p>
+          </div>
+
+          <div class="update">
+            <h3>⬆ Mettre à jour</h3>
+            <p>Tu n'as presque rien à faire.</p>
+            <ol class="sub">
+              <li>Quand une nouvelle version sort, un bandeau <b>« Kyara Games … est disponible »</b> apparaît sur kyara.games.</li>
+              <li>Clique sur <b>Mettre à jour</b> dans ce bandeau.</li>
+              <li>Une page Tampermonkey s'ouvre : clique sur <b>Mettre à jour</b>.</li>
+              <li>Reviens sur kyara.games et recharge la page (touche <b>F5</b>). Une fenêtre te montre les nouveautés : c'est fini.</li>
+            </ol>
+            <p class="small">Le « ✕ » du bandeau le cache pendant 12 heures. Sans rien faire, Tampermonkey installe aussi la nouvelle version tout seul, environ une fois par jour.</p>
+          </div>
+
+          <details class="help">
+            <summary>Un problème ?</summary>
+            <p><b>Rien ne change sur kyara.games.</b> Recharge la page (<b>F5</b>). Vérifie l'étape 2. Puis clique sur l'icône Tampermonkey en haut à droite du navigateur (elle peut être cachée derrière la pièce de puzzle 🧩) : « Kyara Games » doit être activé.</p>
+            <p><b>Je ne vois pas le bandeau de mise à jour.</b> Il apparaît au plus tard 15 minutes après la sortie d'une version, quand kyara.games est ouvert. Pour mettre à jour tout de suite, reclique sur le bouton rouge « Installer Kyara Games » de cette page : Tampermonkey te propose la nouvelle version.</p>
+            <p><b>Je veux aussi les notifications</b> (boosters gratuits pleins, échanges, ventes…) et la fenêtre de l'extension. Elles viennent avec l'<a href="https://github.com/A-Finch13/Kyara-Games-Extension#installer-lextension-compl%C3%A8te-sur-pc">extension complète</a>, plus longue à installer.</p>
+            <p class="small">Pour que Tampermonkey cherche les mises à jour plus souvent : son tableau de bord → <b>Paramètres</b> (mode <b>Avancé</b>) → <b>Mises à jour des scripts</b> → la fréquence la plus courte.</p>
+          </details>
         </section>
 
         <section data-panel="android" hidden>
-          <h2>Android</h2>
+          <h2>Installer sur Android</h2>
+          <p class="intro">Ça prend 3 minutes et ça se fait une seule fois. Fais les étapes dans l'ordre.</p>
           <ol class="steps">
             <li class="step">
               <div>
                 <h3>Installe Firefox</h3>
-                <p>Sur Android, Firefox accepte les extensions (Chrome, Brave et Samsung Internet non).</p>
+                <p>Kyara Games ne marche pas dans Chrome, Brave ni Samsung Internet sur Android. Il lui faut <b>Firefox</b> (gratuit).</p>
                 <div class="buttons"><a class="btn" href="https://play.google.com/store/apps/details?id=org.mozilla.firefox">Firefox sur le Play Store</a></div>
               </div>
             </li>
             <li class="step">
               <div>
-                <h3>Ajoute Tampermonkey dans Firefox</h3>
-                <p>Ouvre ce lien dans Firefox et touche <b>Ajouter à Firefox</b>, puis <b>Ajouter</b>.</p>
-                <div class="buttons"><a class="btn" href="https://addons.mozilla.org/android/addon/tampermonkey/">Tampermonkey pour Firefox Android</a></div>
+                <h3>Ouvre cette page dans Firefox</h3>
+                <p class="skip" data-only="firefox" hidden>Tu es déjà dans Firefox : passe à l'étape 3.</p>
+                <p>Toutes les étapes suivantes se font <b>dans Firefox</b>.</p>
+                <ol class="sub">
+                  <li>Touche ce bouton pour copier l'adresse de cette page : <button type="button" class="copy" data-copy="page">Copier l'adresse</button></li>
+                  <li>Ouvre Firefox, touche la barre d'adresse en haut, colle l'adresse et valide.</li>
+                </ol>
+              </div>
+            </li>
+            <li class="step">
+              <div>
+                <h3>Ajoute Tampermonkey à Firefox</h3>
+                <p>Tampermonkey est une extension gratuite. C'est elle qui fait marcher Kyara Games.</p>
+                <ol class="sub">
+                  <li>Touche le bouton ci-dessous.</li>
+                  <li>Touche <b>Ajouter à Firefox</b>, puis <b>Ajouter</b>.</li>
+                </ol>
+                <div class="buttons"><a class="btn" href="https://addons.mozilla.org/android/addon/tampermonkey/">Tampermonkey pour Firefox</a></div>
               </div>
             </li>
             <li class="step main">
               <div>
                 <h3>Installe Kyara Games</h3>
-                <p>Dans Firefox, touche le bouton : Tampermonkey affiche le script, touche <b>Installer</b>.</p>
+                <ol class="sub">
+                  <li>Touche le gros bouton rouge ci-dessous.</li>
+                  <li>Une page Tampermonkey s'ouvre avec écrit « Kyara Games » : touche <b>Installer</b>.</li>
+                </ol>
                 <div class="buttons"><a class="btn big" href="https://github.com/A-Finch13/Kyara-Games-Extension/releases/latest/download/kyara-games.user.js">Installer Kyara Games</a></div>
+                <p class="small">Tu vois une page pleine de texte et de code ? Tu n'es pas dans Firefox, ou Tampermonkey n'est pas installé : refais les étapes 2 et 3.</p>
               </div>
             </li>
             <li class="step">
               <div>
                 <h3>Ouvre kyara.games et connecte-toi</h3>
-                <p>Une seule fois. Les réglages : menu du site (☰) → <b>設 Kyara Games</b>.</p>
+                <p>Dans Firefox, connecte-toi comme d'habitude. Une visite guidée te montre ce que Kyara Games ajoute.</p>
                 <div class="buttons"><a class="btn" href="https://kyara.games/collection">Aller sur kyara.games</a></div>
               </div>
             </li>
+            <li class="step">
+              <div>
+                <h3>Les notifications (facultatif)</h3>
+                <p>Pour être prévenu même site fermé (boosters pleins, échanges, ventes…) : menu du site <b>☰</b> → <b>設 Kyara Games</b> → <b>Activer les notifications de Kyara</b>, puis accepte quand le téléphone te le demande.</p>
+              </div>
+            </li>
           </ol>
-          <p class="note">Les mises à jour arrivent toutes seules par Tampermonkey. En plus, le script vérifie toutes les 15 minutes quand kyara.games est ouvert et affiche un bouton <b>Mettre à jour</b> dès qu'une nouvelle version sort. Pour que Tampermonkey vérifie plus souvent de lui-même : son tableau de bord → <b>Paramètres</b> (mode <b>Avancé</b>) → <b>Mises à jour des scripts</b> → la fréquence la plus courte. <b>Notifications</b> : menu du site → <b>設 Kyara Games</b> → <b>Activer les notifications de Kyara</b> (celles du site, même site fermé).</p>
+
+          <div class="check">
+            <h3>✔ Comment savoir que ça marche ?</h3>
+            <p>Sur kyara.games, ouvre le menu du site <b>☰</b> : tu dois y voir <b>設 Kyara Games</b> (les réglages). Sur la page <b>Collection</b>, les cartes que tu n'as pas s'affichent en gris au lieu d'un « ? ».</p>
+          </div>
+
+          <div class="update">
+            <h3>⬆ Mettre à jour</h3>
+            <p>Tu n'as presque rien à faire.</p>
+            <ol class="sub">
+              <li>Quand une nouvelle version sort, un bandeau <b>« Kyara Games … est disponible »</b> apparaît sur kyara.games.</li>
+              <li>Touche <b>Mettre à jour</b> dans ce bandeau.</li>
+              <li>Une page Tampermonkey s'ouvre : touche <b>Mettre à jour</b>.</li>
+              <li>Reviens sur kyara.games et recharge la page (menu <b>⋮</b> → flèche <b>⟳</b>). Une fenêtre te montre les nouveautés : c'est fini.</li>
+            </ol>
+            <p class="small">Le « ✕ » du bandeau le cache pendant 12 heures. Sans rien faire, Tampermonkey installe aussi la nouvelle version tout seul, environ une fois par jour.</p>
+          </div>
+
+          <details class="help">
+            <summary>Un problème ?</summary>
+            <p><b>Rien ne change sur kyara.games.</b> Vérifie que tu es bien dans <b>Firefox</b>, puis recharge la page (menu <b>⋮</b> → <b>⟳</b>).</p>
+            <p><b>Je ne vois pas le bandeau de mise à jour.</b> Il apparaît au plus tard 15 minutes après la sortie d'une version, quand kyara.games est ouvert. Pour mettre à jour tout de suite, retouche le bouton rouge « Installer Kyara Games » de cette page.</p>
+          </details>
         </section>
 
         <section data-panel="ios" hidden>
-          <h2>iPhone et iPad</h2>
+          <h2>Installer sur iPhone et iPad</h2>
+          <p class="intro">Ça prend 3 minutes et ça se fait une seule fois. Fais les étapes dans l'ordre. Kyara Games marche seulement dans <b>Safari</b>, pas dans Chrome.</p>
           <ol class="steps">
             <li class="step">
               <div>
                 <h3>Installe l'app Userscripts</h3>
-                <p>Gratuite. Ouvre-la une fois après l'installation.</p>
+                <p>C'est une app gratuite. C'est elle qui fait marcher Kyara Games. Après l'avoir installée, ouvre-la une fois puis reviens ici.</p>
                 <div class="buttons"><a class="btn" href="https://apps.apple.com/app/userscripts/id1463298887">Userscripts sur l'App Store</a></div>
               </div>
             </li>
             <li class="step">
               <div>
-                <h3>Active-la dans Safari</h3>
-                <p><b>Réglages</b> → <b>Apps</b> → <b>Safari</b> → <b>Extensions</b> → <b>Userscripts</b> : active <b>Autoriser l'extension</b>, puis autorise <b>kyara.games</b> (ou tous les sites).</p>
+                <h3>Active Userscripts dans Safari</h3>
+                <ol class="sub">
+                  <li>Ouvre l'app <b>Réglages</b> du téléphone.</li>
+                  <li>Touche <b>Apps</b> → <b>Safari</b> → <b>Extensions</b> → <b>Userscripts</b>.</li>
+                  <li>Active <b>Autoriser l'extension</b>.</li>
+                  <li>Juste en dessous, dans <b>Autorisations</b>, touche <b>kyara.games</b> (ou « Autres sites web ») et choisis <b>Autoriser</b>.</li>
+                </ol>
+                <p class="small">Pas de menu « Apps » ? Sur les iPhone plus anciens : <b>Réglages</b> → <b>Safari</b> → <b>Extensions</b>.</p>
               </div>
             </li>
             <li class="step main">
               <div>
                 <h3>Installe Kyara Games</h3>
-                <p>Ouvre ce bouton dans <b>Safari</b>, touche l'icône des extensions dans la barre d'adresse (<b>ᴀA</b> ou la pièce de puzzle) → <b>Userscripts</b>, puis <b>Installer</b>.</p>
+                <ol class="sub">
+                  <li>Dans <b>Safari</b>, touche le gros bouton rouge ci-dessous.</li>
+                  <li>Une page pleine de texte s'ouvre : <b>c'est normal</b>.</li>
+                  <li>Touche l'icône <b>ᴀA</b> (ou la pièce de puzzle) à côté de l'adresse, en haut ou en bas de l'écran.</li>
+                  <li>Touche <b>Userscripts</b>, puis <b>Installer</b>.</li>
+                </ol>
                 <div class="buttons"><a class="btn big" href="https://github.com/A-Finch13/Kyara-Games-Extension/releases/latest/download/kyara-games.user.js">Installer Kyara Games</a></div>
               </div>
             </li>
             <li class="step">
               <div>
                 <h3>Ouvre kyara.games dans Safari et connecte-toi</h3>
-                <p>Une seule fois. Les réglages : menu du site (☰) → <b>設 Kyara Games</b>.</p>
+                <p>Connecte-toi comme d'habitude. Une visite guidée te montre ce que Kyara Games ajoute.</p>
                 <div class="buttons"><a class="btn" href="https://kyara.games/collection">Aller sur kyara.games</a></div>
               </div>
             </li>
             <li class="step">
               <div>
                 <h3>Une icône sur l'écran d'accueil (facultatif)</h3>
-                <p>Le site ajouté en « app web » s'ouvre hors de Safari, et iOS n'y charge aucune extension : Kyara Games n'y apparaît pas. Pour garder une icône qui marche avec Kyara Games :</p>
-                <p>Dans Safari, sur kyara.games : <b>Partager</b> → <b>Sur l'écran d'accueil</b>, <b>désactive « Ouvrir en tant qu'app web »</b>, puis <b>Ajouter</b>. L'icône ouvrira kyara.games dans Safari.</p>
-                <p class="small">Si l'option n'apparaît pas (iOS plus ancien) : ajoute plutôt kyara.games aux Favoris de Safari (Partager → Ajouter aux favoris). Une icône déjà ajoutée en app web peut être supprimée et ajoutée à nouveau.</p>
+                <p>Attention : une icône ajoutée en « app web » ouvre le site sans Kyara Games. Pour une icône qui marche :</p>
+                <ol class="sub">
+                  <li>Dans Safari, sur kyara.games, touche <b>Partager</b> (le carré avec une flèche).</li>
+                  <li>Touche <b>Sur l'écran d'accueil</b>.</li>
+                  <li><b>Désactive « Ouvrir en tant qu'app web »</b>, puis touche <b>Ajouter</b>.</li>
+                </ol>
+                <p class="small">Cette option n'existe pas sur ton iPhone ? Ajoute plutôt kyara.games aux Favoris de Safari (Partager → Ajouter aux favoris). Une ancienne icône « app web » peut être supprimée puis ajoutée à nouveau.</p>
               </div>
             </li>
           </ol>
-          <p class="note">Userscripts vérifie les mises à jour du script. Pour forcer la dernière version, rouvre le bouton « Installer Kyara Games » et réinstalle.</p>
+
+          <div class="check">
+            <h3>✔ Comment savoir que ça marche ?</h3>
+            <p>Sur kyara.games, ouvre le menu du site <b>☰</b> : tu dois y voir <b>設 Kyara Games</b> (les réglages). Sur la page <b>Collection</b>, les cartes que tu n'as pas s'affichent en gris au lieu d'un « ? ».</p>
+          </div>
+
+          <div class="update">
+            <h3>⬆ Mettre à jour</h3>
+            <ol class="sub">
+              <li>Quand une nouvelle version sort, un bandeau <b>« Kyara Games … est disponible »</b> apparaît sur kyara.games.</li>
+              <li>Touche <b>Mettre à jour</b> : la page pleine de texte s'ouvre, c'est normal.</li>
+              <li>Touche <b>ᴀA</b> (ou la pièce de puzzle) → <b>Userscripts</b> → <b>Installer</b>.</li>
+              <li>Reviens sur kyara.games et recharge la page (flèche <b>⟳</b> à côté de l'adresse). Une fenêtre te montre les nouveautés : c'est fini.</li>
+            </ol>
+            <p class="small">Pas de bandeau ? Il apparaît au plus tard 15 minutes après la sortie d'une version, quand kyara.games est ouvert. Tu peux aussi retoucher le bouton rouge « Installer Kyara Games » de cette page à tout moment.</p>
+          </div>
+
+          <details class="help">
+            <summary>Un problème ?</summary>
+            <p><b>Rien ne change sur kyara.games.</b> Vérifie que tu es dans <b>Safari</b> (pas Chrome, pas une icône « app web »), puis refais l'étape 2 : Userscripts doit être autorisé pour kyara.games.</p>
+            <p><b>Je ne trouve pas « Userscripts » en touchant ᴀA.</b> L'extension n'est pas activée : refais l'étape 2.</p>
+          </details>
         </section>
 
         <h2>Ce que ça ajoute</h2>
@@ -438,6 +664,27 @@
       show(/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'ios' : /Android/.test(ua) ? 'android' : 'pc');
       const browser = /Edg\//.test(ua) ? 'edge' : /Firefox\//.test(ua) ? 'firefox' : /Chrome\//.test(ua) ? 'chrome' : null;
       if (browser) document.querySelector(`[data-browser="${browser}"]`)?.classList.add('mine');
+      // Step 2: the extensions page of this browser; the "nothing to do here" lines only on Firefox.
+      if (browser === 'edge') document.querySelectorAll('.ext-url').forEach((c) => (c.textContent = 'edge://extensions'));
+      document.querySelectorAll('[data-only]').forEach((el) => (el.hidden = el.dataset.only !== browser));
+      // "Copier" buttons: the address next to them, or the address of this page.
+      document.querySelectorAll('.copy').forEach((btn) =>
+        btn.addEventListener('click', async () => {
+          const text = btn.dataset.copy === 'page' ? location.href : btn.parentElement.querySelector(btn.dataset.copy)?.textContent ?? '';
+          const label = btn.textContent;
+          try {
+            await navigator.clipboard.writeText(text);
+            btn.textContent = 'Copié ✔';
+          } catch {
+            btn.textContent = 'Copie-la à la main';
+          }
+          btn.classList.add('done');
+          setTimeout(() => {
+            btn.textContent = label;
+            btn.classList.remove('done');
+          }, 2500);
+        })
+      );
     </script>
   </body>
 </html>

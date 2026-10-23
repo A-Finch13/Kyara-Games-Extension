@@ -45,7 +45,7 @@ const KYX_TOUR = [
   {
     id: 'favoris',
     title: 'Tes œuvres favorites',
-    text: 'Touche l’étoile ☆ d’un album pour mettre l’œuvre en favori. Ses offres apparaîtront dans le filtre « ★ Favoris » du marché.',
+    text: 'Touche l’étoile ☆ d’un album pour mettre l’œuvre en favori. Le filtre « ★ Favoris » montre alors ses cartes, ici dans la vue Cartes, ses offres au marché et ses offres d’échange.',
     page: '/collection',
     prepare: 'albums',
     target: 'ul.albums > li:has(.kyx-fav)'
@@ -68,7 +68,7 @@ const KYX_TOUR = [
   {
     id: 'echanges',
     title: 'Échanger sans te tromper',
-    text: 'Pendant un échange : badges ×N (doublon) et « Unique » (ton dernier exemplaire) sur tes cartes, filtres « Ses doublons » et « ★ Favoris » (les cartes de tes œuvres favorites), et à la confirmation la série, le prix de chaque carte et l’écart de valeur entre les deux côtés.'
+    text: 'Pendant un échange : badges ×N (doublon) et « Unique » (ton dernier exemplaire) sur tes cartes, « Possédée » ou « Manquante » sur les cartes qu’on te propose, filtres « Ses doublons » et « ★ Favoris » (les cartes de tes œuvres favorites), et à la confirmation la série, le prix de chaque carte et l’écart de valeur entre les deux côtés.'
   },
   {
     id: 'boosters',
@@ -124,6 +124,15 @@ const KYX_TOUR = [
 
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
+  {
+    version: '1.7.3',
+    items: [
+      ['Échanges en attente : les cartes que tu reçois indiquent si tu les as déjà (« Possédée », « Possédée ×N ») ou non (« Manquante »).', 'echanges'],
+      ['Collection, vue Cartes : filtre « ★ Favoris » pour ne voir que les cartes de tes œuvres favorites.', 'favoris'],
+      'Marché, onglet Échanges : filtre « ★ Favoris » pour ne voir que les offres qui donnent une carte de tes œuvres favorites.',
+      'Installation et mises à jour expliquées pas à pas, plus simplement, sur la page d’installation et dans les messages de mise à jour.'
+    ]
+  },
   {
     version: '1.7.2',
     items: [['Visite guidée : la bulle d’explication ne cache plus jamais l’élément entouré, sur téléphone comme sur PC (elle se place dessous, dessus ou à côté).', 'manquantes']]

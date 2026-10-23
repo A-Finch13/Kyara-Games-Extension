@@ -41,6 +41,11 @@
   color: #1a1400;
 }
 
+.kyx-badge[data-kind="owned"] {
+  background: #6b6577;
+  color: #fff;
+}
+
 /* Trade confirmation: the card block starts with its "Tu donnes" / "Tu reçois" label, keep the badge on the picture */
 .cf-s > .kyx-badge {
   top: 24px;
@@ -1022,6 +1027,35 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
 .kyx-fav.inline[aria-pressed="true"] {
   border-color: #f5c518;
+}
+
+/* "★ Favoris" chips of the Collection cards and of the market's trade offers: gold star, no dot; filled gold when on */
+.chips > .kyx-chip.kyx-favcoll,
+.filters > .kyx-chip.kyx-favboard {
+  border-color: rgba(245, 197, 24, 0.45);
+}
+
+.kyx-favcoll .kyx-star,
+.kyx-favboard .kyx-star {
+  color: #f5c518;
+}
+
+.chips > .kyx-chip.kyx-favcoll.on,
+.filters > .kyx-chip.kyx-favboard.on {
+  border-color: #f5c518;
+  background: #f5c518;
+  color: #1a1400;
+}
+
+.kyx-favcoll.on .kyx-star,
+.kyx-favboard.on .kyx-star {
+  color: #1a1400;
+}
+
+.chips > .kyx-chip.kyx-favcoll:disabled,
+.filters > .kyx-chip.kyx-favboard:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* Market: offers of the favourite series */

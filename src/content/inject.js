@@ -1,4 +1,5 @@
-// Runs in the page: forwards to content.js the Kyara API answers the extension needs, without changing any request.
+// Runs in the page: forwards to content.js the Kyara API answers the extension needs.
+// The only request it changes is the search of the market's trade offers while "★ Favoris" is on.
 (() => {
   if (window.__kyaraGamesHook) return;
   window.__kyaraGamesHook = true;
@@ -16,8 +17,56 @@
   const WRITE = /^\/(packs\/[^/]+\/open(-many)?|trades(\/.*)?|market\/.*|me\/collection\/.*|me\/progress\/claim|me\/alt\/settle)$/;
 
   const original = window.fetch;
+
+  // ---------- "★ Favoris" of the market's trade offers ----------
+
+  const OFFERS = '/api/trades/offers/search';
+  const MAX_IDS = 400; // the server refuses more ids in one search
+  // JSON answer made by the extension.
+  const answer = (body) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+
+  // The site's offer search narrowed to the favourite cards (data-kyx-board-ids, set by content.js), 50 offers a page.
+  async function favOffers(url, input, init) {
+    const fav = document.documentElement.dataset.kyxBoardIds;
+    if (!fav || url.origin !== location.origin || url.pathname !== OFFERS || url.searchParams.get('pageSize') !== '20') return null;
+    let ids = fav.split(',');
+    const typed = url.searchParams.get('ids');
+    if (typed) {
+      const keep = new Set(typed.split(','));
+      ids = ids.filter((id) => keep.has(id));
+    }
+    if (!ids.length) return answer({ items: [], total: 0, more: false });
+    const parts = [];
+    for (let i = 0; i < ids.length; i += MAX_IDS) parts.push(ids.slice(i, i + MAX_IDS));
+    const pages = await Promise.all(
+      parts.map(async (part) => {
+        const u = new URL(url);
+        u.searchParams.set('ids', part.join(','));
+        u.searchParams.set('pageSize', '50');
+        const res = await original.call(window, new Request(u.toString(), input instanceof Request ? input : init ?? {}));
+        if (!res.ok) throw new Error(String(res.status));
+        return res.json();
+      })
+    );
+    if (pages.length === 1) return answer(pages[0]);
+    // Several searches: one page of each, newest first, without the offers found twice.
+    const seen = new Set();
+    const items = pages
+      .flatMap((p) => p.items ?? [])
+      .filter((o) => !seen.has(o.id) && seen.add(o.id))
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    return answer({ items, total: pages.reduce((n, p) => n + (p.total ?? 0), 0), more: pages.some((p) => p.more) });
+  }
+
   window.fetch = async function (input, init) {
-    const res = await original.apply(this, arguments);
+    let res = null;
+    try {
+      const target = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url, location.href);
+      res = await favOffers(target, input, init);
+    } catch {
+      res = null;
+    }
+    if (!res) res = await original.apply(this, arguments);
     try {
       const url = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url, location.href);
       if (url.origin !== location.origin || !url.pathname.startsWith('/api/') || !res.ok) return res;

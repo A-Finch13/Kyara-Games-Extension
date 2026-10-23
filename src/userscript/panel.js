@@ -5,7 +5,7 @@
     ['hideComplete', 'Masquer les séries complètes'],
     ['hideSmall', 'Masquer les séries de moins de 5 persos'],
     ['badgeMissing', 'Badge « Manquante » sur les cartes (hors marché, sauf pendant un échange)'],
-    ['badgeDupes', 'Badge « ×N » sur mes doublons et « Unique » sur mes cartes en un seul exemplaire'],
+    ['badgeDupes', 'Badge « ×N » sur mes doublons, « Unique » sur mes cartes en un seul exemplaire et « Possédée » sur les cartes proposées que j’ai déjà'],
     ['theirDupes', 'Filtre « Ses doublons » activé d’office dans les propositions d’échange'],
     ['lockLastListed', 'Verrouiller le dernier exemplaire d’une carte dont un doublon est en vente'],
     ['cardToWiki', 'Page Collection : un clic sur une carte que j’ai ouvre sa fiche'],
@@ -152,7 +152,7 @@
     bar.querySelector('.kyx-update-go').href = `https://github.com/${REPO}/releases/latest/download/kyara-games.user.js`;
     bar.querySelector('.kyx-update-notes').href = `https://github.com/${REPO}/releases/latest`;
     bar.querySelector('.kyx-update-go').addEventListener('click', () => {
-      bar.querySelector('span').textContent = 'Confirme la mise à jour dans Tampermonkey, puis recharge cette page.';
+      bar.querySelector('span').textContent = 'Dernière étape : dans la page qui vient de s’ouvrir, clique sur « Mettre à jour » (ou « Installer »), puis reviens ici et recharge la page.';
       bar.querySelector('.kyx-update-go').remove();
     });
     // Later: asked again in 12 hours.

@@ -76,6 +76,8 @@
     if ('smartLock' in changes) smartLock = new Set(changes.smartLock.newValue ?? []);
     if ('marketFav' in changes) marketFav = !!changes.marketFav.newValue;
     if ('tradeFav' in changes) tradeFav = !!changes.tradeFav.newValue;
+    if ('collectionFav' in changes) collectionFav = !!changes.collectionFav.newValue;
+    if ('boardFav' in changes) boardFav = !!changes.boardFav.newValue;
     if ('favSeries' in changes || 'marketFav' in changes) {
       if ('favSeries' in changes) favSeries = new Set(changes.favSeries.newValue ?? []);
       marketShown = '';
@@ -83,6 +85,8 @@
       scanMarket();
     }
     if ('favSeries' in changes || 'tradeFav' in changes) scanComposer();
+    if ('favSeries' in changes || 'collectionFav' in changes) scanCollectionChips();
+    if ('favSeries' in changes || 'boardFav' in changes) scanTradeBoard();
     for (const k of ['settings', 'collection', 'catalog', 'partner']) if (k in changes) picked[k] = changes[k].newValue;
     if (!Object.keys(picked).length) return;
     applyStorage(picked);
@@ -165,22 +169,26 @@
     return false;
   }
 
-  // True for a card on the "Tu donnes" side of a pending trade in "Mes échanges".
-  function givenInPendingTrade(img) {
+  // Side of a card in a pending trade of "Mes échanges": 'give', 'get' or null.
+  function pendingTradeSide(img) {
     const item = img.closest('li.trade');
-    if (!item?.querySelector('.st-pending')) return false;
+    if (!item?.querySelector('.st-pending')) return null;
     for (let el = img.parentElement; el && el !== item; el = el.parentElement) {
       const text = el.textContent;
       const give = text.includes('Tu donnes');
       const get = text.includes('Tu reçois');
-      if (give || get) return give && !get;
+      if (give && get) return null;
+      if (give) return 'give';
+      if (get) return 'get';
     }
-    return false;
+    return null;
   }
 
-  // Badges a card gets where it is shown: missing, duplicate (×N), single copy (Unique).
+  // Badges a card gets where it is shown: missing, duplicate (×N), single copy (Unique), owned (received side).
   function badgeScope(img) {
-    if (givenInPendingTrade(img)) return { missing: false, dupes: settings.badgeDupes, single: settings.badgeDupes };
+    const side = pendingTradeSide(img);
+    if (side === 'give') return { missing: false, dupes: settings.badgeDupes, single: settings.badgeDupes };
+    if (side === 'get') return { missing: settings.badgeMissing, owned: settings.badgeDupes };
     const trade = inComposer(img);
     const path = location.pathname;
     if (path.startsWith('/marche') && !trade) return { missing: false, dupes: false, single: false };
@@ -205,6 +213,9 @@
       if (q === 0 && scope.missing) {
         kind = 'missing';
         text = 'Manquante';
+      } else if (q > 0 && scope.owned) {
+        kind = 'owned';
+        text = q > 1 ? `Possédée ×${q}` : 'Possédée';
       } else if (q > 1 && scope.dupes) {
         kind = 'dupe';
         text = `×${q}`;
@@ -577,6 +588,8 @@
   let favSeries = new Set();
   let marketFav = false;
   let tradeFav = false; // "★ Favoris" of the trade composer
+  let collectionFav = false; // "★ Favoris" of the Collection cards
+  let boardFav = false; // "★ Favoris" of the market's trade offers
   let marketShown = '';
 
   // Adds or removes a favourite series.
@@ -612,7 +625,7 @@
     const text = inline ? (on ? '★ Favori' : '☆ Mettre en favori') : on ? '★' : '☆';
     if (star.textContent !== text) star.textContent = text;
     star.setAttribute('aria-pressed', String(on));
-    const title = on ? `Retirer ${name} des favoris` : `Mettre ${name} en favori (filtre « Favoris » du Marché)`;
+    const title = on ? `Retirer ${name} des favoris` : `Mettre ${name} en favori (filtres « Favoris » de la Collection et du Marché)`;
     if (star.title !== title) {
       star.title = title;
       star.setAttribute('aria-label', title);
@@ -2390,11 +2403,158 @@
         btn.classList.toggle('on', on);
         btn.setAttribute('aria-pressed', String(on));
       }
+      favChip(chips, first, after);
       if (!select.dataset.kyxWatched) {
         select.dataset.kyxWatched = '1';
-        select.addEventListener('change', () => scanCollectionChips());
+        select.addEventListener('change', () => {
+          collectionMore = 0;
+          scanCollectionChips();
+        });
       }
     }
+    scanCollectionFav();
+  }
+
+  // "★ Favoris" chip after "Manquantes": only the cards of the favourite series; remembered.
+  function favChip(chips, first, after) {
+    let btn = chips.querySelector(':scope > .kyx-favcoll');
+    if (!btn) {
+      btn = first.cloneNode(true);
+      btn.classList.remove('on');
+      btn.classList.add('kyx-chip', 'kyx-favcoll');
+      btn.innerHTML = '<span class="kyx-star" aria-hidden="true">★</span> Favoris';
+      btn.addEventListener('click', () => {
+        if (!alive()) return shutdown();
+        if (!favSeries.size) return;
+        collectionMore = 0;
+        collectionFav = !collectionFav;
+        scanCollectionChips();
+        chrome.storage.local.set({ collectionFav });
+      });
+      after.after(btn);
+    }
+    const on = collectionFav && favSeries.size > 0;
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.disabled = !favSeries.size;
+    const n = favSeries.size;
+    const title = n
+      ? `Seulement les cartes de tes ${n} œuvre${n > 1 ? 's' : ''} favorite${n > 1 ? 's' : ''}`
+      : 'Aucune œuvre en favori : mets-en avec l’étoile ☆ des albums';
+    if (btn.title !== title) btn.title = title;
+  }
+
+  let collectionMore = 0;
+  // Hides the Collection cards outside the favourite series, and loads more until a full page shows.
+  function scanCollectionFav() {
+    if (location.pathname !== '/collection') return;
+    const on = collectionFav && favSeries.size > 0;
+    const grids = new Set();
+    for (const slot of document.querySelectorAll('a.slot')) {
+      const cell = slot.parentElement;
+      if (!cell) continue;
+      if (cell.parentElement) grids.add(cell.parentElement);
+      const id = Number(slot.getAttribute('href')?.match(/\/wiki\/(\d+)/)?.[1]);
+      const series = id ? catalog?.get(id)?.s : null;
+      const hide = on && !!series && !favSeries.has(series);
+      if (hide) {
+        if (cell.dataset.kyxHidden !== '1') cell.dataset.kyxHidden = '1';
+      } else if (cell.dataset.kyxHidden) delete cell.dataset.kyxHidden;
+    }
+    for (const grid of grids) {
+      const visible = [...grid.children].filter((c) => c.querySelector(':scope > a.slot') && c.dataset.kyxHidden !== '1').length;
+      const near = [grid.nextElementSibling, ...(grid.nextElementSibling?.querySelectorAll('button') ?? []), ...(grid.parentElement?.querySelectorAll(':scope > button') ?? [])];
+      const more = near.find((b) => b?.matches?.('button') && /afficher plus|voir plus/i.test(b.textContent));
+      if (on && visible < PAGE && more && collectionMore < 40) {
+        collectionMore++;
+        more.click();
+      } else if (!more || visible >= PAGE) {
+        collectionMore = 0;
+      }
+    }
+  }
+
+  // ---------- "★ Favoris" filter of the market's trade offers ----------
+
+  const BOARD_PAGE = 20;
+  let boardMore = 0;
+  // "★ Favoris" pill of the "Échanges" tab: only the offers giving a card of a favourite series; remembered.
+  function scanTradeBoard() {
+    const board = location.pathname.startsWith('/marche') ? document.querySelector('section.board') : null;
+    const filters = board?.querySelector(':scope > .filters');
+    const pills = [...(filters?.querySelectorAll(':scope > button.pill:not(.kyx-chip)') ?? [])];
+    if (!pills.some((b) => /peux accepter/i.test(b.textContent))) {
+      boardMore = 0;
+      return void boardIds('');
+    }
+    let btn = filters.querySelector(':scope > .kyx-favboard');
+    if (!btn) {
+      btn = pills[0].cloneNode(false);
+      btn.classList.remove('on');
+      btn.classList.add('kyx-chip', 'kyx-favboard');
+      btn.innerHTML = '<span class="kyx-star" aria-hidden="true">★</span> Favoris';
+      btn.addEventListener('click', () => {
+        if (!alive()) return shutdown();
+        if (!favSeries.size) return;
+        boardMore = 0;
+        boardFav = !boardFav;
+        scanTradeBoard();
+        chrome.storage.local.set({ boardFav });
+      });
+      // Before "Mes offres", the last pill.
+      const mine = pills.find((b) => /mes offres/i.test(b.textContent));
+      filters.insertBefore(btn, mine ?? null);
+    }
+    const on = boardFav && favSeries.size > 0 && !!catalog;
+    // The page's offer search asks the server for the favourite cards only (inject.js); the list is asked again when that changes.
+    if (boardIds(on ? favIds() : '')) {
+      boardMore = 0;
+      const pill = pills.find((b) => /cherche/i.test(b.textContent)) ?? pills[0];
+      pill.click();
+      pill.click();
+    }
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.disabled = !favSeries.size;
+    const n = favSeries.size;
+    const title = n
+      ? `Seulement les offres qui donnent une carte de tes ${n} œuvre${n > 1 ? 's' : ''} favorite${n > 1 ? 's' : ''}`
+      : 'Aucune œuvre en favori : mets-en avec l’étoile ☆ des albums, page Collection';
+    if (btn.title !== title) btn.title = title;
+
+    const list = board.querySelector('ul.offers');
+    if (!list) return;
+    let visible = 0;
+    for (const li of list.children) {
+      const m = CARD_SRC.exec(li.querySelector('.give img')?.getAttribute('src') || '');
+      const series = m ? catalog?.get(Number(m[1]))?.s : null;
+      if (on && !!series && !favSeries.has(series)) {
+        if (li.dataset.kyxHidden !== '1') li.dataset.kyxHidden = '1';
+      } else {
+        visible++;
+        if (li.dataset.kyxHidden) delete li.dataset.kyxHidden;
+      }
+    }
+    // Loads the site's next offers until a full page of matching ones shows.
+    const more = board.querySelector('button.more');
+    if (on && visible < BOARD_PAGE && more && boardMore < 40) {
+      boardMore++;
+      more.click();
+    } else if (!more || visible >= BOARD_PAGE) {
+      boardMore = 0;
+    }
+  }
+
+  // Ids of the cards of the favourite series, comma separated.
+  const favIds = () => [...(catalog?.values() ?? [])].filter((c) => favSeries.has(c.s)).map((c) => c.id).join(',');
+
+  // Hands the favourite cards to inject.js; true when they changed.
+  function boardIds(ids) {
+    const root = document.documentElement;
+    if ((root.dataset.kyxBoardIds ?? '') === ids) return false;
+    if (ids) root.dataset.kyxBoardIds = ids;
+    else delete root.dataset.kyxBoardIds;
+    return true;
   }
 
   // ---------- "Ses doublons" filter in the trade composer ----------
@@ -2528,6 +2688,7 @@
     scanAlbums();
     scanComposer();
     scanCollectionChips();
+    scanTradeBoard();
     scanMissing();
     scanAlbumBar();
     scanMissions();
@@ -2548,6 +2709,7 @@
     scanAlbums();
     scanComposer();
     scanCollectionChips();
+    scanTradeBoard();
     scanMissing();
     scanAlbumBar();
     scanMissions();
@@ -2571,6 +2733,7 @@
     observer.disconnect();
     document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-favtrade, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket, .kyx-fav-pick, .kyx-rec, .kyx-tuto-back, .kyx-tuto-entry, .kyx-spot, .kyx-bubble').forEach((el) => el.remove());
     delete document.documentElement.dataset.kyxView;
+    delete document.documentElement.dataset.kyxBoardIds;
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched], [data-kyx-ghost]').forEach((el) => {
       delete el.dataset.kyxHidden;
       delete el.dataset.kyxPos;
@@ -2593,12 +2756,14 @@
   }, 1000);
 
   (async () => {
-    const stored = await chrome.storage.local.get(['settings', 'collection', 'catalog', 'partner', 'smartLock', 'favSeries', 'marketFav', 'tradeFav']);
+    const stored = await chrome.storage.local.get(['settings', 'collection', 'catalog', 'partner', 'smartLock', 'favSeries', 'marketFav', 'tradeFav', 'collectionFav', 'boardFav']);
     applyStorage(stored);
     smartLock = new Set(stored.smartLock ?? []);
     favSeries = new Set(stored.favSeries ?? []);
     marketFav = !!stored.marketFav;
     tradeFav = !!stored.tradeFav;
+    collectionFav = !!stored.collectionFav;
+    boardFav = !!stored.boardFav;
     if (partner && Date.now() - (partner.at ?? 0) > 30 * 60e3) partner = null;
     document.querySelectorAll('#kyx-root').forEach((el) => el.remove()); // left by older versions
     window.addEventListener('hashchange', onBoostersHash);
