@@ -1484,11 +1484,53 @@
     menu.appendChild(item);
   }
 
-  // The same entry in the site's phone menu (#mobile-nav).
+  // ---------- the phone "Plus" sheet of the site's bottom bar ----------
+
+  // List of links of the "Plus" sheet (bottom bar nav.mb), while it is open.
+  const plusSheet = () => [...document.querySelectorAll('[role="dialog"] > ul')].find((ul) => ul.querySelector(':scope > li > a > .k')) ?? null;
+  // Closes the sheet, as a tap on its dark backdrop does.
+  const closePlusSheet = () => plusSheet()?.closest('[role="dialog"]')?.parentElement?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  // Adds a link to the sheet, like the site's: kanji, label, action.
+  function addSheetEntry(cls, kanji, label, act) {
+    const list = plusSheet();
+    if (!list || list.querySelector(`:scope > li > .${cls}`)) return null;
+    const model = list.querySelector(':scope > li');
+    const link = model?.querySelector(':scope > a');
+    const mark = link?.querySelector(':scope > .k');
+    if (!mark) return null;
+    const li = document.createElement('li');
+    li.className = model.className;
+    const a = document.createElement('a');
+    a.className = link.className;
+    a.classList.remove('on');
+    a.classList.add(cls);
+    a.href = '#';
+    const k = mark.cloneNode(false);
+    k.textContent = kanji;
+    a.append(k, ` ${label} `);
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      closePlusSheet();
+      act();
+    });
+    li.appendChild(a);
+    list.appendChild(li);
+    return a;
+  }
+
+  // The same entry in the site's phone menus: the older #mobile-nav grid and the "Plus" sheet of the bottom bar.
   function scanMobileNav() {
+    const open = !!document.querySelector('.kyx-view');
+    const link = plusSheet()?.querySelector(':scope > li > .kyx-more') ?? addSheetEntry('kyx-more', '得', 'Boosters rentables', openBoosters);
+    link?.classList.toggle('on', open);
+    if (open) plusSheet()?.querySelectorAll(':scope > li > a.on:not(.kyx-more)').forEach((a) => a.classList.remove('on'));
+    scanMobileGrid(open);
+  }
+
+  // Entry of the #mobile-nav grid.
+  function scanMobileGrid(open) {
     const grid = document.querySelector('#mobile-nav .sheet-grid');
     if (!grid) return;
-    const open = !!document.querySelector('.kyx-view');
     grid.querySelectorAll(':scope > a.on:not(.kyx-more)').forEach((a) => open && a.classList.remove('on'));
     let tile = grid.querySelector(':scope > .kyx-more');
     if (!tile) {
@@ -2005,6 +2047,12 @@
         return () => document.querySelector('.rec-box .rec-a button:last-child')?.click();
       }
     } else if (what === 'menu') {
+      // Phone bottom bar: its "Plus" button opens the sheet.
+      const plus = [...document.querySelectorAll('nav.mb > button:not(.open)')].find((b) => b.getBoundingClientRect().width > 0);
+      if (plus) {
+        if (!plusSheet()) plus.click();
+        return () => plusSheet() && closePlusSheet();
+      }
       const burger = document.querySelector('button.burger[aria-controls="mobile-nav"]');
       const more = document.querySelector('button[aria-controls="nav-more"]');
       const toggler = burger && burger.getBoundingClientRect().width > 0 ? burger : more;
@@ -2087,7 +2135,10 @@
   // Scrolls the element (in its menu or in the page) into the free space: below the site's header, above the bubble
   // on a phone, in the middle of the screen on a computer.
   function revealTarget(target) {
-    const header = document.querySelector('header')?.getBoundingClientRect().bottom ?? 0;
+    // A sticky header hides while scrolling down and comes back on the way up: its full height is kept free.
+    const head = document.querySelector('header');
+    const header = head && /sticky|fixed/.test(getComputedStyle(head).position) ? head.offsetHeight : head?.getBoundingClientRect().bottom ?? 0;
+    revealSideways(target);
     const r = target.getBoundingClientRect();
     const top = Math.max(0, header) + 12;
     const bottom = phone() ? innerHeight - Math.min(tour.bubble.offsetHeight, innerHeight * 0.45) - 24 : innerHeight - 12;
@@ -2097,6 +2148,17 @@
     while (box && box !== document.body && !(box.scrollHeight > box.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(box).overflowY))) box = box.parentElement;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     (box && box !== document.body ? box : window).scrollBy({ top: shift, behavior: reduce ? 'auto' : 'smooth' });
+  }
+
+  // In a row that scrolls sideways (tabs, chips on a phone), brings the element to the middle of the row.
+  function revealSideways(target) {
+    const r = target.getBoundingClientRect();
+    if (r.left >= 8 && r.right <= innerWidth - 8) return;
+    let box = target.parentElement;
+    while (box && box !== document.body && !(box.scrollWidth > box.clientWidth + 4 && /auto|scroll/.test(getComputedStyle(box).overflowX))) box = box.parentElement;
+    if (!box || box === document.body) return;
+    const b = box.getBoundingClientRect();
+    box.scrollBy({ left: r.left + r.width / 2 - (b.left + b.width / 2), behavior: 'auto' });
   }
 
   function renderBubble(step, index, count, loading = false) {
@@ -2277,6 +2339,7 @@
     };
     add(document.querySelector('#nav-more'), '.dk', '.dt b', 'button[aria-controls="nav-more"][aria-expanded="true"]');
     add(document.querySelector('#mobile-nav .sheet-grid'), '.tk', '.tl', 'button.burger[aria-controls="mobile-nav"]');
+    addSheetEntry('kyx-tuto-entry', '学', 'Tutoriel', () => tour || startTour(0));
   }
 
   // ---------- series and price under each card of the trade confirmation ----------
@@ -2478,16 +2541,19 @@
 
   const BOARD_PAGE = 20;
   let boardMore = 0;
+  let boardReload = 0; // when the site was asked for the list again
+  let boardAsked = -1; // offers listed when "Voir plus d'offres" was last clicked
   // "★ Favoris" pill of the "Échanges" tab: only the offers giving a card of a favourite series; remembered.
   function scanTradeBoard() {
     const board = location.pathname.startsWith('/marche') ? document.querySelector('section.board') : null;
     const filters = board?.querySelector(':scope > .filters');
-    const pills = [...(filters?.querySelectorAll(':scope > button.pill:not(.kyx-chip)') ?? [])];
+    // The site's pills, in their own row (.pills) or right in the filters.
+    const pills = [...(filters?.querySelectorAll(':scope > button.pill:not(.kyx-chip), :scope > .pills > button.pill:not(.kyx-chip)') ?? [])];
     if (!pills.some((b) => /peux accepter/i.test(b.textContent))) {
       boardMore = 0;
       return void boardIds('');
     }
-    let btn = filters.querySelector(':scope > .kyx-favboard');
+    let btn = filters.querySelector('.kyx-favboard');
     if (!btn) {
       btn = pills[0].cloneNode(false);
       btn.classList.remove('on');
@@ -2503,12 +2569,14 @@
       });
       // Before "Mes offres", the last pill.
       const mine = pills.find((b) => /mes offres/i.test(b.textContent));
-      filters.insertBefore(btn, mine ?? null);
+      pills[0].parentElement.insertBefore(btn, mine ?? null);
     }
     const on = boardFav && favSeries.size > 0 && !!catalog;
     // The page's offer search asks the server for the favourite cards only (inject.js); the list is asked again when that changes.
     if (boardIds(on ? favIds() : '')) {
       boardMore = 0;
+      boardReload = Date.now();
+      boardAsked = -1;
       const pill = pills.find((b) => /cherche/i.test(b.textContent)) ?? pills[0];
       pill.click();
       pill.click();
@@ -2537,7 +2605,12 @@
     }
     // Loads the site's next offers until a full page of matching ones shows.
     const more = board.querySelector('button.more');
+    // Not while the new list is on its way (the site asks for it 300 ms after a filter changes).
+    if (Date.now() - boardReload < 1500) return void setTimeout(scanTradeBoard, 1600);
     if (on && visible < BOARD_PAGE && more && boardMore < 40) {
+      // One click at a time: the next one once the site added the offers it asked for.
+      if (list.children.length === boardAsked) return;
+      boardAsked = list.children.length;
       boardMore++;
       more.click();
     } else if (!more || visible >= BOARD_PAGE) {

@@ -1031,7 +1031,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 
 /* "★ Favoris" chips of the Collection cards and of the market's trade offers: gold star, no dot; filled gold when on */
 .chips > .kyx-chip.kyx-favcoll,
-.filters > .kyx-chip.kyx-favboard {
+.filters .kyx-chip.kyx-favboard {
   border-color: rgba(245, 197, 24, 0.45);
 }
 
@@ -1041,7 +1041,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 }
 
 .chips > .kyx-chip.kyx-favcoll.on,
-.filters > .kyx-chip.kyx-favboard.on {
+.filters .kyx-chip.kyx-favboard.on {
   border-color: #f5c518;
   background: #f5c518;
   color: #1a1400;
@@ -1053,7 +1053,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
 }
 
 .chips > .kyx-chip.kyx-favcoll:disabled,
-.filters > .kyx-chip.kyx-favboard:disabled {
+.filters .kyx-chip.kyx-favboard:disabled {
   opacity: 0.5;
   cursor: default;
 }

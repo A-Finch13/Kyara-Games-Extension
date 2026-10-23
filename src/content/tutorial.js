@@ -75,7 +75,7 @@ const KYX_TOUR = [
     title: 'Le booster le plus rentable',
     text: 'Dans le menu : « Boosters rentables » classe les boosters par prix ou par taux de drop, pour une rareté, un perso ou une carte qui te manque.',
     prepare: 'menu',
-    target: '#nav-more .kyx-more, #mobile-nav .kyx-more'
+    target: '#nav-more .kyx-more, #mobile-nav .kyx-more, [role="dialog"] > ul .kyx-more'
   },
   {
     id: 'amis',
@@ -103,7 +103,7 @@ const KYX_TOUR = [
     title: 'Réglages et autre appareil',
     text: 'Ici : active ou coupe chaque fonction, et « Autre appareil » te donne un code court pour retrouver tes réglages et tes favoris sur un autre appareil.',
     prepare: 'menu',
-    target: '#nav-more .kyx-settings-entry, #mobile-nav .kyx-settings-entry'
+    target: '#nav-more .kyx-settings-entry, #mobile-nav .kyx-settings-entry, [role="dialog"] > ul .kyx-settings-entry'
   },
   {
     id: 'notifications',
@@ -111,19 +111,27 @@ const KYX_TOUR = [
     title: 'Les notifications sur ton téléphone',
     text: 'Dans ces réglages, « Activer les notifications de Kyara » te fait recevoir les notifications du site (boosters pleins, marché, échanges, amis), même site fermé.',
     prepare: 'menu',
-    target: '#nav-more .kyx-settings-entry, #mobile-nav .kyx-settings-entry'
+    target: '#nav-more .kyx-settings-entry, #mobile-nav .kyx-settings-entry, [role="dialog"] > ul .kyx-settings-entry'
   },
   {
     id: 'fin',
     title: 'C’est tout !',
     text: 'Tu retrouves cette visite ici, à tout moment. Après chaque mise à jour, les nouveautés te sont présentées, avec un bouton « Montre-moi ».',
     prepare: 'menu',
-    target: '#nav-more .kyx-tuto-entry, #mobile-nav .kyx-tuto-entry'
+    target: '#nav-more .kyx-tuto-entry, #mobile-nav .kyx-tuto-entry, [role="dialog"] > ul .kyx-tuto-entry'
   }
 ];
 
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
+  {
+    version: '1.7.5',
+    items: [
+      ['Téléphone : « Kyara Games », « Boosters rentables » et « Tutoriel » sont de retour dans le nouveau menu « Plus » de la barre du bas.', 'fin'],
+      ['Correction : le filtre « ★ Favoris » de l’onglet Échanges du Marché réapparaît (le site a changé la place de ses puces), et la recherche des offres suivantes est plus régulière.', 'favoris'],
+      'Visite guidée sur téléphone : l’élément montré ne se cache plus sous l’en-tête du site, et les onglets qui défilent de côté sont amenés à l’écran.'
+    ]
+  },
   {
     version: '1.7.4',
     items: ['iPhone et iPad : le bouton « Mettre à jour » du bandeau montre le chemin vers les mises à jour de Userscripts (ᴀA → Userscripts → mises à jour → Update), sans rien télécharger.']

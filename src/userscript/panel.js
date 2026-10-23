@@ -176,10 +176,41 @@
     document.body.appendChild(bar);
   }
 
+  // List of links of the phone "Plus" sheet (bottom bar nav.mb), while it is open.
+  const plusSheet = () => [...document.querySelectorAll('[role="dialog"] > ul')].find((ul) => ul.querySelector(':scope > li > a > .k')) ?? null;
+
+  // "Kyara Games" entry in the "Plus" sheet, like the site's links.
+  function addSheetEntry() {
+    const list = plusSheet();
+    if (!list || list.querySelector(':scope > li > .kyx-settings-entry')) return;
+    const model = list.querySelector(':scope > li');
+    const link = model?.querySelector(':scope > a');
+    const mark = link?.querySelector(':scope > .k');
+    if (!mark) return;
+    const li = document.createElement('li');
+    li.className = model.className;
+    const a = document.createElement('a');
+    a.className = link.className;
+    a.classList.remove('on');
+    a.classList.add('kyx-settings-entry');
+    a.href = '#';
+    const k = mark.cloneNode(false);
+    k.textContent = '設';
+    a.append(k, ' Kyara Games ');
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      list.closest('[role="dialog"]')?.parentElement?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); // closes the sheet, as a tap on its backdrop
+      openSettings();
+    });
+    li.appendChild(a);
+    list.insertBefore(li, list.querySelector(':scope > li:has(> .kyx-more), :scope > li:has(> .kyx-tuto-entry)'));
+  }
+
   // Adds the entry to the site's menus.
   const scan = () => {
     addEntry(document.querySelector('#nav-more'), 'button[aria-controls="nav-more"][aria-expanded="true"]');
     addEntry(document.querySelector('#mobile-nav .sheet-grid'), 'button.burger[aria-controls="mobile-nav"]');
+    addSheetEntry();
   };
   new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
   scan();

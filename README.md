@@ -89,7 +89,7 @@ Si tu déplaces le dossier de l'extension, relance **installer-mises-a-jour.bat*
 
 ## Installer sur téléphone
 
-Sur téléphone, Kyara Games s'installe en version **script**. Elle a toutes les fonctions sur le site ; les réglages sont dans le menu du site (☰ → 設 Kyara Games).
+Sur téléphone, Kyara Games s'installe en version **script**. Elle a toutes les fonctions sur le site ; les réglages sont dans le menu du site : bouton **他 Plus** de la barre du bas → **設 Kyara Games** (ou ☰ → 設 Kyara Games sur l'ancienne version du site).
 
 Lien du script (pour les étapes ci-dessous) :
 **https://github.com/A-Finch13/Kyara-Games-Extension/releases/latest/download/kyara-games.user.js**
@@ -101,9 +101,9 @@ Lien du script (pour les étapes ci-dessous) :
 3. Dans Firefox, ouvre le lien du script ci-dessus. Une page Tampermonkey s'ouvre : touche **Installer**.
 4. Ouvre [kyara.games](https://kyara.games) dans Firefox et connecte-toi.
 
-**Ça marche ?** Le menu du site (☰) contient **設 Kyara Games**.
+**Ça marche ?** Le bouton **他 Plus** de la barre du bas (ou le menu ☰) contient **設 Kyara Games**.
 
-**Notifications** (facultatif) : menu du site ☰ → **設 Kyara Games** → **Activer les notifications de Kyara**. Elles arrivent même site fermé.
+**Notifications** (facultatif) : bouton **他 Plus** de la barre du bas → **設 Kyara Games** → **Activer les notifications de Kyara**. Elles arrivent même site fermé.
 
 ### iPhone et iPad
 
@@ -115,7 +115,7 @@ Kyara Games marche seulement dans **Safari**, avec l'app gratuite **Userscripts*
 4. Touche l'icône **ᴀA** (ou la pièce de puzzle) à côté de l'adresse → **Userscripts** → **Installer**.
 5. Ouvre [kyara.games](https://kyara.games) dans Safari et connecte-toi.
 
-**Ça marche ?** Le menu du site (☰) contient **設 Kyara Games**. Sur iPhone et iPad, il n'y a pas de notifications.
+**Ça marche ?** Le bouton **他 Plus** de la barre du bas (ou le menu ☰) contient **設 Kyara Games**. Sur iPhone et iPad, il n'y a pas de notifications.
 
 **Icône sur l'écran d'accueil** : une icône ajoutée en « app web » ouvre le site **sans** Kyara Games. Pour une icône qui marche : dans Safari, sur kyara.games, **Partager** → **Sur l'écran d'accueil** → **désactive « Ouvrir en tant qu'app web »** → **Ajouter**. Si l'option n'existe pas, ajoute plutôt kyara.games aux Favoris de Safari.
 
