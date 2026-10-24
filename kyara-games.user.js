@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyara Games
 // @namespace    https://github.com/A-Finch13/Kyara-Games-Extension
-// @version      1.7.5
+// @version      1.7.6
 // @description  Compagnon non officiel pour kyara.games : cartes manquantes en gris avec ordre d'achat, albums complets masqués, doublons pendant les échanges, booster le plus rentable, classement entre amis.
 // @author       A-Finch13
 // @license      MIT
@@ -46,7 +46,7 @@
 'use strict';
 if (window.__kyaraGamesUserscript) return;
 window.__kyaraGamesUserscript = true;
-const KYX_VERSION = '1.7.5';
+const KYX_VERSION = '1.7.6';
 
 // ---------- 1. src/userscript/shim.js : stockage et messages, à la place des fonctions d'extension ----------
 // Userscript: the extension APIs used by the page code, rebuilt in the page.
@@ -2446,7 +2446,7 @@ const KYX_TOUR = [
   {
     id: 'marche',
     title: 'Tes favoris au marché',
-    text: '« ★ Favoris » n’affiche que les offres de tes œuvres favorites, toutes ou une seule, avec tous les filtres du site. La liste s’actualise toutes les 15 secondes.',
+    text: '« ★ Favoris » n’affiche que les offres de tes œuvres favorites, toutes ou une seule, avec tous les filtres du site. Les œuvres dont tu as tous les persos ne sont pas cherchées. La liste s’actualise toutes les 15 secondes.',
     page: '/marche',
     target: '.kyx-fav-chip'
   },
@@ -2509,6 +2509,10 @@ const KYX_TOUR = [
 
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
+  {
+    version: '1.7.6',
+    items: [['Marché : les œuvres favorites dont tu as tous les persos sortent de la liste « ★ Favoris » et ne sont plus cherchées, au marché comme dans l’onglet Échanges : moins de recherches, des offres plus utiles.', 'marche']]
+  },
   {
     version: '1.7.5',
     items: [
@@ -3375,19 +3379,30 @@ const KYX_CHANGES = [
       view.kyxState = {};
       filters.after(view);
     }
-    // Shows the favourites again when they or the tab (buy, auctions) change.
-    const key = `${[...favSeries].join('|')}#${siteFilters(filters).type}`;
+    // Shows the favourites again when they, the finished albums or the tab (buy, auctions) change.
+    const key = `${openFavourites().join('|')}#${siteFilters(filters).type}`;
     if (marketShown === key && view.childElementCount) return;
     marketShown = key;
     renderFavMarket(view);
   }
 
-  // "★ Favoris" list in the site's filter row, where its "Univers" list was: all favourites or a single one.
+  // Favourite series still to complete: the market looks for nothing in a finished album (all of them while the collection is unknown).
+  function openFavourites() {
+    const index = seriesIndex();
+    if (!index) return [...favSeries];
+    return [...favSeries].filter((name) => {
+      const s = index.get(norm(name));
+      return !s || s.owned < s.total;
+    });
+  }
+
+  // "★ Favoris" list in the site's filter row, where its "Univers" list was: all favourites still to complete or a single one.
   function favPicker(filters, universe) {
     const row = filters.querySelector('.row2');
     let pick = row?.querySelector(':scope > .kyx-fav-pick');
     if (!marketFav || !row) return void pick?.remove();
-    if (favOnly && !favSeries.has(favOnly)) favOnly = null;
+    const names = openFavourites();
+    if (favOnly && !names.includes(favOnly)) favOnly = null;
     if (!pick) {
       pick = document.createElement('label');
       pick.className = `kyx-fav-pick ${universe?.className ?? ''}`;
@@ -3411,13 +3426,15 @@ const KYX_CHANGES = [
       else row.prepend(pick);
     }
     const select = pick.querySelector('select');
-    const names = [...favSeries];
-    const key = names.join('|');
+    const done = favSeries.size - names.length;
+    const key = `${names.join('|')}#${done}`;
     if (pick.dataset.key !== key) {
       pick.dataset.key = key;
       select.innerHTML = '';
-      select.add(new Option(`Toutes mes favorites (${names.length})`, ''));
+      const hidden = done ? ` · ${done} complète${done > 1 ? 's' : ''} masquée${done > 1 ? 's' : ''}` : '';
+      select.add(new Option(`Toutes mes favorites (${names.length}${hidden})`, ''));
       for (const name of names) select.add(new Option(name, name));
+      pick.title = done ? 'Les œuvres favorites dont tu as tous les persos ne sont pas cherchées.' : '';
     }
     select.value = favOnly ?? '';
     pick.querySelector('.kyx-fav-del').hidden = !favOnly;
@@ -3459,7 +3476,7 @@ const KYX_CHANGES = [
     const st = view.kyxState;
     const run = (view.kyxRun = (view.kyxRun ?? 0) + 1);
     const f = siteFilters(marketFilters());
-    const names = favOnly ? [favOnly] : [...favSeries].slice(0, 30);
+    const names = favOnly ? [favOnly] : openFavourites().slice(0, 30);
     const refresh = mode === 'refresh' && st.page > 0;
     if (mode === true || (mode === 'refresh' && !refresh)) {
       st.page = 0;
@@ -3472,6 +3489,12 @@ const KYX_CHANGES = [
     const note = view.querySelector('.kyx-fm-note');
     const more = view.querySelector('.kyx-fm-more');
     if (!note) return;
+    if (!names.length) {
+      more.hidden = true;
+      view.querySelector('.kyx-fm-grid').innerHTML = '';
+      note.textContent = 'Tu as tous les persos de tes œuvres favorites : rien à chercher. Ajoute d’autres œuvres avec l’étoile ☆ des albums, page Collection.';
+      return;
+    }
     if (!refresh) note.textContent = 'Chargement des offres…';
     more.hidden = true;
     const answers = await Promise.all(
@@ -5180,7 +5203,8 @@ const KYX_CHANGES = [
       const mine = pills.find((b) => /mes offres/i.test(b.textContent));
       pills[0].parentElement.insertBefore(btn, mine ?? null);
     }
-    const on = boardFav && favSeries.size > 0 && !!catalog;
+    const open = new Set(openFavourites());
+    const on = boardFav && open.size > 0 && !!catalog;
     // The page's offer search asks the server for the favourite cards only (inject.js); the list is asked again when that changes.
     if (boardIds(on ? favIds() : '')) {
       boardMore = 0;
@@ -5192,11 +5216,14 @@ const KYX_CHANGES = [
     }
     btn.classList.toggle('on', on);
     btn.setAttribute('aria-pressed', String(on));
-    btn.disabled = !favSeries.size;
-    const n = favSeries.size;
+    btn.disabled = !open.size;
+    const n = open.size;
+    const done = favSeries.size - n;
     const title = n
-      ? `Seulement les offres qui donnent une carte de tes ${n} œuvre${n > 1 ? 's' : ''} favorite${n > 1 ? 's' : ''}`
-      : 'Aucune œuvre en favori : mets-en avec l’étoile ☆ des albums, page Collection';
+      ? `Seulement les offres qui donnent une carte de tes ${n} œuvre${n > 1 ? 's' : ''} favorite${n > 1 ? 's' : ''}${done ? ` (${done} complète${done > 1 ? 's' : ''} non cherchée${done > 1 ? 's' : ''})` : ''}`
+      : favSeries.size
+        ? 'Tu as tous les persos de tes œuvres favorites : rien à chercher'
+        : 'Aucune œuvre en favori : mets-en avec l’étoile ☆ des albums, page Collection';
     if (btn.title !== title) btn.title = title;
 
     const list = board.querySelector('ul.offers');
@@ -5205,7 +5232,7 @@ const KYX_CHANGES = [
     for (const li of list.children) {
       const m = CARD_SRC.exec(li.querySelector('.give img')?.getAttribute('src') || '');
       const series = m ? catalog?.get(Number(m[1]))?.s : null;
-      if (on && !!series && !favSeries.has(series)) {
+      if (on && !!series && !open.has(series)) {
         if (li.dataset.kyxHidden !== '1') li.dataset.kyxHidden = '1';
       } else {
         visible++;
@@ -5227,8 +5254,11 @@ const KYX_CHANGES = [
     }
   }
 
-  // Ids of the cards of the favourite series, comma separated.
-  const favIds = () => [...(catalog?.values() ?? [])].filter((c) => favSeries.has(c.s)).map((c) => c.id).join(',');
+  // Ids of the cards of the favourite series still to complete, comma separated.
+  function favIds() {
+    const open = new Set(openFavourites());
+    return [...(catalog?.values() ?? [])].filter((c) => open.has(c.s)).map((c) => c.id).join(',');
+  }
 
   // Hands the favourite cards to inject.js; true when they changed.
   function boardIds(ids) {

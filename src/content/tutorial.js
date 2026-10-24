@@ -61,7 +61,7 @@ const KYX_TOUR = [
   {
     id: 'marche',
     title: 'Tes favoris au marché',
-    text: '« ★ Favoris » n’affiche que les offres de tes œuvres favorites, toutes ou une seule, avec tous les filtres du site. La liste s’actualise toutes les 15 secondes.',
+    text: '« ★ Favoris » n’affiche que les offres de tes œuvres favorites, toutes ou une seule, avec tous les filtres du site. Les œuvres dont tu as tous les persos ne sont pas cherchées. La liste s’actualise toutes les 15 secondes.',
     page: '/marche',
     target: '.kyx-fav-chip'
   },
@@ -124,6 +124,10 @@ const KYX_TOUR = [
 
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
+  {
+    version: '1.7.6',
+    items: [['Marché : les œuvres favorites dont tu as tous les persos sortent de la liste « ★ Favoris » et ne sont plus cherchées, au marché comme dans l’onglet Échanges : moins de recherches, des offres plus utiles.', 'marche']]
+  },
   {
     version: '1.7.5',
     items: [
