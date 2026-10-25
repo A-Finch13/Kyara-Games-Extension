@@ -125,6 +125,13 @@ const KYX_TOUR = [
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
   {
+    version: '1.7.7',
+    items: [
+      ['Collection et Marché : avec « ★ Favoris », la liste « Univers » est remplacée par la liste de tes œuvres favorites, y compris dans le panneau « Filtres » du téléphone.', 'favoris'],
+      'Marché sur téléphone : la recherche des favoris suit aussi le tri, les prix, « Que je n’ai pas » et « Que je cherche » choisis dans le panneau « Filtres ».'
+    ]
+  },
+  {
     version: '1.7.6',
     items: [['Marché : les œuvres favorites dont tu as tous les persos sortent de la liste « ★ Favoris » et ne sont plus cherchées, au marché comme dans l’onglet Échanges : moins de recherches, des offres plus utiles.', 'marche']]
   },

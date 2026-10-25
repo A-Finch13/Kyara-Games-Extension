@@ -29,7 +29,7 @@ Compagnon non officiel pour [kyara.games](https://kyara.games) (site et appli in
 | Filtrer ses cartes sur ses doublons | Puce **Ses doublons**, active d'office, dans chaque fenêtre « Proposer un échange » (profil, offres du marché, comptoir), onglet **Cartes de …** ; la désactiver est retenu |
 | Filtrer un échange sur ses œuvres favorites | Puce **★ Favoris** à côté de « Ses doublons », dans les deux onglets de la fenêtre d'échange : seulement les cartes de tes œuvres favorites ; retenu |
 | Voir les offres d'échange de ses œuvres favorites | Puce **★ Favoris** dans le **Marché**, onglet **Échanges** : seulement les offres qui donnent une carte de tes œuvres favorites, recherchées directement sur le serveur ; se combine avec les autres puces du site ; retenu |
-| Voir seulement les cartes de ses œuvres favorites | Puce **★ Favoris** après « Manquantes » sur la page **Collection**, vue Cartes ; retenu |
+| Voir seulement les cartes de ses œuvres favorites | Puce **★ Favoris** après « Manquantes » sur la page **Collection**, vue Cartes : la liste « Univers » devient la liste de tes œuvres favorites (toutes ou une seule), aussi dans le panneau « Filtres » du téléphone ; retenu |
 | Savoir si on a déjà les cartes qu'on reçoit | Badge **Manquante**, **Possédée** ou **Possédée ×N** côté « Tu reçois » des échanges en attente, onglet **Échanges** du Marché |
 | Afficher les cartes possédées ou manquantes de la collection | Puces **Possédées** et **Manquantes** à côté de « Toutes » sur la page Collection (un second clic réaffiche tout), et onglet **Manquantes** de la popup |
 | Savoir si les cartes que tu donnes dans un échange en cours sont en double | Badge **×N** ou **Unique** côté « Tu donnes » des échanges en attente, onglet **Échanges** du Marché |

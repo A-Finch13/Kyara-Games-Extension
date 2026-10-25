@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyara Games
 // @namespace    https://github.com/A-Finch13/Kyara-Games-Extension
-// @version      1.7.6
+// @version      1.7.7
 // @description  Compagnon non officiel pour kyara.games : cartes manquantes en gris avec ordre d'achat, albums complets masqués, doublons pendant les échanges, booster le plus rentable, classement entre amis.
 // @author       A-Finch13
 // @license      MIT
@@ -46,7 +46,7 @@
 'use strict';
 if (window.__kyaraGamesUserscript) return;
 window.__kyaraGamesUserscript = true;
-const KYX_VERSION = '1.7.6';
+const KYX_VERSION = '1.7.7';
 
 // ---------- 1. src/userscript/shim.js : stockage et messages, à la place des fonctions d'extension ----------
 // Userscript: the extension APIs used by the page code, rebuilt in the page.
@@ -2510,6 +2510,13 @@ const KYX_TOUR = [
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
   {
+    version: '1.7.7',
+    items: [
+      ['Collection et Marché : avec « ★ Favoris », la liste « Univers » est remplacée par la liste de tes œuvres favorites, y compris dans le panneau « Filtres » du téléphone.', 'favoris'],
+      'Marché sur téléphone : la recherche des favoris suit aussi le tri, les prix, « Que je n’ai pas » et « Que je cherche » choisis dans le panneau « Filtres ».'
+    ]
+  },
+  {
     version: '1.7.6',
     items: [['Marché : les œuvres favorites dont tu as tous les persos sortent de la liste « ★ Favoris » et ne sont plus cherchées, au marché comme dans l’onglet Échanges : moins de recherches, des offres plus utiles.', 'marche']]
   },
@@ -3194,6 +3201,9 @@ const KYX_CHANGES = [
 
   // ---------- favourite series (œuvres) and the "★ Favoris" filter of the market ----------
 
+  // True for an element laid out on the page (not display: none, nor inside a hidden parent).
+  const onScreen = (el) => !!el && el.getClientRects().length > 0;
+
   // Text made safe for HTML.
   const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -3287,29 +3297,57 @@ const KYX_CHANGES = [
 
   // Current values of the site's market filters, applied to the favourites too.
   const marketFilters = () => (location.pathname === '/marche' ? document.querySelector('#mq')?.closest('.filters') : null);
-  // The site's sort select, and the label of its "Univers" select.
-  const sortSelect = (filters) => filters?.querySelector('.row2 select option[value="price_asc"]')?.parentElement ?? null;
-  const universeLabel = (filters) =>
-    [...(filters?.querySelectorAll('.row2 > label:not(.kyx-fav-pick)') ?? [])].find((l) => {
+  // The site's sort select, and the label of its "Univers" select, in a row of market filters.
+  const sortSelect = (row) => row?.querySelector('select option[value="price_asc"]')?.parentElement ?? null;
+  const universeLabel = (row) =>
+    [...(row?.querySelectorAll(':scope > label:not(.kyx-fav-pick)') ?? [])].find((l) => {
       const sel = l.querySelector(':scope > select');
-      return sel && sel !== sortSelect(filters);
+      return sel && sel !== sortSelect(row);
     }) ?? null;
+  // The row with "Univers", sort, prices and pills: in the filter bar on a computer, in the "Filtres" sheet on a phone (while open).
+  // (A phone keeps a hidden copy in the bar: the row on screen comes first.)
+  function marketRow(filters) {
+    const rows = [filters?.querySelector('.row2'), ...document.querySelectorAll('[role="dialog"] .row2')].filter((row) => sortSelect(row));
+    return rows.find(onScreen) ?? rows[0] ?? null;
+  }
 
+  // Values of that row, kept for when the phone sheet is closed.
+  let rowValues = { sort: 'ending', min: '', max: '', missing: false, wished: false };
   // The site's filters as request parameters.
   function siteFilters(filters) {
-    const price = [...(filters?.querySelectorAll('.row2 label.price input') ?? [])];
-    const amount = (input) => (input && input.value !== '' && Number(input.value) >= 0 ? String(Math.round(Number(input.value))) : '');
-    const pill = (re) => [...(filters?.querySelectorAll('button.pill') ?? [])].find((b) => re.test(b.textContent))?.getAttribute('aria-pressed') === 'true';
+    const row = marketRow(filters);
+    if (row) {
+      const price = [...row.querySelectorAll('label.price input')];
+      const amount = (input) => (input && input.value !== '' && Number(input.value) >= 0 ? String(Math.round(Number(input.value))) : '');
+      const pill = (re) => [...row.querySelectorAll('button.pill')].find((b) => re.test(b.textContent))?.getAttribute('aria-pressed') === 'true';
+      rowValues = { sort: sortSelect(row)?.value || 'ending', min: amount(price[0]), max: amount(price[1]), missing: pill(/n.ai pas/i), wished: pill(/cherche/i) };
+    }
     return {
       q: filters?.querySelector('#mq')?.value.trim() ?? '',
       rarity: siteRarity(filters?.querySelector('.chips')),
-      sort: sortSelect(filters)?.value || 'ending',
-      min: amount(price[0]),
-      max: amount(price[1]),
-      missing: pill(/n.ai pas/i),
-      wished: pill(/cherche/i),
+      ...rowValues,
       type: new URLSearchParams(location.search).get('onglet') === 'encheres' ? 'auction' : 'fixed'
     };
+  }
+
+  // Asks the favourites again a moment after a filter of the site changes.
+  let marketTimer = 0;
+  function marketLater(ms) {
+    if (!marketFav) return;
+    clearTimeout(marketTimer);
+    marketTimer = setTimeout(() => {
+      const view = document.querySelector('.kyx-favmarket');
+      if (view?.kyxState) loadFavOffers(view, true);
+    }, ms);
+  }
+  // Watches the site's filters in an element (the filter bar, or the phone "Filtres" sheet).
+  function watchMarket(el) {
+    if (!el || el.dataset.kyxWatch) return;
+    el.dataset.kyxWatch = '1';
+    const ours = (e) => e.target.closest?.('.kyx-fav-pick, .kyx-chip');
+    el.addEventListener('input', (e) => ours(e) || marketLater(500));
+    el.addEventListener('change', (e) => ours(e) || marketLater(150));
+    el.addEventListener('click', (e) => ours(e) || !e.target.closest('button') || marketLater(150));
   }
 
   // "★ Favoris" chip of the market and the favourites view.
@@ -3338,29 +3376,19 @@ const KYX_CHANGES = [
     }
     btn.classList.toggle('on', marketFav);
     btn.setAttribute('aria-pressed', String(marketFav));
-    // Asks the favourites again when a filter of the site changes.
-    if (!filters.dataset.kyxWatch) {
-      filters.dataset.kyxWatch = '1';
-      let timer = 0;
-      const later = (ms) => {
-        if (!marketFav) return;
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-          const view = document.querySelector('.kyx-favmarket');
-          if (view?.kyxState) loadFavOffers(view, true);
-        }, ms);
-      };
-      const ours = (e) => e.target.closest?.('.kyx-fav-pick, .kyx-chip');
-      filters.addEventListener('input', (e) => ours(e) || later(500));
-      filters.addEventListener('change', (e) => ours(e) || later(150));
-      filters.addEventListener('click', (e) => ours(e) || !e.target.closest('button') || later(150));
+    // Asks the favourites again when a filter of the site changes, in the bar or in the phone sheet.
+    watchMarket(filters);
+    const row = marketRow(filters);
+    if (row && !filters.contains(row)) {
+      watchMarket(row.parentElement);
+      siteFilters(filters); // keeps the sheet's values for when it closes
     }
-    const universe = universeLabel(filters);
+    const universe = universeLabel(row);
     if (universe) {
       if (marketFav && universe.dataset.kyxHidden !== '1') universe.dataset.kyxHidden = '1';
       else if (!marketFav && universe.dataset.kyxHidden) delete universe.dataset.kyxHidden;
     }
-    favPicker(filters, universe);
+    favPicker(row, universe);
     // Hides the site's offers while the favourites are shown.
     let view = filters.parentElement.querySelector(':scope > .kyx-favmarket');
     for (let el = filters.nextElementSibling; el; el = el.nextElementSibling) {
@@ -3396,9 +3424,8 @@ const KYX_CHANGES = [
     });
   }
 
-  // "★ Favoris" list in the site's filter row, where its "Univers" list was: all favourites still to complete or a single one.
-  function favPicker(filters, universe) {
-    const row = filters.querySelector('.row2');
+  // "★ Favoris" list in the site's filter row (or phone sheet), where its "Univers" list was: all favourites still to complete or a single one.
+  function favPicker(row, universe) {
     let pick = row?.querySelector(':scope > .kyx-fav-pick');
     if (!marketFav || !row) return void pick?.remove();
     const names = openFavourites();
@@ -5139,11 +5166,63 @@ const KYX_CHANGES = [
     if (btn.title !== title) btn.title = title;
   }
 
+  // The site's "Univers" select of the Collection: in the filter row, or in the phone "Filtres" sheet (the one on screen first).
+  function collectionUniverse() {
+    const selects = [...document.querySelectorAll('label > select')].filter((s) => s.querySelector(':scope > option[value="Tous"]') && !s.closest('.kyx-coll-pick'));
+    // One hidden by us counts as on screen when our list beside it is.
+    const shown = (s) => onScreen(s) || (s.parentElement.dataset.kyxUni === '1' && onScreen(s.parentElement.previousElementSibling));
+    return selects.find(shown) ?? selects[0] ?? null;
+  }
+
+  // While "★ Favoris" is on: a list of the favourite series in place of "Univers"; choosing one sets the site's "Univers".
+  function collectionPicker(on) {
+    const site = on ? collectionUniverse() : null;
+    const label = site?.parentElement;
+    document.querySelectorAll('[data-kyx-uni]').forEach((l) => {
+      if (l === label) return;
+      delete l.dataset.kyxUni;
+      delete l.dataset.kyxHidden;
+    });
+    let pick = document.querySelector('.kyx-coll-pick');
+    if (!label) return void pick?.remove();
+    if (pick && pick.nextElementSibling !== label) pick.remove();
+    if (!pick?.isConnected) {
+      pick = label.cloneNode(false);
+      pick.classList.add('kyx-coll-pick');
+      pick.innerHTML = `<span>★ Favoris</span> <select class="${esc(site.className)}"></select>`;
+      pick.querySelector('select').addEventListener('change', (e) => {
+        collectionMore = 0;
+        site.value = e.target.value || 'Tous';
+        site.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      label.before(pick);
+    }
+    label.dataset.kyxUni = '1';
+    if (label.dataset.kyxHidden !== '1') label.dataset.kyxHidden = '1';
+    // A series outside the favourites would show nothing: back to all of them.
+    if (site.value !== 'Tous' && !favSeries.has(site.value)) {
+      site.value = 'Tous';
+      site.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    const select = pick.querySelector('select');
+    const names = [...favSeries];
+    const key = names.join('|');
+    if (select.dataset.key !== key) {
+      select.dataset.key = key;
+      select.innerHTML = '';
+      select.add(new Option(`Toutes mes favorites (${names.length})`, ''));
+      for (const name of names) select.add(new Option(name, name));
+    }
+    const value = site.value === 'Tous' ? '' : site.value;
+    if (select.value !== value) select.value = value;
+  }
+
   let collectionMore = 0;
   // Hides the Collection cards outside the favourite series, and loads more until a full page shows.
   function scanCollectionFav() {
     if (location.pathname !== '/collection') return;
     const on = collectionFav && favSeries.size > 0;
+    collectionPicker(on);
     const grids = new Set();
     for (const slot of document.querySelectorAll('a.slot')) {
       const cell = slot.parentElement;
@@ -5443,7 +5522,7 @@ const KYX_CHANGES = [
     if (document.documentElement.dataset.kyxOwner === owner) delete document.documentElement.dataset.kyxOwner;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-favtrade, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket, .kyx-fav-pick, .kyx-rec, .kyx-tuto-back, .kyx-tuto-entry, .kyx-spot, .kyx-bubble').forEach((el) => el.remove());
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-favtrade, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket, .kyx-fav-pick, .kyx-coll-pick, .kyx-rec, .kyx-tuto-back, .kyx-tuto-entry, .kyx-spot, .kyx-bubble').forEach((el) => el.remove());
     delete document.documentElement.dataset.kyxView;
     delete document.documentElement.dataset.kyxBoardIds;
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched], [data-kyx-ghost]').forEach((el) => {
