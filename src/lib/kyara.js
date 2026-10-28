@@ -307,6 +307,172 @@ export const asList = (x, ...keys) => {
   return [];
 };
 
+// ---------- subscribers of the site, for the "Mur de la Honte" page ----------
+
+// Rankings read for the badges of their top 100.
+const SUB_LADDERS = [
+  ['prestige', 'Prestige'],
+  ['collection', 'Collection'],
+  ['mythics', 'Mythiques'],
+  ['series', 'Séries'],
+  ['achievements', 'Succès'],
+  ['renown', 'Renommée'],
+  ['renaissance', 'Renaissance']
+];
+const SUBS_SCAN_MINUTES = 1; // the public lists are searched again in the background after this
+const SUBS_RECHECK_MINUTES = 1; // a player found without a subscription is looked up again after this
+const SUB_TIERS = ['nakama', 'senpai', 'sensei', 'daimyo']; // lowest first
+
+// Highest tier of a player from their "membre-…" badges, or null.
+const subTierOf = (badges) => {
+  const ids = new Set((badges ?? []).map((b) => b?.id));
+  return [...SUB_TIERS].reverse().find((t) => ids.has(`membre-${t}`)) ?? null;
+};
+
+// Saved record of a subscriber found in `where` (a ranking, the market…), with position and stats when known.
+const subRecord = (u, tier, where, stats = {}) => ({
+  id: u.id ?? u.userId,
+  pseudo: u.pseudo ?? '?',
+  avatar: u.avatar ?? null,
+  color: u.nameColor ?? null,
+  tier,
+  owned: stats.owned ?? u.owned,
+  mythics: stats.mythics ?? u.mythics,
+  points: stats.points ?? u.points,
+  seen: Date.now(),
+  src: { [where]: stats.pos ?? 0 }
+});
+
+// Reads every public list of players and adds the new subscribers to `known`.
+async function scanSubscribers(known) {
+  // Notes a player; true for a subscriber. Subscribers already saved are kept as they are.
+  const look = (u, where, stats) => {
+    const id = u?.id ?? u?.userId;
+    if (!id) return false;
+    if (known[id]) return true;
+    const tier = u.tier ?? subTierOf(u.badges);
+    if (tier) known[id] = subRecord(u, tier, where, stats);
+    return !!tier;
+  };
+
+  const jobs = [];
+  jobs.push(async () => {
+    const wall = await api('/membership/wall', { auth: false }).catch(() => []);
+    (Array.isArray(wall) ? wall : wall?.items ?? []).forEach((w) => look(w.user ?? w, 'Mur des soutiens'));
+  });
+  // A ranking, or one tier ("palier") of it.
+  const ladder = (by, label, league) => async () => {
+    const res = await api(`/leaderboard/ladder?by=${by}${league == null ? '' : `&league=${league}`}`, { auth: false }).catch(() => null);
+    const rows = res?.rows ?? [];
+    const name = league == null ? label : `${label} palier ${league}`;
+    for (const r of rows) look(r, name, { pos: r.pos, owned: r.owned, mythics: r.mythics, points: r.points });
+    // The top tier's top 100 is the general one.
+    const leagues = league == null && by !== 'renaissance' ? res?.leagues ?? [] : [];
+    const top = Math.max(...leagues.map((l) => l.level));
+    for (const l of leagues) if (l.level !== top && l.count > 0) jobs.push(ladder(by, label, l.level));
+  };
+  for (const [by, label] of SUB_LADDERS) jobs.push(ladder(by, label));
+  jobs.push(async () => {
+    const feed = await api('/feed', { auth: false }).catch(() => []);
+    (Array.isArray(feed) ? feed : []).forEach((f) => look(f, 'Derniers tirages'));
+  });
+  jobs.push(async () => {
+    const chat = await api('/market/chat?limit=100', { auth: false }).catch(() => null);
+    (chat?.items ?? []).forEach((m) => look(m.author, 'Chat du marché'));
+  });
+
+  // 3 requests at a time; a ranking adds its tiers to the queue.
+  const worker = async () => {
+    while (jobs.length) await jobs.shift()();
+  };
+  await Promise.all([worker(), worker(), worker()]);
+}
+
+let subsScan = null; // search of the public lists in progress
+
+// Searches the public lists and saves the new subscribers, never two searches at once.
+export function runSubsScan() {
+  return (subsScan ??= (async () => {
+    const { subscribers: known = {} } = await chrome.storage.local.get('subscribers');
+    const found = { ...known };
+    await scanSubscribers(found);
+    const { subscribers: latest = {} } = await chrome.storage.local.get('subscribers');
+    await chrome.storage.local.set({ subscribers: { ...found, ...latest }, subscribersAt: Date.now() });
+  })()
+    .catch(() => {})
+    .finally(() => (subsScan = null)));
+}
+
+// Search every minute and on each change of page of the site (30 s apart at least, across tabs).
+export async function autoSubsScan(pageChanged) {
+  if (subsScan) return;
+  const { subscribersAt = 0 } = await chrome.storage.local.get('subscribersAt');
+  if (Date.now() - subscribersAt >= (pageChanged ? 30e3 : SUBS_SCAN_MINUTES * 60e3)) runSubsScan();
+}
+
+let subsChecked = null; // id -> when the player was found without a subscription
+let checkedSave = 0;
+const subsQueue = new Map(); // id -> { player, where }, players to look up
+let lookingUp = false;
+
+// Adds subscribers to the saved ones; those already saved are left as they are.
+async function saveSubscribers(found) {
+  if (!found.length) return;
+  const { subscribers: known = {} } = await chrome.storage.local.get('subscribers');
+  const fresh = found.filter((s) => s.id && !known[s.id]);
+  if (!fresh.length) return;
+  for (const s of fresh) known[s.id] = s;
+  await chrome.storage.local.set({ subscribers: known });
+}
+
+// Remembers a player without a subscription, saved a few seconds later without the old entries.
+function markChecked(id) {
+  subsChecked[id] = Date.now();
+  clearTimeout(checkedSave);
+  checkedSave = setTimeout(() => {
+    const limit = Date.now() - SUBS_RECHECK_MINUTES * 60e3;
+    for (const [k, t] of Object.entries(subsChecked)) if (t < limit) delete subsChecked[k];
+    chrome.storage.local.set({ subsChecked });
+  }, 5000);
+}
+
+// Players shown by the site: subscribers with their badge are saved, players without badges are looked up.
+export async function meetPlayers(list, where) {
+  if (!Array.isArray(list) || !list.length) return;
+  subsChecked ??= (await chrome.storage.local.get('subsChecked')).subsChecked ?? {};
+  const { subscribers: known = {} } = await chrome.storage.local.get('subscribers');
+  const found = [];
+  for (const p of list) {
+    if (typeof p?.id !== 'string' || typeof p.pseudo !== 'string' || known[p.id] || subsQueue.has(p.id)) continue;
+    if (Array.isArray(p.badges)) {
+      const tier = subTierOf(p.badges);
+      if (tier) found.push(subRecord(p, tier, where));
+      else markChecked(p.id);
+    } else if (Date.now() - (subsChecked[p.id] ?? 0) > SUBS_RECHECK_MINUTES * 60e3 && subsQueue.size < 500) {
+      subsQueue.set(p.id, { player: p, where });
+    }
+  }
+  await saveSubscribers(found);
+  lookUpQueued();
+}
+
+// Badges of the queued players, read from their profile, one at a time.
+async function lookUpQueued() {
+  if (lookingUp) return;
+  lookingUp = true;
+  while (subsQueue.size) {
+    const [id, { player, where }] = subsQueue.entries().next().value;
+    subsQueue.delete(id);
+    const profile = await api(`/users/${encodeURIComponent(id)}`, { auth: false }).catch(() => null);
+    const tier = subTierOf(profile?.badges);
+    if (tier) await saveSubscribers([subRecord({ ...player, ...profile }, tier, where)]);
+    else if (profile) markChecked(id);
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  lookingUp = false;
+}
+
+
 // ---------- new versions published on GitHub ----------
 
 // True when version a is newer than version b.

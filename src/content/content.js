@@ -87,6 +87,7 @@
     if ('favSeries' in changes || 'tradeFav' in changes) scanComposer();
     if ('favSeries' in changes || 'collectionFav' in changes) scanCollectionChips();
     if ('favSeries' in changes || 'boardFav' in changes) scanTradeBoard();
+    if ('subscribers' in changes) refreshSubs?.(changes.subscribers.newValue);
     for (const k of ['settings', 'collection', 'catalog', 'partner']) if (k in changes) picked[k] = changes[k].newValue;
     if (!Object.keys(picked).length) return;
     applyStorage(picked);
@@ -113,6 +114,7 @@
   window.addEventListener('message', (e) => {
     if (e.origin !== location.origin || e.data?.__kyaraGames !== 1) return;
     const { kind, path, body } = e.data;
+    if (kind === 'players') return void send({ type: 'subs-players', list: e.data.list, where: playersWhere(path, e.data.query) });
     if (kind === 'write') {
       if (/^\/market\//.test(path)) setTimeout(refreshFavMarket, 1500);
       return void send({ type: 'collection-stale' });
@@ -1492,35 +1494,49 @@
       <p class="foot mono ${sc}">${rows.length} joueurs · tes amis et toi · « au général » = place au classement de tous les joueurs</p>`;
   }
 
-  // ---------- "Boosters rentables" page, in the site's "Plus" menu ----------
+  // ---------- pages of the extension, in the site's "Plus" menu ----------
 
-  // "Boosters rentables" entry at the end of the site's "Plus" menu.
+  const BOOSTERS_HASH = '#boosters-rentables';
+  const SUBS_HASH = '#kyx-abonnes';
+
+  // Pages shown in place of the site's content: address, view name, menu entry (class, kanji, title, hint).
+  const VIEWS = [
+    { hash: BOOSTERS_HASH, view: 'boosters', cls: 'kyx-more', kanji: '得', title: 'Boosters rentables', hint: 'Le meilleur booster pour une carte', open: () => openBoosters() },
+    { hash: SUBS_HASH, view: 'abonnes', cls: 'kyx-subs-entry', kanji: '恥', title: 'Mur de la Honte', hint: 'Les abos du site', open: () => openSubscribers() }
+  ];
+  const VIEW_ENTRIES = VIEWS.map((v) => `.${v.cls}`).join(', ');
+  // True while the page of v is shown.
+  const viewOpen = (v) => document.documentElement.dataset.kyxView === v.view;
+
+  // Entries of the pages at the end of the site's "Plus" menu, before "Tutoriel".
   function scanMoreMenu() {
     const menu = document.querySelector('#nav-more');
-    const open = !!document.querySelector('.kyx-view');
-    // Marks the entry as the current page while it is open.
-    menu?.querySelectorAll(':scope > a.on:not(.kyx-more)').forEach((a) => open && a.classList.remove('on'));
-    const mine = menu?.querySelector(':scope > .kyx-more');
-    if (mine) return void mine.classList.toggle('on', open);
     if (!menu) return;
+    // Marks the entry of the open page as the current one.
+    if (VIEWS.some(viewOpen)) menu.querySelectorAll(`:scope > a.on:not(${VIEW_ENTRIES})`).forEach((a) => a.classList.remove('on'));
     const model = menu.querySelector(':scope > a');
-    if (!model?.querySelector('.dk') || !model.querySelector('.dt b')) return;
-    const item = model.cloneNode(true);
-    item.classList.add('kyx-more');
-    item.classList.toggle('on', open);
-    item.removeAttribute('aria-current');
-    item.href = '#boosters-rentables';
-    item.querySelector('.dk').textContent = '得';
-    item.querySelector('.dt b').textContent = 'Boosters rentables';
-    const hint = item.querySelector('.dt small');
-    if (hint) hint.textContent = 'Le meilleur booster pour une carte';
-    [...item.children].forEach((el) => el.matches('.dk, .dt') || el.remove());
-    item.addEventListener('click', (e) => {
-      e.preventDefault();
-      document.querySelector('button[aria-controls="nav-more"][aria-expanded="true"]')?.click(); // close the menu
-      openBoosters();
-    });
-    menu.appendChild(item);
+    for (const v of VIEWS) {
+      let item = menu.querySelector(`:scope > .${v.cls}`);
+      if (!item) {
+        if (!model?.querySelector('.dk') || !model.querySelector('.dt b') || model.matches(VIEW_ENTRIES)) return;
+        item = model.cloneNode(true);
+        item.classList.add(v.cls);
+        item.removeAttribute('aria-current');
+        item.href = v.hash;
+        item.querySelector('.dk').textContent = v.kanji;
+        item.querySelector('.dt b').textContent = v.title;
+        const hint = item.querySelector('.dt small');
+        if (hint) hint.textContent = v.hint;
+        [...item.children].forEach((el) => el.matches('.dk, .dt') || el.remove());
+        item.addEventListener('click', (e) => {
+          e.preventDefault();
+          document.querySelector('button[aria-controls="nav-more"][aria-expanded="true"]')?.click(); // close the menu
+          v.open();
+        });
+        menu.insertBefore(item, menu.querySelector(':scope > .kyx-tuto-entry'));
+      }
+      item.classList.toggle('on', viewOpen(v));
+    }
   }
 
   // ---------- the phone "Plus" sheet of the site's bottom bar ----------
@@ -1557,39 +1573,43 @@
     return a;
   }
 
-  // The same entry in the site's phone menus: the older #mobile-nav grid and the "Plus" sheet of the bottom bar.
+  // The same entries in the site's phone menus: the older #mobile-nav grid and the "Plus" sheet of the bottom bar.
   function scanMobileNav() {
-    const open = !!document.querySelector('.kyx-view');
-    const link = plusSheet()?.querySelector(':scope > li > .kyx-more') ?? addSheetEntry('kyx-more', '得', 'Boosters rentables', openBoosters);
-    link?.classList.toggle('on', open);
-    if (open) plusSheet()?.querySelectorAll(':scope > li > a.on:not(.kyx-more)').forEach((a) => a.classList.remove('on'));
+    const open = VIEWS.some(viewOpen);
+    for (const v of VIEWS) {
+      const link = plusSheet()?.querySelector(`:scope > li > .${v.cls}`) ?? addSheetEntry(v.cls, v.kanji, v.title, v.open);
+      link?.classList.toggle('on', viewOpen(v));
+    }
+    if (open) plusSheet()?.querySelectorAll(`:scope > li > a.on:not(${VIEW_ENTRIES})`).forEach((a) => a.classList.remove('on'));
     scanMobileGrid(open);
   }
 
-  // Entry of the #mobile-nav grid.
+  // Entries of the #mobile-nav grid.
   function scanMobileGrid(open) {
     const grid = document.querySelector('#mobile-nav .sheet-grid');
     if (!grid) return;
-    grid.querySelectorAll(':scope > a.on:not(.kyx-more)').forEach((a) => open && a.classList.remove('on'));
-    let tile = grid.querySelector(':scope > .kyx-more');
-    if (!tile) {
-      const model = grid.querySelector(':scope > a');
-      if (!model?.querySelector('.tk') || !model.querySelector('.tl')) return;
-      tile = model.cloneNode(true);
-      tile.classList.add('kyx-more');
-      tile.removeAttribute('aria-current');
-      tile.href = '#boosters-rentables';
-      tile.querySelector('.tk').textContent = '得';
-      tile.querySelector('.tl').textContent = 'Boosters rentables';
-      [...tile.children].forEach((el) => el.matches('.tk, .tl') || el.remove());
-      tile.addEventListener('click', (e) => {
-        e.preventDefault();
-        document.querySelector('button.burger[aria-controls="mobile-nav"]')?.click(); // close the sheet
-        openBoosters();
-      });
-      grid.appendChild(tile);
+    if (open) grid.querySelectorAll(`:scope > a.on:not(${VIEW_ENTRIES})`).forEach((a) => a.classList.remove('on'));
+    const model = grid.querySelector(':scope > a');
+    for (const v of VIEWS) {
+      let tile = grid.querySelector(`:scope > .${v.cls}`);
+      if (!tile) {
+        if (!model?.querySelector('.tk') || !model.querySelector('.tl') || model.matches(VIEW_ENTRIES)) return;
+        tile = model.cloneNode(true);
+        tile.classList.add(v.cls);
+        tile.removeAttribute('aria-current');
+        tile.href = v.hash;
+        tile.querySelector('.tk').textContent = v.kanji;
+        tile.querySelector('.tl').textContent = v.title;
+        [...tile.children].forEach((el) => el.matches('.tk, .tl') || el.remove());
+        tile.addEventListener('click', (e) => {
+          e.preventDefault();
+          document.querySelector('button.burger[aria-controls="mobile-nav"]')?.click(); // close the sheet
+          v.open();
+        });
+        grid.insertBefore(tile, grid.querySelector(':scope > .kyx-tuto-entry'));
+      }
+      tile.classList.toggle('on', viewOpen(v));
     }
-    tile.classList.toggle('on', open);
   }
 
   let packsCache = null;
@@ -1723,21 +1743,19 @@
       li.querySelector('.kyx-b-title b').textContent = p.name;
       const sub = li.querySelector('.kyx-b-sub');
       if (sub) sub.textContent = p.sub;
-      li.querySelector('a').addEventListener('click', closeBoosters);
+      li.querySelector('a').addEventListener('click', closeView);
       list.appendChild(li);
     });
   }
 
-  // The "Boosters rentables" page, shown in place of the site's content at …#boosters-rentables.
-  const BOOSTERS_HASH = '#boosters-rentables';
-
-  // Leaves the "Boosters rentables" page.
-  function closeBoosters() {
+  // Leaves the open page of the extension.
+  function closeView() {
     document.querySelector('.kyx-view')?.remove();
     const main = document.querySelector('main#contenu');
     if (main?.dataset.kyxHidden) delete main.dataset.kyxHidden;
     delete document.documentElement.dataset.kyxView;
     refreshBoosters = null;
+    refreshSubs = null;
   }
 
   // The "Pack du jour" changes at midnight, French time: rankings are computed again then.
@@ -1755,23 +1773,38 @@
     refreshBoosters?.();
   }
 
-  // Opens or closes the page with the address.
-  function onBoostersHash() {
-    if (location.hash === BOOSTERS_HASH) openBoosters();
-    else closeBoosters();
+  // Opens the page of the address, or closes the open one.
+  function onViewHash() {
+    const v = VIEWS.find((x) => x.hash === location.hash);
+    if (document.querySelector('.kyx-view') && !(v && viewOpen(v))) closeView();
+    v?.open();
   }
 
-  // Builds the page: modes (rarity, character, series), search and ranking.
-  function openBoosters() {
-    if (!alive()) return shutdown();
-    if (location.hash !== BOOSTERS_HASH) return void (location.hash = BOOSTERS_HASH);
+  // Shows a page in place of the site's content; null when it is already shown or the address changes first.
+  function mountView(hash, view, html) {
+    if (!alive()) return void shutdown();
+    if (location.hash !== hash) return void (location.hash = hash);
     const main = document.querySelector('main#contenu');
-    if (!main || document.querySelector('.kyx-view')) return;
+    if (!main || document.querySelector('.kyx-view')) return null;
     document.querySelector('.kyx-modal-back')?.remove();
     const page = document.createElement('section');
     page.className = 'kyx-view kyx-page wrap';
     page.setAttribute('aria-labelledby', 'kyx-view-t');
-    page.innerHTML = `
+    page.innerHTML = html;
+    main.dataset.kyxHidden = '1';
+    main.after(page);
+    document.documentElement.dataset.kyxView = view; // "Plus" underlined in the site's header
+    window.scrollTo(0, 0);
+    page.querySelector('.kyx-page-close').addEventListener('click', () => (history.length > 1 ? history.back() : (location.hash = '')));
+    return page;
+  }
+
+  // Builds the page: modes (rarity, character, series), search and ranking.
+  function openBoosters() {
+    const page = mountView(
+      BOOSTERS_HASH,
+      'boosters',
+      `
         <header class="kyx-page-head">
           <div><small>Boosters rentables · 得</small><h1 id="kyx-view-t">Quel booster ouvrir ?</h1>
           <p>Les boosters en vente classés du plus rentable au moins rentable pour obtenir ce que tu cherches.</p></div>
@@ -1791,14 +1824,11 @@
         </div>
         <div class="kyx-b-summary"></div>
         <ol class="kyx-b-list"></ol>
-        <p class="kyx-page-foot">Comment c’est calculé : avec les taux publiés par le site, on compte combien de boosters il faut ouvrir en moyenne pour tomber une fois sur ce que tu cherches, puis combien de chakra ça représente (nombre de boosters × prix du booster). Classé par <b>prix</b>, la barre compare au meilleur achat : 50 % veut dire deux fois plus cher pour le même résultat. Classé par <b>taux de drop</b>, elle compare au meilleur taux : 50 % veut dire deux fois moins de chances à chaque booster, quel que soit son prix. Ce sont des moyennes, la chance peut faire mieux ou pire. Cliquer sur un booster ouvre sa page, rien n’est acheté.</p>`;
-    main.dataset.kyxHidden = '1';
-    main.after(page);
-    document.documentElement.dataset.kyxView = 'boosters'; // "Plus" underlined in the site's header
-    window.scrollTo(0, 0);
+        <p class="kyx-page-foot">Comment c’est calculé : avec les taux publiés par le site, on compte combien de boosters il faut ouvrir en moyenne pour tomber une fois sur ce que tu cherches, puis combien de chakra ça représente (nombre de boosters × prix du booster). Classé par <b>prix</b>, la barre compare au meilleur achat : 50 % veut dire deux fois plus cher pour le même résultat. Classé par <b>taux de drop</b>, elle compare au meilleur taux : 50 % veut dire deux fois moins de chances à chaque booster, quel que soit son prix. Ce sont des moyennes, la chance peut faire mieux ou pire. Cliquer sur un booster ouvre sa page, rien n’est acheté.</p>`
+    );
+    if (!page) return;
     const query = page.querySelector('.kyx-page-query');
     const note = (text) => (page.querySelector('.kyx-page-note').textContent = text);
-    page.querySelector('.kyx-page-close').addEventListener('click', () => (history.length > 1 ? history.back() : (location.hash = '')));
     let run = 0; // answers of an older search are dropped
 
     // Ranking for one character.
@@ -1992,6 +2022,146 @@
     forRarity('M');
   }
 
+  // ---------- "Mur de la Honte" page: the players who have a subscription ----------
+
+  // Subscription tiers from the cheapest, replaced by the site's offer once loaded.
+  let subTiers = [
+    { id: 'nakama', name: 'Nakama', kanji: '仲間', price: 4.99 },
+    { id: 'senpai', name: 'Senpai', kanji: '先輩', price: 9.99 },
+    { id: 'sensei', name: 'Sensei', kanji: '師', price: 16.99 },
+    { id: 'daimyo', name: 'Daimyō', kanji: '大名', price: 24.99 }
+  ];
+  let refreshSubs = null; // shows the saved subscribers again while the page is open
+  let subsTier = 'all';
+
+  // "24,99 €".
+  const euros = (n) => `${n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+
+  // Tiers and prices of the site's offer.
+  async function loadSubTiers() {
+    const offer = await siteApi('/membership', { auth: false }).catch(() => null);
+    const list = (offer?.tiers ?? [])
+      .map((t) => ({ id: t.id, name: t.name, kanji: t.kanji, price: parseFloat(String(t.priceLabel ?? '').replace(',', '.')) || 0 }))
+      .filter((t) => t.id);
+    if (list.length) subTiers = list;
+  }
+
+  // Shows the figures and the list of the saved subscribers.
+  function renderSubscribers(page, known) {
+    const all = Object.values(known);
+    const rank = new Map(subTiers.map((t, i) => [t.id, i]));
+    const tierInfo = (id) => subTiers.find((t) => t.id === id) ?? { id, name: id, kanji: '援', price: 0 };
+    const avg = (list, k) => {
+      const v = list.map((s) => s[k]).filter((n) => Number.isFinite(n));
+      return v.length ? num(v.reduce((a, b) => a + b, 0) / v.length) : '–';
+    };
+
+    const monthly = all.reduce((sum, s) => sum + tierInfo(s.tier).price, 0);
+    page.querySelector('.kyx-s-figures').innerHTML = `
+      <div class="kyx-s-fig"><b>${num(all.length)}</b><small>abonnés repérés</small></div>
+      <div class="kyx-s-fig"><b>≈ ${euros(monthly)}</b><small>par mois, au prix affiché</small></div>
+      ${[...subTiers]
+        .reverse()
+        .map((t) => {
+          const list = all.filter((s) => s.tier === t.id);
+          return `<div class="kyx-s-fig" data-tier="${esc(t.id)}"><b>${num(list.length)}</b><small>${esc(t.kanji)} ${esc(t.name)} · ${all.length ? num((list.length / all.length) * 100) : 0} %</small><small>moy. ${avg(list, 'owned')} cartes · ${avg(list, 'mythics')} mythiques</small></div>`;
+        })
+        .join('')}`;
+
+    page.querySelectorAll('.kyx-s-tiers [data-tier]').forEach((b) => {
+      const n = b.dataset.tier === 'all' ? all.length : all.filter((s) => s.tier === b.dataset.tier).length;
+      b.querySelector('small').textContent = num(n);
+      b.setAttribute('aria-pressed', String(b.dataset.tier === subsTier));
+    });
+
+    // List filtered by tier, highest tier first.
+    const shown = all.filter((s) => subsTier === 'all' || s.tier === subsTier);
+    shown.sort((a, b) => (rank.get(b.tier) ?? -1) - (rank.get(a.tier) ?? -1) || (b.owned ?? -1) - (a.owned ?? -1));
+    const list = page.querySelector('.kyx-s-list');
+    list.innerHTML = '';
+    if (!shown.length) {
+      list.innerHTML = `<li class="kyx-b-empty">${all.length ? 'Personne à ce palier.' : 'Aucun abonné repéré pour l’instant.'}</li>`;
+      return;
+    }
+    // One badge per subscriber: profile picture and pseudo, edged with the tier's colour.
+    for (const s of shown) {
+      const li = document.createElement('li');
+      li.innerHTML = `<a data-tier="${esc(s.tier)}"><span class="kyx-s-av"></span><b></b></a>`;
+      const a = li.querySelector('a');
+      a.href = `/u/${encodeURIComponent(s.pseudo)}`;
+      a.title = tierInfo(s.tier).name;
+      a.addEventListener('click', closeView);
+      const av = li.querySelector('.kyx-s-av');
+      if (s.avatar) av.appendChild(Object.assign(document.createElement('img'), { alt: '', referrerPolicy: 'no-referrer', loading: 'lazy', src: s.avatar }));
+      else av.textContent = s.pseudo.slice(0, 1).toUpperCase();
+      const name = li.querySelector('b');
+      name.textContent = s.pseudo;
+      if (s.color) name.style.color = s.color;
+      list.appendChild(li);
+    }
+  }
+
+  // Builds the page and reads the site's lists again.
+  async function openSubscribers() {
+    const page = mountView(
+      SUBS_HASH,
+      'abonnes',
+      `
+        <header class="kyx-page-head">
+          <div><small>Mur de la Honte · 恥</small><h1 id="kyx-view-t">Mur de la Honte</h1>
+          <p>Les joueurs abonnés (Nakama, Senpai, Sensei ou Daimyō), repérés grâce à leur badge.</p></div>
+          <button type="button" class="kyx-page-close">← Retour</button>
+        </header>
+        <div class="kyx-s-figures"></div>
+        <p class="kyx-page-note" role="status"></p>
+        <div class="kyx-seg kyx-s-tiers" role="group" aria-label="Palier"></div>
+        <ol class="kyx-s-list"></ol>`
+    );
+    if (!page) return;
+    const note = (text) => (page.querySelector('.kyx-page-note').textContent = text);
+    let { subscribers: known = {} } = await chrome.storage.local.get('subscribers').catch(() => ({}));
+    await loadSubTiers();
+    if (!page.isConnected) return;
+    page.querySelector('.kyx-s-tiers').innerHTML = `<button type="button" data-tier="all" aria-pressed="false">Tous <small></small></button>${[...subTiers]
+      .reverse()
+      .map((t) => `<button type="button" data-tier="${esc(t.id)}" aria-pressed="false">${esc(t.kanji)} ${esc(t.name)} <small></small></button>`)
+      .join('')}<button type="button" class="kyx-s-again">↻ Actualiser</button>`;
+    const draw = () => page.isConnected && renderSubscribers(page, known);
+    refreshSubs = (next) => ((known = next ?? known), draw());
+    page.querySelectorAll('.kyx-s-tiers [data-tier]').forEach((b) => b.addEventListener('click', () => ((subsTier = b.dataset.tier), draw())));
+    draw();
+
+    // Reads the site's lists again and saves what was found.
+    const again = page.querySelector('.kyx-s-again');
+    const scan = async () => {
+      again.disabled = true;
+      note('Recherche des abonnés…');
+      await send({ type: 'subs-scan' });
+      again.disabled = false;
+      note('Listes du site relues à l’instant.');
+    };
+    again.addEventListener('click', scan);
+    scan();
+  }
+
+  // ---------- players met while browsing, handed to the background worker for the "Mur de la Honte" page ----------
+
+  // Where players were met, from the address of the answer that showed them.
+  function playersWhere(path, query = '') {
+    if (path.startsWith('/market/chat')) return 'Chat du marché';
+    if (path.startsWith('/market/listings')) return /type=auction/.test(query) ? 'Enchères' : 'Ventes du marché';
+    if (path.startsWith('/market/buy-orders')) return 'Ordres d’achat';
+    if (path.startsWith('/eveil/market')) return 'Marché Éveil';
+    if (/^\/(trades|me\/trades)/.test(path)) return 'Échanges';
+    if (path.startsWith('/me/market')) return 'Mes ventes';
+    if (path.startsWith('/me/friends')) return 'Amis';
+    if (path.startsWith('/leaderboard')) return 'Classement';
+    if (path.startsWith('/users/')) return 'Profil';
+    if (path === '/feed') return 'Derniers tirages';
+    if (path.startsWith('/membership/wall')) return 'Mur des soutiens';
+    return 'Kyara';
+  }
+
   // ---------- guided tour and what's new ----------
 
   const TUTO_HASH = '#kyx-tutoriel';
@@ -2008,7 +2178,8 @@
 
   // Follows a link of the site through its own navigation.
   function goTo(href) {
-    if (href.includes('#boosters-rentables')) return openBoosters();
+    const view = VIEWS.find((v) => href.includes(v.hash));
+    if (view) return view.open();
     const link = Object.assign(document.createElement('a'), { href });
     link.hidden = true;
     document.body.appendChild(link);
@@ -2356,7 +2527,7 @@
   function scanTutoMenu() {
     const add = (menu, kanjiSel, titleSel, closer) => {
       if (!menu || menu.querySelector(':scope > .kyx-tuto-entry')) return;
-      const model = menu.querySelector(':scope > a:not(.kyx-more):not(.kyx-settings-entry)');
+      const model = menu.querySelector(':scope > a:not(.kyx-more):not(.kyx-subs-entry):not(.kyx-settings-entry)');
       if (!model?.querySelector(kanjiSel) || !model.querySelector(titleSel)) return;
       const item = model.cloneNode(true);
       item.classList.remove('on');
@@ -2902,7 +3073,7 @@
     if (document.documentElement.dataset.kyxOwner === owner) delete document.documentElement.dataset.kyxOwner;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-favtrade, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket, .kyx-fav-pick, .kyx-coll-pick, .kyx-rec, .kyx-tuto-back, .kyx-tuto-entry, .kyx-spot, .kyx-bubble').forEach((el) => el.remove());
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-favtrade, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-subs-entry, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket, .kyx-fav-pick, .kyx-coll-pick, .kyx-rec, .kyx-tuto-back, .kyx-tuto-entry, .kyx-spot, .kyx-bubble').forEach((el) => el.remove());
     delete document.documentElement.dataset.kyxView;
     delete document.documentElement.dataset.kyxBoardIds;
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched], [data-kyx-ghost]').forEach((el) => {
@@ -2914,11 +3085,21 @@
   }
 
   let lastPath = location.pathname;
+  let lastPage = location.pathname + location.search; // a market tab counts as a page
+  let lastSubsTry = 0;
   const ticker = setInterval(() => {
     if (!alive()) return shutdown();
     syncAuth();
-    if (location.hash !== BOOSTERS_HASH && document.querySelector('.kyx-view')) closeBoosters(); // left through a link of the site
+    if (document.querySelector('.kyx-view') && !VIEWS.some((v) => v.hash === location.hash && viewOpen(v))) closeView(); // left through a link of the site
     checkBoostersDay();
+    if (Date.now() - lastSubsTry > 30e3) {
+      lastSubsTry = Date.now();
+      send({ type: 'subs-auto' });
+    }
+    if (location.pathname + location.search !== lastPage) {
+      lastPage = location.pathname + location.search;
+      send({ type: 'subs-auto', pageChanged: true });
+    }
     if (location.pathname !== lastPath) {
       lastPath = location.pathname;
       autoMore = 0;
@@ -2937,16 +3118,17 @@
     boardFav = !!stored.boardFav;
     if (partner && Date.now() - (partner.at ?? 0) > 30 * 60e3) partner = null;
     document.querySelectorAll('#kyx-root').forEach((el) => el.remove()); // left by older versions
-    window.addEventListener('hashchange', onBoostersHash);
+    window.addEventListener('hashchange', onViewHash);
     window.addEventListener('hashchange', onTutorialHash);
     syncAuth();
     observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
     refreshAll();
     onTutorialHash();
     showTutorialOnce();
-    if (location.hash === BOOSTERS_HASH) {
+    const view = VIEWS.find((v) => v.hash === location.hash);
+    if (view) {
       if (!catalog) await chrome.storage.local.get('catalog').then(applyStorage);
-      openBoosters();
+      view.open();
     }
     if (!catalog || !coll) send({ type: 'ensure-data' });
   })();

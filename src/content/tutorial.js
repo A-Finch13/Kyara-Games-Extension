@@ -78,6 +78,13 @@ const KYX_TOUR = [
     target: '#nav-more .kyx-more, #mobile-nav .kyx-more, [role="dialog"] > ul .kyx-more'
   },
   {
+    id: 'mur-honte',
+    title: 'Le Mur de la Honte',
+    text: 'Cher utilisateur de l’extension, j’ai l’immense honneur de vous présenter le nouveau « Mur de la Honte » créé par Sayko, qui aura pour but de mettre en lumière les abos du site au fur et à mesure de votre navigation dans le site. Que le divertissement commence !',
+    prepare: 'menu',
+    target: '#nav-more .kyx-subs-entry, #mobile-nav .kyx-subs-entry, [role="dialog"] > ul .kyx-subs-entry'
+  },
+  {
     id: 'amis',
     title: 'Te comparer à tes amis',
     text: 'Le filtre « 友 Amis » affiche le classement de tes amis, avec le même podium que le site.',
@@ -124,6 +131,10 @@ const KYX_TOUR = [
 
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
+  {
+    version: '1.8.0',
+    items: [['Cher utilisateur de l’extension, j’ai l’immense honneur de vous présenter le nouveau « Mur de la Honte » créé par Sayko, qui aura pour but de mettre en lumière les abos du site au fur et à mesure de votre navigation dans le site. Que le divertissement commence !', 'mur-honte']]
+  },
   {
     version: '1.7.7',
     items: [

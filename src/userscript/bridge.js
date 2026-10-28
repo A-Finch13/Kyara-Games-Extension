@@ -44,6 +44,15 @@ async function handle(msg) {
     case 'prices':
       // The site's fair price of each card, as shown in its trade composer: { [id]: chakra }.
       return (await api(`/fair-play/prices?ids=${msg.ids.slice(0, 200).join(',')}`)) ?? {};
+    case 'subs-scan':
+      await runSubsScan();
+      return { ok: true };
+    case 'subs-auto':
+      autoSubsScan(msg.pageChanged);
+      return { ok: true };
+    case 'subs-players':
+      meetPlayers(msg.list, msg.where);
+      return { ok: true };
     case 'ensure-data':
     case 'refresh':
       await Promise.allSettled([loadCatalog(), loadCollection(msg.type === 'refresh')]);

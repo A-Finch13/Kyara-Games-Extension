@@ -16,7 +16,30 @@
   // Writes after which the collection is no longer what the extension has cached.
   const WRITE = /^\/(packs\/[^/]+\/open(-many)?|trades(\/.*)?|market\/.*|me\/collection\/.*|me\/progress\/claim|me\/alt\/settle)$/;
 
+  // Answers that show other players (market, auctions, trades, chat, rankings, profiles), read for the "Mur de la Honte" page.
+  const PLAYERS = /^\/(market\/(listings|chat|buy-orders)|trades\/|eveil\/market|me\/(trades|market|friends)|leaderboard\/|feed$|users\/[^/]+$|membership\/wall)/;
+
   const original = window.fetch;
+
+  // Players found in an answer: id, pseudo, avatar, name colour, badges when the answer has them, and stats.
+  function players(body) {
+    const out = new Map();
+    let left = 20000;
+    const walk = (v, depth) => {
+      if (!v || typeof v !== 'object' || depth > 6 || --left < 0) return;
+      if (Array.isArray(v)) return void v.forEach((x) => walk(x, depth + 1));
+      const id = v.userId ?? v.id;
+      if (typeof v.pseudo === 'string' && typeof id === 'string' && !out.has(id)) {
+        const p = { id, pseudo: v.pseudo, avatar: v.avatar ?? null, nameColor: v.nameColor ?? null };
+        if (Array.isArray(v.badges)) p.badges = v.badges.map((b) => ({ id: b?.id }));
+        for (const k of ['owned', 'mythics', 'points']) if (typeof v[k] === 'number') p[k] = v[k];
+        out.set(id, p);
+      }
+      for (const k in v) walk(v[k], depth + 1);
+    };
+    walk(body, 0);
+    return [...out.values()];
+  }
 
   // ---------- "★ Favoris" of the market's trade offers ----------
 
@@ -72,6 +95,15 @@
       if (url.origin !== location.origin || !url.pathname.startsWith('/api/') || !res.ok) return res;
       const path = url.pathname.slice(4);
       const method = String(init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+      if (method === 'GET' && PLAYERS.test(path)) {
+        res.clone().json().then(
+          (body) => {
+            const list = players(body);
+            if (list.length) window.postMessage({ __kyaraGames: 1, kind: 'players', path, query: url.search, list }, location.origin);
+          },
+          () => {}
+        );
+      }
       if (method === 'GET' && READ.some((r) => r.test(path))) {
         res.clone().json().then(
           (body) => window.postMessage({ __kyaraGames: 1, kind: 'read', path, body }, location.origin),

@@ -98,7 +98,7 @@
   // "Kyara Games" entry at the end of a menu of the site; closer: the button that closes that menu.
   function addEntry(menu, closer) {
     if (!menu || menu.querySelector(':scope > .kyx-settings-entry')) return;
-    const model = menu.querySelector(':scope > a:not(.kyx-more)');
+    const model = menu.querySelector(':scope > a:not(.kyx-more):not(.kyx-subs-entry)');
     const kanji = model?.querySelector('.dk, .tk');
     const title = model?.querySelector('.dt b, .tl');
     if (!kanji || !title) return;

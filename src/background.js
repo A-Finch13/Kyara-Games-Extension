@@ -1,7 +1,8 @@
-import { ORIGIN, REPO, api, checkUpdate, newer, getSettings, setSettings, loadCatalog, loadCollection, slimCollection, slimMe } from './lib/kyara.js';
+import { ORIGIN, REPO, api, checkUpdate, newer, getSettings, setSettings, loadCatalog, loadCollection, slimCollection, slimMe, runSubsScan, autoSubsScan, meetPlayers } from './lib/kyara.js';
 
 const ALARM = 'kyara-poll';
 const UPDATE_ALARM = 'kyara-update';
+const SUBS_ALARM = 'kyara-subs';
 const FIREFOX = navigator.userAgent.includes('Firefox');
 const ICON = chrome.runtime.getURL('icons/icon128.png');
 const MAX_SEEN = 400;
@@ -27,13 +28,15 @@ const CATEGORY = {
   collection_shared: 'notifyFriends'
 };
 
-// Alarms: notifications at the interval of the settings (15 seconds by default), new versions every 15 minutes.
+// Alarms: notifications at the interval of the settings (15 seconds by default), new versions every 15 minutes,
+// subscribers of the site every minute, even with no kyara.games tab open.
 // An alarm can't repeat faster than every 30 seconds: below that, a second check runs in between (onAlarm).
 const pollEvery = (settings) => Math.max(0.25, Number(settings.pollMinutes) || 0.25);
 async function schedule() {
   const every = pollEvery(await getSettings());
   await chrome.alarms.create(ALARM, { periodInMinutes: Math.max(0.5, every) });
   if ((await chrome.alarms.get(UPDATE_ALARM))?.periodInMinutes !== 15) await chrome.alarms.create(UPDATE_ALARM, { delayInMinutes: 1, periodInMinutes: 15 });
+  if (!(await chrome.alarms.get(SUBS_ALARM))) await chrome.alarms.create(SUBS_ALARM, { delayInMinutes: 1, periodInMinutes: 1 });
 }
 
 // Looks for a newer release on GitHub (always the latest one) and notifies it once per version.
@@ -118,6 +121,7 @@ chrome.runtime.onStartup.addListener(() => {
 // Checks the account at each alarm, and once more in between when the interval is under 30 seconds.
 chrome.alarms.onAlarm.addListener(async (a) => {
   if (a.name === UPDATE_ALARM) lookForUpdate();
+  if (a.name === SUBS_ALARM) autoSubsScan();
   if (a.name !== ALARM) return;
   poll();
   const every = pollEvery(await getSettings());
@@ -327,6 +331,15 @@ async function handle(msg) {
     case 'prices':
       // The site's fair price of each card, as shown in its trade composer: { [id]: chakra }.
       return (await api(`/fair-play/prices?ids=${msg.ids.slice(0, 200).join(',')}`)) ?? {};
+    case 'subs-scan':
+      await runSubsScan();
+      return { ok: true };
+    case 'subs-auto':
+      autoSubsScan(msg.pageChanged);
+      return { ok: true };
+    case 'subs-players':
+      meetPlayers(msg.list, msg.where);
+      return { ok: true };
     case 'install-update':
       return installUpdate();
     case 'check-update':
