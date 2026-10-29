@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-29T17:47:01.962Z",
-  "count": 189,
+  "updated": "2026-10-29T17:53:18.499Z",
+  "count": 191,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -639,6 +639,14 @@
       "owned": 2432,
       "mythics": 3,
       "seen": 1793220357152
+    },
+    "e2d536b9-0ad0-4332-9eb8-2395a8d9c2ee": {
+      "id": "e2d536b9-0ad0-4332-9eb8-2395a8d9c2ee",
+      "pseudo": "Sese_sparky",
+      "avatar": "https://cdn.discordapp.com/avatars/1369034419985191024/b46d7b061787f143f4ae826708727a85.webp?size=128",
+      "color": null,
+      "tier": "daimyo",
+      "seen": 1793296186397
     },
     "0639d4bf-0c38-43c6-b174-0dfa100f0759": {
       "id": "0639d4bf-0c38-43c6-b174-0dfa100f0759",
@@ -1525,6 +1533,14 @@
       "color": null,
       "tier": "senpai",
       "seen": 1793288422835
+    },
+    "05aadde8-4368-4bbc-a889-e22f419f5c3c": {
+      "id": "05aadde8-4368-4bbc-a889-e22f419f5c3c",
+      "pseudo": "breiz239",
+      "avatar": "https://cdn.discordapp.com/avatars/612399222985326613/311ebd0bd6548ca86de6d23a648d7764.webp?size=128",
+      "color": null,
+      "tier": "nakama",
+      "seen": 1793296306346
     },
     "cb0cc7f1-e6fb-4c8c-9115-d7b7ae4c34e9": {
       "id": "cb0cc7f1-e6fb-4c8c-9115-d7b7ae4c34e9",
