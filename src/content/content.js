@@ -2031,6 +2031,7 @@
     { id: 'sensei', name: 'Sensei', kanji: '師', price: 16.99 },
     { id: 'daimyo', name: 'Daimyō', kanji: '大名', price: 24.99 }
   ];
+  const SUBS_EXPORTERS = ['e431c603-0a94-40d2-b45e-2fec48015a6e']; // Kyara ids of the accounts that see the "Exporter" button
   let refreshSubs = null; // shows the saved subscribers again while the page is open
   let subsTier = 'all';
 
@@ -2074,13 +2075,14 @@
       b.setAttribute('aria-pressed', String(b.dataset.tier === subsTier));
     });
 
-    // List filtered by tier, highest tier first.
-    const shown = all.filter((s) => subsTier === 'all' || s.tier === subsTier);
+    // List filtered by tier and pseudo, highest tier first.
+    const q = norm(page.querySelector('.kyx-search input').value);
+    const shown = all.filter((s) => (subsTier === 'all' || s.tier === subsTier) && (!q || norm(s.pseudo).includes(q)));
     shown.sort((a, b) => (rank.get(b.tier) ?? -1) - (rank.get(a.tier) ?? -1) || (b.owned ?? -1) - (a.owned ?? -1));
     const list = page.querySelector('.kyx-s-list');
     list.innerHTML = '';
     if (!shown.length) {
-      list.innerHTML = `<li class="kyx-b-empty">${all.length ? 'Personne à ce palier.' : 'Aucun abonné repéré pour l’instant.'}</li>`;
+      list.innerHTML = `<li class="kyx-b-empty">${all.length ? 'Personne ne correspond.' : 'Aucun abonné repéré pour l’instant.'}</li>`;
       return;
     }
     // One badge per subscriber: profile picture and pseudo, edged with the tier's colour.
@@ -2101,6 +2103,34 @@
     }
   }
 
+  // Updates abonnes.json in the repository with a GitHub token (asked once), or downloads the file without one.
+  async function exportSubscribers(btn, note) {
+    let { githubToken: token } = await chrome.storage.local.get('githubToken');
+    if (!token) {
+      token = prompt('Jeton GitHub pour mettre à jour abonnes.json dans le dépôt.\nLaisse vide pour seulement télécharger le fichier.')?.trim();
+      if (token === undefined) return;
+      if (token) await chrome.storage.local.set({ githubToken: token });
+    }
+    if (!token) {
+      const { subscribers = {} } = await chrome.storage.local.get('subscribers');
+      const text = JSON.stringify({ updated: new Date().toISOString(), count: Object.keys(subscribers).length, subscribers }, null, 2);
+      const a = Object.assign(document.createElement('a'), { download: 'abonnes.json', href: URL.createObjectURL(new Blob([text], { type: 'application/json' })) });
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      return;
+    }
+    btn.disabled = true;
+    note('Mise à jour de abonnes.json…');
+    const res = await send({ type: 'subs-export', token });
+    btn.disabled = false;
+    if (res?.error === 'github_token') {
+      await chrome.storage.local.remove('githubToken');
+      return note('Jeton GitHub refusé : il sera redemandé au prochain export.');
+    }
+    if (!res || res.error) return note('abonnes.json n’a pas pu être mis à jour.');
+    note(res.added ? `abonnes.json mis à jour : ${res.added} nouveaux abonnés, ${res.count} en tout.` : `abonnes.json contient déjà tous tes abonnés (${res.count}).`);
+  }
+
   // Builds the page and reads the site's lists again.
   async function openSubscribers() {
     const page = mountView(
@@ -2115,20 +2145,28 @@
         <div class="kyx-s-figures"></div>
         <p class="kyx-page-note" role="status"></p>
         <div class="kyx-seg kyx-s-tiers" role="group" aria-label="Palier"></div>
+        <div class="kyx-search-wrap">
+          <label class="kyx-search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+            <input type="search" autocomplete="off" spellcheck="false" placeholder="Rechercher un joueur…" aria-label="Rechercher un joueur" />
+          </label>
+        </div>
         <ol class="kyx-s-list"></ol>`
     );
     if (!page) return;
     const note = (text) => (page.querySelector('.kyx-page-note').textContent = text);
-    let { subscribers: known = {} } = await chrome.storage.local.get('subscribers').catch(() => ({}));
+    let { subscribers: known = {}, me } = await chrome.storage.local.get(['subscribers', 'me']).catch(() => ({}));
     await loadSubTiers();
     if (!page.isConnected) return;
     page.querySelector('.kyx-s-tiers').innerHTML = `<button type="button" data-tier="all" aria-pressed="false">Tous <small></small></button>${[...subTiers]
       .reverse()
       .map((t) => `<button type="button" data-tier="${esc(t.id)}" aria-pressed="false">${esc(t.kanji)} ${esc(t.name)} <small></small></button>`)
-      .join('')}<button type="button" class="kyx-s-again">↻ Actualiser</button>`;
+      .join('')}<button type="button" class="kyx-s-again">↻ Actualiser</button>${SUBS_EXPORTERS.includes(me?.id) ? '<button type="button" class="kyx-s-export">⇪ Exporter</button>' : ''}`;
     const draw = () => page.isConnected && renderSubscribers(page, known);
     refreshSubs = (next) => ((known = next ?? known), draw());
     page.querySelectorAll('.kyx-s-tiers [data-tier]').forEach((b) => b.addEventListener('click', () => ((subsTier = b.dataset.tier), draw())));
+    page.querySelector('.kyx-search input').addEventListener('input', draw);
+    page.querySelector('.kyx-s-export')?.addEventListener('click', (e) => exportSubscribers(e.currentTarget, note));
     draw();
 
     // Reads the site's lists again and saves what was found.

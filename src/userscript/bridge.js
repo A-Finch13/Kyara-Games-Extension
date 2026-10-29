@@ -50,6 +50,8 @@ async function handle(msg) {
     case 'subs-auto':
       autoSubsScan(msg.pageChanged);
       return { ok: true };
+    case 'subs-export':
+      return exportSubs(msg.token);
     case 'subs-players':
       meetPlayers(msg.list, msg.where);
       return { ok: true };

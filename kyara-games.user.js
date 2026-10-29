@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyara Games
 // @namespace    https://github.com/A-Finch13/Kyara-Games-Extension
-// @version      1.8.1
+// @version      1.8.2
 // @description  Compagnon non officiel pour kyara.games : cartes manquantes en gris avec ordre d'achat, albums complets masqués, doublons pendant les échanges, booster le plus rentable, classement entre amis.
 // @author       A-Finch13
 // @license      MIT
@@ -46,7 +46,7 @@
 'use strict';
 if (window.__kyaraGamesUserscript) return;
 window.__kyaraGamesUserscript = true;
-const KYX_VERSION = '1.8.1';
+const KYX_VERSION = '1.8.2';
 
 // ---------- 1. src/userscript/shim.js : stockage et messages, à la place des fonctions d'extension ----------
 // Userscript: the extension APIs used by the page code, rebuilt in the page.
@@ -468,6 +468,8 @@ const SUB_LADDERS = [
 const SUBS_SCAN_MINUTES = 1; // the public lists are searched again in the background after this
 const SUBS_RECHECK_MINUTES = 1; // a player found without a subscription is looked up again after this
 const SUB_TIERS = ['nakama', 'senpai', 'sensei', 'daimyo']; // lowest first
+const SHARED_SUBS = `https://raw.githubusercontent.com/${REPO}/main/abonnes.json`; // list published with the extension
+const SHARED_SUBS_MINUTES = 15;
 
 // Highest tier of a player from their "membre-…" badges, or null.
 const subTierOf = (badges) => {
@@ -549,10 +551,59 @@ function runSubsScan() {
     .finally(() => (subsScan = null)));
 }
 
-// Search every minute and on each change of page of the site (30 s apart at least, across tabs).
+// Adds the subscribers of the list published in the repository (abonnes.json) to the saved ones.
+async function loadSharedSubs() {
+  await chrome.storage.local.set({ sharedSubsAt: Date.now() });
+  const res = await fetch(SHARED_SUBS, { cache: 'no-store' }).catch(() => null);
+  const data = res?.ok ? await res.json().catch(() => null) : null;
+  const list = Object.values(data?.subscribers ?? {}).filter((s) => typeof s?.id === 'string' && typeof s.pseudo === 'string' && SUB_TIERS.includes(s.tier));
+  await saveSubscribers(list.map((s) => ({ ...s, seen: s.seen ?? Date.now(), src: s.src ?? { 'Liste partagée': 0 } })));
+}
+
+// Content of abonnes.json for a set of subscribers: highest tier first, then by pseudo.
+function subsJson(subscribers) {
+  const list = Object.values(subscribers).sort((a, b) => SUB_TIERS.indexOf(b.tier) - SUB_TIERS.indexOf(a.tier) || a.pseudo.localeCompare(b.pseudo, 'fr'));
+  const keep = ({ id, pseudo, avatar, color, tier, owned, mythics, seen }) => [id, { id, pseudo, avatar, color, tier, owned, mythics, seen }];
+  return JSON.stringify({ updated: new Date().toISOString(), count: list.length, subscribers: Object.fromEntries(list.map(keep)) }, null, 2) + '\n';
+}
+
+// Text of a GitHub "contents" answer, and the base64 of a text for it.
+const fromBase64 = (b64) => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g, '')), (c) => c.charCodeAt(0)));
+const toBase64 = (text) => btoa(Array.from(new TextEncoder().encode(text), (b) => String.fromCharCode(b)).join(''));
+
+// Adds the saved subscribers to abonnes.json in the repository with the GitHub token; returns { count, added }.
+async function exportSubs(token) {
+  const url = `https://api.github.com/repos/${REPO}/contents/abonnes.json`;
+  const headers = { accept: 'application/vnd.github+json', authorization: `Bearer ${token}` };
+  const { subscribers: mine = {} } = await chrome.storage.local.get('subscribers');
+  for (let attempt = 0; ; attempt++) {
+    const cur = await fetch(`${url}?ref=main`, { headers, cache: 'no-store' });
+    if (cur.status === 401) throw new ApiError(401, 'github_token');
+    if (!cur.ok && cur.status !== 404) throw new ApiError(cur.status, `github_${cur.status}`);
+    const file = cur.ok ? await cur.json() : null;
+    const known = file ? JSON.parse(fromBase64(file.content)).subscribers ?? {} : {};
+    const merged = { ...mine, ...known };
+    const added = Object.keys(merged).length - Object.keys(known).length;
+    if (!added) return { count: Object.keys(merged).length, added };
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { ...headers, 'content-type': 'application/json' },
+      body: JSON.stringify({ message: `Liste des abonnés : ${Object.keys(merged).length} abonnés`, content: toBase64(subsJson(merged)), sha: file?.sha, branch: 'main' })
+    });
+    if (res.ok) {
+      await saveSubscribers(Object.values(known));
+      return { count: Object.keys(merged).length, added };
+    }
+    if (res.status === 401 || res.status === 403 || res.status === 404) throw new ApiError(401, 'github_token');
+    if (res.status !== 409 || attempt) throw new ApiError(res.status, `github_${res.status}`);
+  }
+}
+
+// Search every minute and on each change of page of the site (30 s apart at least, across tabs); the shared list every 15 minutes.
 async function autoSubsScan(pageChanged) {
   if (subsScan) return;
-  const { subscribersAt = 0 } = await chrome.storage.local.get('subscribersAt');
+  const { subscribersAt = 0, sharedSubsAt = 0 } = await chrome.storage.local.get(['subscribersAt', 'sharedSubsAt']);
+  if (Date.now() - sharedSubsAt >= SHARED_SUBS_MINUTES * 60e3) loadSharedSubs().catch(() => {});
   if (Date.now() - subscribersAt >= (pageChanged ? 30e3 : SUBS_SCAN_MINUTES * 60e3)) runSubsScan();
 }
 
@@ -705,6 +756,8 @@ async function handle(msg) {
     case 'subs-auto':
       autoSubsScan(msg.pageChanged);
       return { ok: true };
+    case 'subs-export':
+      return exportSubs(msg.token);
     case 'subs-players':
       meetPlayers(msg.list, msg.where);
       return { ok: true };
@@ -2790,7 +2843,7 @@ const KYX_TOUR = [
   {
     id: 'mur-honte',
     title: 'Le Mur de la Honte',
-    text: 'Cher utilisateur de l’extension, j’ai l’immense honneur de vous présenter le nouveau « Mur de la Honte » créé par Finch, qui aura pour but de mettre en lumière les abos du site au fur et à mesure de votre navigation dans le site. Que le divertissement commence !',
+    text: 'Cher utilisateur de l’extension, j’ai l’immense honneur de vous présenter le nouveau « Mur de la Honte » créé par Sayko, qui aura pour but de mettre en lumière les abos du site au fur et à mesure de votre navigation dans le site. Que le divertissement commence !',
     prepare: 'menu',
     target: '#nav-more .kyx-subs-entry, #mobile-nav .kyx-subs-entry, [role="dialog"] > ul .kyx-subs-entry'
   },
@@ -2841,6 +2894,13 @@ const KYX_TOUR = [
 
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
+  {
+    version: '1.8.2',
+    items: [
+      ['Mur de la Honte : les abonnés déjà repérés arrivent tout de suite dans ta liste, grâce à une liste partagée mise à jour à chaque version.', 'mur-honte'],
+      ['Mur de la Honte : une barre de recherche pour trouver un joueur.', 'mur-honte']
+    ]
+  },
   {
     version: '1.8.1',
     items: [['Mur de la Honte : un clic sur un badge ouvre le profil du joueur.', 'mur-honte']]
@@ -4991,6 +5051,7 @@ const KYX_CHANGES = [
     { id: 'sensei', name: 'Sensei', kanji: '師', price: 16.99 },
     { id: 'daimyo', name: 'Daimyō', kanji: '大名', price: 24.99 }
   ];
+  const SUBS_EXPORTERS = ['e431c603-0a94-40d2-b45e-2fec48015a6e']; // Kyara ids of the accounts that see the "Exporter" button
   let refreshSubs = null; // shows the saved subscribers again while the page is open
   let subsTier = 'all';
 
@@ -5034,13 +5095,14 @@ const KYX_CHANGES = [
       b.setAttribute('aria-pressed', String(b.dataset.tier === subsTier));
     });
 
-    // List filtered by tier, highest tier first.
-    const shown = all.filter((s) => subsTier === 'all' || s.tier === subsTier);
+    // List filtered by tier and pseudo, highest tier first.
+    const q = norm(page.querySelector('.kyx-search input').value);
+    const shown = all.filter((s) => (subsTier === 'all' || s.tier === subsTier) && (!q || norm(s.pseudo).includes(q)));
     shown.sort((a, b) => (rank.get(b.tier) ?? -1) - (rank.get(a.tier) ?? -1) || (b.owned ?? -1) - (a.owned ?? -1));
     const list = page.querySelector('.kyx-s-list');
     list.innerHTML = '';
     if (!shown.length) {
-      list.innerHTML = `<li class="kyx-b-empty">${all.length ? 'Personne à ce palier.' : 'Aucun abonné repéré pour l’instant.'}</li>`;
+      list.innerHTML = `<li class="kyx-b-empty">${all.length ? 'Personne ne correspond.' : 'Aucun abonné repéré pour l’instant.'}</li>`;
       return;
     }
     // One badge per subscriber: profile picture and pseudo, edged with the tier's colour.
@@ -5061,6 +5123,34 @@ const KYX_CHANGES = [
     }
   }
 
+  // Updates abonnes.json in the repository with a GitHub token (asked once), or downloads the file without one.
+  async function exportSubscribers(btn, note) {
+    let { githubToken: token } = await chrome.storage.local.get('githubToken');
+    if (!token) {
+      token = prompt('Jeton GitHub pour mettre à jour abonnes.json dans le dépôt.\nLaisse vide pour seulement télécharger le fichier.')?.trim();
+      if (token === undefined) return;
+      if (token) await chrome.storage.local.set({ githubToken: token });
+    }
+    if (!token) {
+      const { subscribers = {} } = await chrome.storage.local.get('subscribers');
+      const text = JSON.stringify({ updated: new Date().toISOString(), count: Object.keys(subscribers).length, subscribers }, null, 2);
+      const a = Object.assign(document.createElement('a'), { download: 'abonnes.json', href: URL.createObjectURL(new Blob([text], { type: 'application/json' })) });
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      return;
+    }
+    btn.disabled = true;
+    note('Mise à jour de abonnes.json…');
+    const res = await send({ type: 'subs-export', token });
+    btn.disabled = false;
+    if (res?.error === 'github_token') {
+      await chrome.storage.local.remove('githubToken');
+      return note('Jeton GitHub refusé : il sera redemandé au prochain export.');
+    }
+    if (!res || res.error) return note('abonnes.json n’a pas pu être mis à jour.');
+    note(res.added ? `abonnes.json mis à jour : ${res.added} nouveaux abonnés, ${res.count} en tout.` : `abonnes.json contient déjà tous tes abonnés (${res.count}).`);
+  }
+
   // Builds the page and reads the site's lists again.
   async function openSubscribers() {
     const page = mountView(
@@ -5075,20 +5165,28 @@ const KYX_CHANGES = [
         <div class="kyx-s-figures"></div>
         <p class="kyx-page-note" role="status"></p>
         <div class="kyx-seg kyx-s-tiers" role="group" aria-label="Palier"></div>
+        <div class="kyx-search-wrap">
+          <label class="kyx-search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+            <input type="search" autocomplete="off" spellcheck="false" placeholder="Rechercher un joueur…" aria-label="Rechercher un joueur" />
+          </label>
+        </div>
         <ol class="kyx-s-list"></ol>`
     );
     if (!page) return;
     const note = (text) => (page.querySelector('.kyx-page-note').textContent = text);
-    let { subscribers: known = {} } = await chrome.storage.local.get('subscribers').catch(() => ({}));
+    let { subscribers: known = {}, me } = await chrome.storage.local.get(['subscribers', 'me']).catch(() => ({}));
     await loadSubTiers();
     if (!page.isConnected) return;
     page.querySelector('.kyx-s-tiers').innerHTML = `<button type="button" data-tier="all" aria-pressed="false">Tous <small></small></button>${[...subTiers]
       .reverse()
       .map((t) => `<button type="button" data-tier="${esc(t.id)}" aria-pressed="false">${esc(t.kanji)} ${esc(t.name)} <small></small></button>`)
-      .join('')}<button type="button" class="kyx-s-again">↻ Actualiser</button>`;
+      .join('')}<button type="button" class="kyx-s-again">↻ Actualiser</button>${SUBS_EXPORTERS.includes(me?.id) ? '<button type="button" class="kyx-s-export">⇪ Exporter</button>' : ''}`;
     const draw = () => page.isConnected && renderSubscribers(page, known);
     refreshSubs = (next) => ((known = next ?? known), draw());
     page.querySelectorAll('.kyx-s-tiers [data-tier]').forEach((b) => b.addEventListener('click', () => ((subsTier = b.dataset.tier), draw())));
+    page.querySelector('.kyx-search input').addEventListener('input', draw);
+    page.querySelector('.kyx-s-export')?.addEventListener('click', (e) => exportSubscribers(e.currentTarget, note));
     draw();
 
     // Reads the site's lists again and saves what was found.

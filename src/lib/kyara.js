@@ -322,6 +322,8 @@ const SUB_LADDERS = [
 const SUBS_SCAN_MINUTES = 1; // the public lists are searched again in the background after this
 const SUBS_RECHECK_MINUTES = 1; // a player found without a subscription is looked up again after this
 const SUB_TIERS = ['nakama', 'senpai', 'sensei', 'daimyo']; // lowest first
+const SHARED_SUBS = `https://raw.githubusercontent.com/${REPO}/main/abonnes.json`; // list published with the extension
+const SHARED_SUBS_MINUTES = 15;
 
 // Highest tier of a player from their "membre-…" badges, or null.
 const subTierOf = (badges) => {
@@ -403,10 +405,59 @@ export function runSubsScan() {
     .finally(() => (subsScan = null)));
 }
 
-// Search every minute and on each change of page of the site (30 s apart at least, across tabs).
+// Adds the subscribers of the list published in the repository (abonnes.json) to the saved ones.
+async function loadSharedSubs() {
+  await chrome.storage.local.set({ sharedSubsAt: Date.now() });
+  const res = await fetch(SHARED_SUBS, { cache: 'no-store' }).catch(() => null);
+  const data = res?.ok ? await res.json().catch(() => null) : null;
+  const list = Object.values(data?.subscribers ?? {}).filter((s) => typeof s?.id === 'string' && typeof s.pseudo === 'string' && SUB_TIERS.includes(s.tier));
+  await saveSubscribers(list.map((s) => ({ ...s, seen: s.seen ?? Date.now(), src: s.src ?? { 'Liste partagée': 0 } })));
+}
+
+// Content of abonnes.json for a set of subscribers: highest tier first, then by pseudo.
+export function subsJson(subscribers) {
+  const list = Object.values(subscribers).sort((a, b) => SUB_TIERS.indexOf(b.tier) - SUB_TIERS.indexOf(a.tier) || a.pseudo.localeCompare(b.pseudo, 'fr'));
+  const keep = ({ id, pseudo, avatar, color, tier, owned, mythics, seen }) => [id, { id, pseudo, avatar, color, tier, owned, mythics, seen }];
+  return JSON.stringify({ updated: new Date().toISOString(), count: list.length, subscribers: Object.fromEntries(list.map(keep)) }, null, 2) + '\n';
+}
+
+// Text of a GitHub "contents" answer, and the base64 of a text for it.
+const fromBase64 = (b64) => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g, '')), (c) => c.charCodeAt(0)));
+const toBase64 = (text) => btoa(Array.from(new TextEncoder().encode(text), (b) => String.fromCharCode(b)).join(''));
+
+// Adds the saved subscribers to abonnes.json in the repository with the GitHub token; returns { count, added }.
+export async function exportSubs(token) {
+  const url = `https://api.github.com/repos/${REPO}/contents/abonnes.json`;
+  const headers = { accept: 'application/vnd.github+json', authorization: `Bearer ${token}` };
+  const { subscribers: mine = {} } = await chrome.storage.local.get('subscribers');
+  for (let attempt = 0; ; attempt++) {
+    const cur = await fetch(`${url}?ref=main`, { headers, cache: 'no-store' });
+    if (cur.status === 401) throw new ApiError(401, 'github_token');
+    if (!cur.ok && cur.status !== 404) throw new ApiError(cur.status, `github_${cur.status}`);
+    const file = cur.ok ? await cur.json() : null;
+    const known = file ? JSON.parse(fromBase64(file.content)).subscribers ?? {} : {};
+    const merged = { ...mine, ...known };
+    const added = Object.keys(merged).length - Object.keys(known).length;
+    if (!added) return { count: Object.keys(merged).length, added };
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { ...headers, 'content-type': 'application/json' },
+      body: JSON.stringify({ message: `Liste des abonnés : ${Object.keys(merged).length} abonnés`, content: toBase64(subsJson(merged)), sha: file?.sha, branch: 'main' })
+    });
+    if (res.ok) {
+      await saveSubscribers(Object.values(known));
+      return { count: Object.keys(merged).length, added };
+    }
+    if (res.status === 401 || res.status === 403 || res.status === 404) throw new ApiError(401, 'github_token');
+    if (res.status !== 409 || attempt) throw new ApiError(res.status, `github_${res.status}`);
+  }
+}
+
+// Search every minute and on each change of page of the site (30 s apart at least, across tabs); the shared list every 15 minutes.
 export async function autoSubsScan(pageChanged) {
   if (subsScan) return;
-  const { subscribersAt = 0 } = await chrome.storage.local.get('subscribersAt');
+  const { subscribersAt = 0, sharedSubsAt = 0 } = await chrome.storage.local.get(['subscribersAt', 'sharedSubsAt']);
+  if (Date.now() - sharedSubsAt >= SHARED_SUBS_MINUTES * 60e3) loadSharedSubs().catch(() => {});
   if (Date.now() - subscribersAt >= (pageChanged ? 30e3 : SUBS_SCAN_MINUTES * 60e3)) runSubsScan();
 }
 

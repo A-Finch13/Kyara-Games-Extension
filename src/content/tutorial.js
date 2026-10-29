@@ -132,6 +132,13 @@ const KYX_TOUR = [
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
   {
+    version: '1.8.2',
+    items: [
+      ['Mur de la Honte : les abonnés déjà repérés arrivent tout de suite dans ta liste, grâce à une liste partagée mise à jour à chaque version.', 'mur-honte'],
+      ['Mur de la Honte : une barre de recherche pour trouver un joueur.', 'mur-honte']
+    ]
+  },
+  {
     version: '1.8.1',
     items: [['Mur de la Honte : un clic sur un badge ouvre le profil du joueur.', 'mur-honte']]
   },
