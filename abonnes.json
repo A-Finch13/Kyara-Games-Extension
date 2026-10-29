@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-29T16:37:31.208Z",
-  "count": 187,
+  "updated": "2026-10-29T17:47:01.962Z",
+  "count": 189,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -1148,6 +1148,14 @@
       "mythics": 13,
       "seen": 1793285580005
     },
+    "f62ed601-9ffe-4367-ba9f-775094f38dd9": {
+      "id": "f62ed601-9ffe-4367-ba9f-775094f38dd9",
+      "pseudo": "Simon-20",
+      "avatar": "https://cdn.discordapp.com/avatars/239737001115516929/a_ffdfb5ecc8adbcb541f5fc3780e1d11a.webp?size=128&animated=true",
+      "color": "#38d6e0",
+      "tier": "sensei",
+      "seen": 1793295715779
+    },
     "f75c4b37-56a1-4804-a597-4a71638561d5": {
       "id": "f75c4b37-56a1-4804-a597-4a71638561d5",
       "pseudo": "Skit",
@@ -1437,6 +1445,14 @@
       "color": null,
       "tier": "senpai",
       "seen": 1793219942916
+    },
+    "fab58b0f-4766-4818-8c9f-943f968f8eaa": {
+      "id": "fab58b0f-4766-4818-8c9f-943f968f8eaa",
+      "pseudo": "rafteut",
+      "avatar": "https://cdn.discordapp.com/avatars/640962836398604299/5da06afba6e3501d1014e5d329e99935.webp?size=128",
+      "color": null,
+      "tier": "senpai",
+      "seen": 1793295826384
     },
     "c760a8f6-9a2e-4ff9-be15-bbc0832b32d9": {
       "id": "c760a8f6-9a2e-4ff9-be15-bbc0832b32d9",
