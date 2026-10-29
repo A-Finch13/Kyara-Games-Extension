@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyara Games
 // @namespace    https://github.com/A-Finch13/Kyara-Games-Extension
-// @version      1.8.0
+// @version      1.8.1
 // @description  Compagnon non officiel pour kyara.games : cartes manquantes en gris avec ordre d'achat, albums complets masqués, doublons pendant les échanges, booster le plus rentable, classement entre amis.
 // @author       A-Finch13
 // @license      MIT
@@ -46,7 +46,7 @@
 'use strict';
 if (window.__kyaraGamesUserscript) return;
 window.__kyaraGamesUserscript = true;
-const KYX_VERSION = '1.8.0';
+const KYX_VERSION = '1.8.1';
 
 // ---------- 1. src/userscript/shim.js : stockage et messages, à la place des fonctions d'extension ----------
 // Userscript: the extension APIs used by the page code, rebuilt in the page.
@@ -2790,7 +2790,7 @@ const KYX_TOUR = [
   {
     id: 'mur-honte',
     title: 'Le Mur de la Honte',
-    text: 'Cher utilisateur de l’extension, j’ai l’immense honneur de vous présenter le nouveau « Mur de la Honte » créé par Sayko, qui aura pour but de mettre en lumière les abos du site au fur et à mesure de votre navigation dans le site. Que le divertissement commence !',
+    text: 'Cher utilisateur de l’extension, j’ai l’immense honneur de vous présenter le nouveau « Mur de la Honte » créé par Finch, qui aura pour but de mettre en lumière les abos du site au fur et à mesure de votre navigation dans le site. Que le divertissement commence !',
     prepare: 'menu',
     target: '#nav-more .kyx-subs-entry, #mobile-nav .kyx-subs-entry, [role="dialog"] > ul .kyx-subs-entry'
   },
@@ -2841,6 +2841,10 @@ const KYX_TOUR = [
 
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
+  {
+    version: '1.8.1',
+    items: [['Mur de la Honte : un clic sur un badge ouvre le profil du joueur.', 'mur-honte']]
+  },
   {
     version: '1.8.0',
     items: [['Cher utilisateur de l’extension, j’ai l’immense honneur de vous présenter le nouveau « Mur de la Honte » créé par Sayko, qui aura pour but de mettre en lumière les abos du site au fur et à mesure de votre navigation dans le site. Que le divertissement commence !', 'mur-honte']]
@@ -5044,7 +5048,7 @@ const KYX_CHANGES = [
       const li = document.createElement('li');
       li.innerHTML = `<a data-tier="${esc(s.tier)}"><span class="kyx-s-av"></span><b></b></a>`;
       const a = li.querySelector('a');
-      a.href = `/u/${encodeURIComponent(s.pseudo)}`;
+      a.href = `/profil/${encodeURIComponent(s.id)}`;
       a.title = tierInfo(s.tier).name;
       a.addEventListener('click', closeView);
       const av = li.querySelector('.kyx-s-av');

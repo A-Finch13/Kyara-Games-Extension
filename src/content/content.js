@@ -2088,7 +2088,7 @@
       const li = document.createElement('li');
       li.innerHTML = `<a data-tier="${esc(s.tier)}"><span class="kyx-s-av"></span><b></b></a>`;
       const a = li.querySelector('a');
-      a.href = `/u/${encodeURIComponent(s.pseudo)}`;
+      a.href = `/profil/${encodeURIComponent(s.id)}`;
       a.title = tierInfo(s.tier).name;
       a.addEventListener('click', closeView);
       const av = li.querySelector('.kyx-s-av');
