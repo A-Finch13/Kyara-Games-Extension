@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-30T20:32:15.105Z",
-  "count": 237,
+  "updated": "2026-10-30T20:37:14.989Z",
+  "count": 238,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -1979,6 +1979,16 @@
       "color": null,
       "tier": "nakama",
       "seen": 1793290162781
+    },
+    "b5cf5097-86eb-4fd5-9b5e-9bf6f0a2a859": {
+      "id": "b5cf5097-86eb-4fd5-9b5e-9bf6f0a2a859",
+      "pseudo": "Gpsnkrs",
+      "avatar": "https://cdn.discordapp.com/avatars/1241056214373367910/3b7eeea8429d33bb755006ef1333052b.webp?size=128",
+      "color": "#e9b93c",
+      "tier": "nakama",
+      "owned": 3429,
+      "mythics": 10,
+      "seen": 1793392634989
     },
     "c5607333-ce22-4747-99db-c3af54334d67": {
       "id": "c5607333-ce22-4747-99db-c3af54334d67",
