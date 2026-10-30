@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-30T21:03:24.925Z",
-  "count": 239,
+  "updated": "2026-10-30T21:19:19.152Z",
+  "count": 240,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -53,6 +53,16 @@
       "owned": 1068,
       "mythics": 94,
       "seen": 1793288387496
+    },
+    "3e1cabe4-5cc8-47ef-9398-c04eb15efe3f": {
+      "id": "3e1cabe4-5cc8-47ef-9398-c04eb15efe3f",
+      "pseudo": "_pvfb",
+      "avatar": "https://cdn.discordapp.com/avatars/1391023033254412379/7d7c57b518a2c35895b347e4efb8b861.webp?size=128",
+      "color": "#5cb8ff",
+      "tier": "daimyo",
+      "owned": 3236,
+      "mythics": 13,
+      "seen": 1793395159152
     },
     "b65b1b4c-a892-495e-9a76-a1d4418d5e85": {
       "id": "b65b1b4c-a892-495e-9a76-a1d4418d5e85",
