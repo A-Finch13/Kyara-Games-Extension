@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-30T22:12:15.137Z",
-  "count": 253,
+  "updated": "2026-10-30T22:22:33.772Z",
+  "count": 254,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -1077,6 +1077,16 @@
       "owned": 1376,
       "mythics": 141,
       "seen": 1793288387496
+    },
+    "b2f32054-4211-4589-8499-aa51bbd36f7a": {
+      "id": "b2f32054-4211-4589-8499-aa51bbd36f7a",
+      "pseudo": "Yotxess",
+      "avatar": "https://cdn.discordapp.com/avatars/197736802566668288/ae19a0b7fcd171cecf87b710246f1392.webp?size=128",
+      "color": "#3fcf9b",
+      "tier": "daimyo",
+      "owned": 4449,
+      "mythics": 14,
+      "seen": 1793398953772
     },
     "a0af0b55-fbae-4e00-8116-ecf138d3e2bd": {
       "id": "a0af0b55-fbae-4e00-8116-ecf138d3e2bd",
