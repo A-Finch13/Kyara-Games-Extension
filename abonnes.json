@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-30T21:40:15.638Z",
-  "count": 248,
+  "updated": "2026-10-30T21:45:29.842Z",
+  "count": 249,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -1247,6 +1247,16 @@
       "color": "#ff4d6d",
       "tier": "sensei",
       "seen": 1793223960662
+    },
+    "b13cf891-8464-4632-8495-bae6476c0e0b": {
+      "id": "b13cf891-8464-4632-8495-bae6476c0e0b",
+      "pseudo": "Framboise",
+      "avatar": "https://cdn.discordapp.com/avatars/907781383668236348/317484910ab4b24d0bb61c6af51bd9bd.webp?size=128",
+      "color": "#38d6e0",
+      "tier": "sensei",
+      "owned": 2962,
+      "mythics": 13,
+      "seen": 1793396729842
     },
     "4f197ab4-789c-4dfa-9cda-64a90b93d47a": {
       "id": "4f197ab4-789c-4dfa-9cda-64a90b93d47a",
