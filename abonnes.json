@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-30T21:35:15.091Z",
-  "count": 242,
+  "updated": "2026-10-30T21:40:15.638Z",
+  "count": 248,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -196,6 +196,16 @@
       "mythics": 15,
       "seen": 1793291769004
     },
+    "d8e6c90d-ebb0-46cd-9fe3-6a3258cce0f3": {
+      "id": "d8e6c90d-ebb0-46cd-9fe3-6a3258cce0f3",
+      "pseudo": "Delta_One",
+      "avatar": "https://cdn.discordapp.com/avatars/437599661407338528/edc65607fbdf3197d654a0f5a8b18a04.webp?size=128",
+      "color": "#5cb8ff",
+      "tier": "daimyo",
+      "owned": 2327,
+      "mythics": 6,
+      "seen": 1793396415638
+    },
     "f0b083d4-989a-4afa-9a38-252fd0c19f31": {
       "id": "f0b083d4-989a-4afa-9a38-252fd0c19f31",
       "pseudo": "Dieu-2",
@@ -241,6 +251,16 @@
       "owned": 4150,
       "mythics": 18,
       "seen": 1793391403081
+    },
+    "0ba6c3e6-fc4d-4c26-bbd2-6fedcd273e7f": {
+      "id": "0ba6c3e6-fc4d-4c26-bbd2-6fedcd273e7f",
+      "pseudo": "Drinkbull",
+      "avatar": "https://cdn.discordapp.com/avatars/680481483474862120/28db39a971f491780298742a8c7254f2.webp?size=128",
+      "color": null,
+      "tier": "daimyo",
+      "owned": 3028,
+      "mythics": 8,
+      "seen": 1793396415096
     },
     "6592f0c4-7d7f-4924-9faf-943f320c7baa": {
       "id": "6592f0c4-7d7f-4924-9faf-943f320c7baa",
@@ -717,6 +737,16 @@
       "owned": 2032,
       "mythics": 85,
       "seen": 1793288387492
+    },
+    "846b2fd4-65f0-473c-800a-951afa46e8cf": {
+      "id": "846b2fd4-65f0-473c-800a-951afa46e8cf",
+      "pseudo": "PandaXLinknoe",
+      "avatar": "https://cdn.discordapp.com/avatars/234594261637660672/a_3616f2552dcea5312253a48e876efe48.webp?size=128&animated=true",
+      "color": "#e9b93c",
+      "tier": "daimyo",
+      "owned": 1196,
+      "mythics": 8,
+      "seen": 1793396415361
     },
     "05a6b0ab-3857-4f94-9860-9a46b7da1631": {
       "id": "05a6b0ab-3857-4f94-9860-9a46b7da1631",
@@ -1718,6 +1748,16 @@
       "tier": "senpai",
       "seen": 1793220840801
     },
+    "585811ca-5373-4092-bd80-c0cc5e90ff08": {
+      "id": "585811ca-5373-4092-bd80-c0cc5e90ff08",
+      "pseudo": "Divin",
+      "avatar": "https://cdn.discordapp.com/avatars/717316363806441492/6dc78af339d6657562e7d61ccf33f9ea.webp?size=128",
+      "color": "#ff4d6d",
+      "tier": "senpai",
+      "owned": 219,
+      "mythics": 18,
+      "seen": 1793396415183
+    },
     "33492517-ab59-4e9d-b6d3-d826cdcca97e": {
       "id": "33492517-ab59-4e9d-b6d3-d826cdcca97e",
       "pseudo": "Dynamight",
@@ -1801,6 +1841,16 @@
       "color": null,
       "tier": "senpai",
       "seen": 1793214878325
+    },
+    "bfd2b2fc-17d9-4133-8b95-3e645b646e93": {
+      "id": "bfd2b2fc-17d9-4133-8b95-3e645b646e93",
+      "pseudo": "KC_MetaSumeer",
+      "avatar": "https://cdn.discordapp.com/avatars/1103342029297172611/7a3ec0e2c8ed42b8a5701aeacd107a7f.webp?size=128",
+      "color": null,
+      "tier": "senpai",
+      "owned": 2016,
+      "mythics": 31,
+      "seen": 1793396415548
     },
     "56aa1b0d-a679-4aba-8e3b-3c3a61471bdd": {
       "id": "56aa1b0d-a679-4aba-8e3b-3c3a61471bdd",
@@ -2027,6 +2077,16 @@
       "color": "#ff4d6d",
       "tier": "nakama",
       "seen": 1793219183622
+    },
+    "acf3980b-74de-42d0-92df-5ed9d56c1fc5": {
+      "id": "acf3980b-74de-42d0-92df-5ed9d56c1fc5",
+      "pseudo": "madani-2",
+      "avatar": "https://cdn.discordapp.com/avatars/238713977192972290/a80f5d7290e2bcef5fe36315e5dcb4de.webp?size=128",
+      "color": "#e9b93c",
+      "tier": "nakama",
+      "owned": 4884,
+      "mythics": 16,
+      "seen": 1793396415458
     },
     "0a2966b5-2739-4810-8faf-98121bb40c49": {
       "id": "0a2966b5-2739-4810-8faf-98121bb40c49",
