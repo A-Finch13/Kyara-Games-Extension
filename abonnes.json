@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-30T21:56:15.161Z",
-  "count": 251,
+  "updated": "2026-10-30T22:12:15.137Z",
+  "count": 253,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -630,6 +630,16 @@
       "tier": "daimyo",
       "seen": 1793283286542
     },
+    "f14afc35-e4d1-4d86-8d4e-3d0d6c509a9a": {
+      "id": "f14afc35-e4d1-4d86-8d4e-3d0d6c509a9a",
+      "pseudo": "Luffytimeout",
+      "avatar": "https://cdn.discordapp.com/avatars/954849475120226305/a_9c8706bd38a61ba23dece034876c4bdc.webp?size=128&animated=true",
+      "color": null,
+      "tier": "daimyo",
+      "owned": 4133,
+      "mythics": 28,
+      "seen": 1793398335137
+    },
     "c1418eca-4f93-4389-9250-c5002ff39827": {
       "id": "c1418eca-4f93-4389-9250-c5002ff39827",
       "pseudo": "Maitre_Julux",
@@ -1187,6 +1197,16 @@
       "color": null,
       "tier": "sensei",
       "seen": 1793214774489
+    },
+    "2b54888f-8fd3-4601-8fbc-c637640a40d1": {
+      "id": "2b54888f-8fd3-4601-8fbc-c637640a40d1",
+      "pseudo": "Buster-3",
+      "avatar": "https://cdn.discordapp.com/avatars/656426137911820289/ee81c6eee40082ceb2ec44ec0dd6e3d5.webp?size=128",
+      "color": "#ff7eb6",
+      "tier": "sensei",
+      "owned": 2274,
+      "mythics": 5,
+      "seen": 1793398335049
     },
     "0fe8f3fd-d82e-4175-a82d-167fa6a3563c": {
       "id": "0fe8f3fd-d82e-4175-a82d-167fa6a3563c",
