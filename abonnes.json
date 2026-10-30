@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-30T21:19:19.152Z",
-  "count": 240,
+  "updated": "2026-10-30T21:35:15.091Z",
+  "count": 242,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -525,6 +525,16 @@
       "color": "#38d6e0",
       "tier": "daimyo",
       "seen": 1793217863661
+    },
+    "b1238d99-c99c-4d9e-abc4-38880d032a64": {
+      "id": "b1238d99-c99c-4d9e-abc4-38880d032a64",
+      "pseudo": "Kyoma-3",
+      "avatar": "https://cdn.discordapp.com/avatars/703974375480623137/7c0604b2f7ef41deb1c5d882209613a9.webp?size=128",
+      "color": null,
+      "tier": "daimyo",
+      "owned": 4019,
+      "mythics": 11,
+      "seen": 1793396115091
     },
     "239e998d-ad7e-4a87-b163-f5b05dcdc604": {
       "id": "239e998d-ad7e-4a87-b163-f5b05dcdc604",
@@ -2041,6 +2051,16 @@
       "color": null,
       "tier": "nakama",
       "seen": 1793284524744
+    },
+    "09c94b5e-eff5-4416-ba21-ae27f0cdfaaf": {
+      "id": "09c94b5e-eff5-4416-ba21-ae27f0cdfaaf",
+      "pseudo": "Miyu-11",
+      "avatar": "https://cdn.discordapp.com/avatars/278936852101201933/71c4588b5e413e81e9189a6e4f5ca2a6.webp?size=128",
+      "color": "#3fcf9b",
+      "tier": "nakama",
+      "owned": 1668,
+      "mythics": 2,
+      "seen": 1793396114994
     },
     "576da9a5-c300-4a3a-adc0-1cdbea03dab6": {
       "id": "576da9a5-c300-4a3a-adc0-1cdbea03dab6",
