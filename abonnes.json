@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-30T20:37:14.989Z",
-  "count": 238,
+  "updated": "2026-10-30T21:03:24.925Z",
+  "count": 239,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -1197,6 +1197,16 @@
       "color": "#ff4d6d",
       "tier": "sensei",
       "seen": 1793223960662
+    },
+    "4f197ab4-789c-4dfa-9cda-64a90b93d47a": {
+      "id": "4f197ab4-789c-4dfa-9cda-64a90b93d47a",
+      "pseudo": "Genpashi",
+      "avatar": "https://cdn.discordapp.com/avatars/1490223315971739678/848bcf1f81263b5acd3698943d6c7889.webp?size=128",
+      "color": "#a98bff",
+      "tier": "sensei",
+      "owned": 4953,
+      "mythics": 17,
+      "seen": 1793394204925
     },
     "a5fc4b78-4078-47ef-9ff8-c18632ec5bda": {
       "id": "a5fc4b78-4078-47ef-9ff8-c18632ec5bda",
