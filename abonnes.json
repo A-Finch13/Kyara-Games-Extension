@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-30T21:50:57.277Z",
-  "count": 250,
+  "updated": "2026-10-30T21:56:15.161Z",
+  "count": 251,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -601,6 +601,16 @@
       "owned": 1798,
       "mythics": 19,
       "seen": 1793288387492
+    },
+    "3d8a8310-a9cd-468c-b980-4b421a9ba5e2": {
+      "id": "3d8a8310-a9cd-468c-b980-4b421a9ba5e2",
+      "pseudo": "Loup-2",
+      "avatar": "https://cdn.discordapp.com/avatars/330442663121649664/41496ec436ba4e826599ff3b4411d8b7.webp?size=128",
+      "color": null,
+      "tier": "daimyo",
+      "owned": 4110,
+      "mythics": 18,
+      "seen": 1793397375161
     },
     "482ab13d-0bec-4c45-9a83-fb88f4a85ec9": {
       "id": "482ab13d-0bec-4c45-9a83-fb88f4a85ec9",
