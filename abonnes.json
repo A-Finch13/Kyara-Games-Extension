@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-30T20:26:39.584Z",
-  "count": 236,
+  "updated": "2026-10-30T20:32:15.105Z",
+  "count": 237,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -1323,6 +1323,16 @@
       "owned": 4207,
       "mythics": 12,
       "seen": 1793391402799
+    },
+    "65bee1e3-db69-473f-b1cc-2e201b15398e": {
+      "id": "65bee1e3-db69-473f-b1cc-2e201b15398e",
+      "pseudo": "MathisLLL",
+      "avatar": "https://cdn.discordapp.com/avatars/1563459312708354139/60ef74132ea321ee16aa0f0c7b9c01c8.webp?size=128",
+      "color": null,
+      "tier": "sensei",
+      "owned": 3126,
+      "mythics": 5,
+      "seen": 1793392335105
     },
     "8739cd75-d906-4e47-a1de-b27199a6c3b2": {
       "id": "8739cd75-d906-4e47-a1de-b27199a6c3b2",
