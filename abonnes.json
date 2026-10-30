@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-30T21:45:29.842Z",
-  "count": 249,
+  "updated": "2026-10-30T21:50:57.277Z",
+  "count": 250,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -887,6 +887,16 @@
       "owned": 3670,
       "mythics": 21,
       "seen": 1793287943699
+    },
+    "670c775b-c736-4a5f-b97c-c878b94ffd18": {
+      "id": "670c775b-c736-4a5f-b97c-c878b94ffd18",
+      "pseudo": "Shidiwen",
+      "avatar": "https://cdn.discordapp.com/avatars/325731009297645568/80fbb7b3e3558f67a08798f5b6cf12f3.webp?size=128",
+      "color": "#38d6e0",
+      "tier": "daimyo",
+      "owned": 4222,
+      "mythics": 13,
+      "seen": 1793397057277
     },
     "79180c55-1a4f-4794-be3f-8b51b22230ba": {
       "id": "79180c55-1a4f-4794-be3f-8b51b22230ba",
