@@ -1988,3 +1988,68 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   background: color-mix(in srgb, var(--kyx-ink) 22%, transparent);
   box-shadow: inset 3px 0 0 var(--kyx-ink);
 }
+
+/* Window of the players who use the extension (Mur de la Honte, owner only) */
+.kyx-s-who {
+  margin-left: 6px;
+  padding: 3px 10px;
+  border: 1px solid #ff8a3d;
+  border-radius: 999px;
+  background: rgba(255, 138, 61, 0.12);
+  color: #ffb070;
+  font: inherit;
+  cursor: pointer;
+}
+
+.kyx-members {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(760px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid var(--line3, #3a3642);
+  border-radius: 18px;
+  background: var(--panel, #16141b);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  color: var(--fg, #fff);
+}
+
+.kyx-members-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+}
+
+.kyx-members-count {
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: rgba(255, 138, 61, 0.16);
+  color: #ffb070;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.kyx-members-close {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.kyx-members-note:empty {
+  display: none;
+}
+
+.kyx-members-note {
+  margin: 0;
+  color: var(--fg2, #a9a4b0);
+}
+
+.kyx-s-list a[data-tier="ext"] {
+  --kyx-tier: #ff8a3d;
+}

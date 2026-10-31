@@ -2119,6 +2119,76 @@
     }
   }
 
+  // Window listing the players without a subscription who use the extension, as badges like the wall's, with a search.
+  async function openMembers() {
+    document.querySelector('.kyx-modal-back')?.remove();
+    const back = document.createElement('div');
+    back.className = 'kyx-modal-back';
+    back.innerHTML = `
+      <div class="kyx-modal kyx-members" role="dialog" aria-modal="true" aria-label="Joueurs avec l’extension">
+        <div class="kyx-members-head"><b>Joueurs avec l’extension</b><span class="kyx-members-count"></span><button type="button" class="kyx-members-close" aria-label="Fermer">✕</button></div>
+        <label class="kyx-search"><input type="search" placeholder="Chercher un joueur…" autocomplete="off" /></label>
+        <p class="kyx-members-note" role="status">Chargement…</p>
+        <ol class="kyx-s-list"></ol>
+      </div>`;
+    document.body.appendChild(back);
+    const onKey = (e) => e.key === 'Escape' && close();
+    const close = () => {
+      back.remove();
+      document.removeEventListener('keydown', onKey);
+    };
+    document.addEventListener('keydown', onKey);
+    back.addEventListener('click', (e) => e.target === back && close());
+    back.querySelector('.kyx-members-close').addEventListener('click', close);
+    const members = await send({ type: 'relay-members' });
+    const note = back.querySelector('.kyx-members-note');
+    if (!Array.isArray(members)) return void (note.textContent = 'Le relais ne répond pas, réessaie plus tard.');
+    const sort = () => members.sort((a, b) => (a.pseudo === '?') - (b.pseudo === '?') || a.pseudo.localeCompare(b.pseudo, 'fr'));
+    sort();
+    back.querySelector('.kyx-members-count').textContent = num(members.length);
+    const list = back.querySelector('.kyx-s-list');
+    const input = back.querySelector('input');
+    const draw = () => {
+      const q = norm(input.value);
+      const shown = members.filter((m) => !q || norm(m.pseudo).includes(q));
+      note.textContent = shown.length ? '' : members.length ? 'Aucun joueur ne correspond.' : 'Personne pour l’instant.';
+      list.replaceChildren();
+      for (const m of shown) {
+        const li = document.createElement('li');
+        li.innerHTML = '<a data-tier="ext"><span class="kyx-s-av"></span><b></b></a>';
+        const a = li.querySelector('a');
+        a.href = `/profil/${encodeURIComponent(m.id)}`;
+        a.addEventListener('click', () => (close(), closeView()));
+        const av = li.querySelector('.kyx-s-av');
+        if (m.avatar) av.appendChild(Object.assign(document.createElement('img'), { alt: '', referrerPolicy: 'no-referrer', loading: 'lazy', src: m.avatar }));
+        else av.textContent = m.pseudo.slice(0, 1).toUpperCase();
+        const name = li.querySelector('b');
+        name.textContent = m.pseudo;
+        if (m.color) name.style.color = m.color;
+        list.appendChild(li);
+      }
+    };
+    input.addEventListener('input', draw);
+    draw();
+    input.focus();
+
+    // Players the relay knows without their pseudo: read from their public profile, 4 at a time.
+    const unnamed = members.filter((m) => m.pseudo === '?' || !m.avatar);
+    let redraw = 0;
+    const next = async () => {
+      for (let m; back.isConnected && (m = unnamed.shift()); ) {
+        const p = await siteApi(`/users/${encodeURIComponent(m.id)}`, { auth: false }).catch(() => null);
+        if (!p) continue;
+        m.pseudo = p.pseudo ?? m.pseudo;
+        m.avatar = p.avatar ?? m.avatar;
+        m.color ??= p.nameColor ?? null;
+        clearTimeout(redraw);
+        redraw = setTimeout(() => back.isConnected && (sort(), draw()), 150);
+      }
+    };
+    await Promise.all([next(), next(), next(), next()]);
+  }
+
   // Updates abonnes.json in the repository with a GitHub token (asked once), or downloads the file without one.
   async function exportSubscribers(btn, progress) {
     let { githubToken: token } = await chrome.storage.local.get('githubToken');
@@ -2212,7 +2282,10 @@
       send({ type: 'relay-stats' }).then((s) => {
         if (!s?.month || !page.isConnected) return;
         const line = Object.assign(document.createElement('p'), { className: 'kyx-s-users' });
-        line.textContent = `Extension utilisée par ${num(s.day)} personnes aujourd’hui · ${num(s.week)} cette semaine · ${num(s.month)} ce mois-ci`;
+        line.textContent = `Extension utilisée par ${num(s.day)} personnes aujourd’hui · ${num(s.week)} cette semaine · ${num(s.month)} ce mois-ci `;
+        const who = Object.assign(document.createElement('button'), { type: 'button', className: 'kyx-s-who', textContent: '👥 Voir qui' });
+        who.addEventListener('click', openMembers);
+        line.appendChild(who);
         page.querySelector('.kyx-page-note').before(line);
       });
     }

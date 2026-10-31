@@ -137,6 +137,10 @@ const KYX_TOUR = [
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
   {
+    version: '1.9.1',
+    items: [['Le badge 拡 Kyara Games, les couleurs et les fonds des messages des autres joueurs se mettent à jour en 10 minutes au plus.']]
+  },
+  {
     version: '1.9.0',
     items: [
       ['Profil : sans abonnement, « Personnaliser » ouvre un pseudo de n’importe quelle couleur ou en dégradé, la couleur de tes messages au comptoir, un titre au choix, la bannière, le thème, le fond de vitrine et des liens Twitch, YouTube, X, TikTok…, visibles par tous les joueurs qui ont l’extension.', 'profil-perso'],

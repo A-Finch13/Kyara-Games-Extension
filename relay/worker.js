@@ -265,10 +265,13 @@ async function saveProfile(env, body) {
     at: Date.now()
   };
   const all = await profiles(env);
-  all[me.id] = { ...rec, ext: true };
+  all[me.id] = { ...rec, ...who(me, pub), ext: true };
   await env.KV.put('profiles', JSON.stringify(all));
   return { ok: true, profile: all[me.id] };
 }
+
+// Pseudo and profile picture of a player, from their session and public profile.
+const who = (me, pub) => ({ pseudo: text(pub?.pseudo ?? me.pseudo, 40) ?? '?', avatar: typeof (pub?.avatar ?? me.avatar) === 'string' ? (pub?.avatar ?? me.avatar).slice(0, 300) : null });
 
 // Marks the player whose session is given as using the extension (its badge), or unmarks them once subscribed.
 async function saveMember(env, body) {
@@ -277,9 +280,11 @@ async function saveMember(env, body) {
   const pub = await profile(me.id).catch(() => null);
   const ext = !(me.membership || tierOf(pub?.badges));
   const all = await profiles(env);
-  if (!!all[me.id]?.ext === ext) return { ok: true, ext };
-  if (ext) all[me.id] = { ...all[me.id], ext: true, at: Date.now() };
-  else if (all[me.id]) all[me.id].ext = false;
+  const { pseudo, avatar } = who(me, pub);
+  const cur = all[me.id];
+  if (!!cur?.ext === ext && (!ext || (cur.pseudo === pseudo && cur.avatar === avatar))) return { ok: true, ext };
+  if (ext) all[me.id] = { ...cur, pseudo, avatar, ext: true, at: Date.now() };
+  else if (cur) cur.ext = false;
   await env.KV.put('profiles', JSON.stringify(all));
   return { ok: true, ext };
 }

@@ -115,7 +115,7 @@
   // Badge of the players without a subscription who use the extension, seen only by players without one either.
   const EXT_BADGE = { id: 'kyx-extension', label: 'Kyara Games', description: 'Joue avec l’extension Kyara Games', kanji: '拡', frame: false };
   const EXT_COLOR = '#ff8a3d'; // colour of the badge, for the players who chose no name colour
-  const MEMBER_EVERY = 24 * 3600e3; // the relay is told once a day that the player uses the extension
+  const MEMBER_EVERY = 10 * 60e3; // the relay is told every 10 minutes that the player uses the extension
   const DEFAULT_GRADIENT = ['#ff4d6d', '#ffd166', '#38d6e0'];
 
   let gradients = null; // the site's table of name gradients, found among its modules
@@ -230,7 +230,7 @@
     if (!me.sub) tellMember();
   }
 
-  // Tells the relay once a day that the logged-in player uses the extension (their badge), with their session.
+  // Tells the relay every 10 minutes that the logged-in player uses the extension (their badge), with their session.
   function tellMember() {
     const key = `kyx-member:${me.id}`;
     if (Date.now() - (local(key) ?? 0) < MEMBER_EVERY) return;
@@ -247,6 +247,8 @@
       })
       .catch(() => local(key, 0));
   }
+
+  setInterval(() => me && !me.sub && tellMember(), 60e3);
 
   // True for a player without a subscription, from their badges.
   const freePlayer = (p) => !(p.badges ?? []).some((b) => /^membre-/.test(b?.id ?? ''));

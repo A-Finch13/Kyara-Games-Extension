@@ -438,6 +438,17 @@ async function pingRelay() {
   await fetch(`${RELAY}/ping`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ install: installId, version: chrome.runtime.getManifest().version }) }).catch(() => null);
 }
 
+// Players without a subscription who use the extension, as known by the relay: [{ id, pseudo, avatar, color }], or null.
+export async function relayMembers() {
+  if (!RELAY) return null;
+  const res = await fetch(`${RELAY}/profiles`, { cache: 'no-store' }).catch(() => null);
+  const all = res?.ok ? await res.json().catch(() => null) : null;
+  if (!all) return null;
+  return Object.entries(all)
+    .filter(([, r]) => r?.ext)
+    .map(([id, r]) => ({ id, pseudo: r.pseudo ?? '?', avatar: r.avatar ?? null, color: /^#[0-9a-f]{6}$/i.test(r.nameColor ?? '') ? r.nameColor : null }));
+}
+
 // Active installs counted by the relay: { day, week, month, versions }, or null.
 export async function relayStats() {
   if (!RELAY) return null;

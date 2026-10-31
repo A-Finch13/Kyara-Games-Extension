@@ -1,4 +1,4 @@
-import { ORIGIN, REPO, api, checkUpdate, newer, getSettings, setSettings, loadCatalog, loadCollection, slimCollection, slimMe, runSubsScan, autoSubsScan, meetPlayers, exportSubs, relayStats } from './lib/kyara.js';
+import { ORIGIN, REPO, api, checkUpdate, newer, getSettings, setSettings, loadCatalog, loadCollection, slimCollection, slimMe, runSubsScan, autoSubsScan, meetPlayers, exportSubs, relayStats, relayMembers } from './lib/kyara.js';
 
 const ALARM = 'kyara-poll';
 const UPDATE_ALARM = 'kyara-update';
@@ -341,6 +341,8 @@ async function handle(msg) {
       return exportSubs(msg.token);
     case 'relay-stats':
       return relayStats();
+    case 'relay-members':
+      return relayMembers();
     case 'subs-players':
       meetPlayers(msg.list, msg.where);
       return { ok: true };

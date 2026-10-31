@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-31T14:31:04.824Z",
-  "count": 678,
+  "updated": "2026-10-31T17:53:18.580Z",
+  "count": 679,
   "subscribers": {
     "7cd5702f-a0f0-4260-988f-38e10033c3b0": {
       "id": "7cd5702f-a0f0-4260-988f-38e10033c3b0",
@@ -3039,6 +3039,16 @@
       "color": "#a98bff",
       "tier": "sensei",
       "seen": 1793286322774
+    },
+    "21340319-57c3-42a2-8ee4-43de5f844ece": {
+      "id": "21340319-57c3-42a2-8ee4-43de5f844ece",
+      "pseudo": "Asuna-6",
+      "avatar": "https://cdn.discordapp.com/avatars/441508839901233163/6614e5721e4c1caa0639c4101a71124c.webp?size=128",
+      "color": "#ff7eb6",
+      "tier": "sensei",
+      "owned": 3574,
+      "mythics": 52,
+      "seen": 1793469198185
     },
     "4c6d6852-f8fe-4519-832e-132ec8620841": {
       "id": "4c6d6852-f8fe-4519-832e-132ec8620841",

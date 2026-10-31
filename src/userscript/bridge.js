@@ -54,6 +54,8 @@ async function handle(msg) {
       return exportSubs(msg.token);
     case 'relay-stats':
       return relayStats();
+    case 'relay-members':
+      return relayMembers();
     case 'subs-players':
       meetPlayers(msg.list, msg.where);
       return { ok: true };
