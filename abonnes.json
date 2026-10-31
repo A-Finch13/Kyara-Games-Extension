@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-31T04:30:36.171Z",
-  "count": 261,
+  "updated": "2026-10-31T04:35:43.244Z",
+  "count": 263,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -1408,6 +1408,16 @@
       "tier": "sensei",
       "seen": 1793214504740
     },
+    "bfab8249-6cbc-48db-8e4e-b9cec5a97025": {
+      "id": "bfab8249-6cbc-48db-8e4e-b9cec5a97025",
+      "pseudo": "Kardinal",
+      "avatar": "https://cdn.discordapp.com/avatars/357519069080977408/c5bdaacd1b1a0184f630f38b7671766d.webp?size=128",
+      "color": null,
+      "tier": "sensei",
+      "owned": 1814,
+      "mythics": 16,
+      "seen": 1793421343156
+    },
     "324ff7f0-d50e-475d-a3cc-7dec2e9d84b8": {
       "id": "324ff7f0-d50e-475d-a3cc-7dec2e9d84b8",
       "pseudo": "KhrMah",
@@ -2017,6 +2027,16 @@
       "color": "#5cb8ff",
       "tier": "senpai",
       "seen": 1793289596832
+    },
+    "c993b427-e08b-4f07-ab71-c117bf2b23c4": {
+      "id": "c993b427-e08b-4f07-ab71-c117bf2b23c4",
+      "pseudo": "Netsu_",
+      "avatar": "https://cdn.discordapp.com/avatars/1495802106634834000/127e779cb69e32afc102ca8730373af8.webp?size=128",
+      "color": "#ff7a45",
+      "tier": "senpai",
+      "owned": 178,
+      "mythics": 25,
+      "seen": 1793421343244
     },
     "7916e1fa-aa8e-4d76-8f22-d5fe7f4b9919": {
       "id": "7916e1fa-aa8e-4d76-8f22-d5fe7f4b9919",
