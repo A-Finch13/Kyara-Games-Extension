@@ -85,6 +85,11 @@ const KYX_TOUR = [
     target: '#nav-more .kyx-subs-entry, #mobile-nav .kyx-subs-entry, [role="dialog"] > ul .kyx-subs-entry'
   },
   {
+    id: 'profil-perso',
+    title: 'Ton profil, à ta façon',
+    text: 'Sans abonnement, « Personnaliser » sur ton profil t’ouvre un pseudo de la couleur ou en dégradé de ton choix (« Choisir… » : n’importe quelle couleur), la couleur de tes messages au comptoir, le titre de ton choix, la bannière, le thème, le fond de vitrine et tes liens (Twitch, YouTube, X, TikTok…). Tous les joueurs qui ont l’extension les voient. Ta vitrine passe aussi à 10 cartes, ta liste d’envies à 500 et tu peux enregistrer tes recherches du marché.'
+  },
+  {
     id: 'amis',
     title: 'Te comparer à tes amis',
     text: 'Le filtre « 友 Amis » affiche le classement de tes amis, avec le même podium que le site.',
@@ -131,6 +136,19 @@ const KYX_TOUR = [
 
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
+  {
+    version: '1.9.0',
+    items: [
+      ['Profil : sans abonnement, « Personnaliser » ouvre un pseudo de n’importe quelle couleur ou en dégradé, la couleur de tes messages au comptoir, un titre au choix, la bannière, le thème, le fond de vitrine et des liens Twitch, YouTube, X, TikTok…, visibles par tous les joueurs qui ont l’extension.', 'profil-perso'],
+      ['Vitrine de 10 cartes sur deux lignes avec le style animé « Aurore », liste d’envies de 500 persos et recherches du marché enregistrées.', 'profil-perso'],
+      ['Proposer un échange : « Ses doublons » marche partout, quelle que soit la page d’où tu ouvres l’échange (profil, marché, amis…).'],
+      ['Mon activité : dans un échange reçu, « Unique » ou « ×N » sur les cartes que tu donnes, « Possédée » ou « Manquante » sur celles que tu reçois.'],
+      ['Un badge 拡 Kyara Games, bordé d’orange, montre les joueurs sans abonnement qui ont l’extension, sur leur profil et au comptoir.'],
+      ['Comptoir : les messages des joueurs qui ont l’extension arrivent avec un effet d’entrée et gardent un fond de la couleur de leur pseudo.'],
+      ['Marché : le pseudo des vendeurs prend la couleur ou le dégradé qu’ils ont choisi, sous chaque offre et dans le détail de l’annonce.'],
+      ['« Personnaliser » n’a plus le choix « Mur des soutiens » : avec l’extension, on ne peut plus s’en retirer.']
+    ]
+  },
   {
     version: '1.8.2',
     items: [

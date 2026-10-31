@@ -323,7 +323,9 @@ const SUBS_SCAN_MINUTES = 1; // the public lists are searched again in the backg
 const SUBS_RECHECK_MINUTES = 1; // a player found without a subscription is looked up again after this
 const SUB_TIERS = ['nakama', 'senpai', 'sensei', 'daimyo']; // lowest first
 const SHARED_SUBS = `https://raw.githubusercontent.com/${REPO}/main/abonnes.json`; // list published with the extension
-const SHARED_SUBS_MINUTES = 15;
+const SHARED_SUBS_MINUTES = 5;
+const DAY_MS = 864e5;
+const RELAY = 'https://kyara-games-relay.finch-arhold-git.workers.dev'; // Kyara Games relay (relay/worker.js): active installs and new subscribers for abonnes.json; empty = off
 
 // Highest tier of a player from their "membre-…" badges, or null.
 const subTierOf = (badges) => {
@@ -405,13 +407,42 @@ export function runSubsScan() {
     .finally(() => (subsScan = null)));
 }
 
-// Adds the subscribers of the list published in the repository (abonnes.json) to the saved ones.
-async function loadSharedSubs() {
+// Brings abonnes.json and the saved subscribers level: adds the file's subscribers here, and sends the ones
+// missing from the file to the relay, which queues them, checks them and adds them (each id sent once a day at most).
+async function syncSharedSubs() {
   await chrome.storage.local.set({ sharedSubsAt: Date.now() });
   const res = await fetch(SHARED_SUBS, { cache: 'no-store' }).catch(() => null);
   const data = res?.ok ? await res.json().catch(() => null) : null;
-  const list = Object.values(data?.subscribers ?? {}).filter((s) => typeof s?.id === 'string' && typeof s.pseudo === 'string' && SUB_TIERS.includes(s.tier));
+  if (!data) return;
+  const shared = data.subscribers ?? {};
+  const list = Object.values(shared).filter((s) => typeof s?.id === 'string' && typeof s.pseudo === 'string' && SUB_TIERS.includes(s.tier));
   await saveSubscribers(list.map((s) => ({ ...s, seen: s.seen ?? Date.now(), src: s.src ?? { 'Liste partagée': 0 } })));
+  if (!RELAY) return;
+  const { subscribers: mine = {}, subsSent = {} } = await chrome.storage.local.get(['subscribers', 'subsSent']);
+  for (const [id, t] of Object.entries(subsSent)) if (Date.now() - t > DAY_MS || shared[id]) delete subsSent[id];
+  const ids = Object.keys(mine).filter((id) => !shared[id] && !subsSent[id]);
+  if (ids.length) {
+    const res = await fetch(`${RELAY}/subscribers`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ ids }) }).catch(() => null);
+    if (res?.ok) for (const id of ids) subsSent[id] = Date.now();
+  }
+  await chrome.storage.local.set({ subsSent });
+}
+
+// Tells the relay once a day that this install is in use: a random id made at install, nothing about the account.
+async function pingRelay() {
+  if (!RELAY) return;
+  let { installId, pingAt = 0 } = await chrome.storage.local.get(['installId', 'pingAt']);
+  if (Date.now() - pingAt < DAY_MS / 2) return;
+  installId ??= crypto.randomUUID();
+  await chrome.storage.local.set({ installId, pingAt: Date.now() });
+  await fetch(`${RELAY}/ping`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ install: installId, version: chrome.runtime.getManifest().version }) }).catch(() => null);
+}
+
+// Active installs counted by the relay: { day, week, month, versions }, or null.
+export async function relayStats() {
+  if (!RELAY) return null;
+  const res = await fetch(`${RELAY}/stats`, { cache: 'no-store' }).catch(() => null);
+  return res?.ok ? res.json() : null;
 }
 
 // Content of abonnes.json for a set of subscribers: highest tier first, then by pseudo.
@@ -426,11 +457,15 @@ const fromBase64 = (b64) => new TextDecoder().decode(Uint8Array.from(atob(b64.re
 const toBase64 = (text) => btoa(Array.from(new TextEncoder().encode(text), (b) => String.fromCharCode(b)).join(''));
 
 // Adds the saved subscribers to abonnes.json in the repository with the GitHub token; returns { count, added }.
+// Each step is written to "subsExport" for the page to show.
 export async function exportSubs(token) {
   const url = `https://api.github.com/repos/${REPO}/contents/abonnes.json`;
   const headers = { accept: 'application/vnd.github+json', authorization: `Bearer ${token}` };
+  const step = (n, text) => chrome.storage.local.set({ subsExport: { step: n, of: 4, text, at: Date.now() } });
   const { subscribers: mine = {} } = await chrome.storage.local.get('subscribers');
+  await step(1, `Ta liste : ${Object.keys(mine).length} abonnés`);
   for (let attempt = 0; ; attempt++) {
+    await step(2, attempt ? 'Le fichier a changé entre-temps, nouvelle lecture sur GitHub…' : 'Lecture de abonnes.json sur GitHub…');
     const cur = await fetch(`${url}?ref=main`, { headers, cache: 'no-store' });
     if (cur.status === 401) throw new ApiError(401, 'github_token');
     if (!cur.ok && cur.status !== 404) throw new ApiError(cur.status, `github_${cur.status}`);
@@ -439,6 +474,7 @@ export async function exportSubs(token) {
     const merged = { ...mine, ...known };
     const added = Object.keys(merged).length - Object.keys(known).length;
     if (!added) return { count: Object.keys(merged).length, added };
+    await step(3, `Envoi de ${added} nouveaux abonnés sur GitHub (${Object.keys(merged).length} en tout)…`);
     const res = await fetch(url, {
       method: 'PUT',
       headers: { ...headers, 'content-type': 'application/json' },
@@ -453,11 +489,12 @@ export async function exportSubs(token) {
   }
 }
 
-// Search every minute and on each change of page of the site (30 s apart at least, across tabs); the shared list every 15 minutes.
+// Search every minute and on each change of page of the site (30 s apart at least, across tabs); the shared list every 5 minutes, the relay once a day.
 export async function autoSubsScan(pageChanged) {
   if (subsScan) return;
   const { subscribersAt = 0, sharedSubsAt = 0 } = await chrome.storage.local.get(['subscribersAt', 'sharedSubsAt']);
-  if (Date.now() - sharedSubsAt >= SHARED_SUBS_MINUTES * 60e3) loadSharedSubs().catch(() => {});
+  if (Date.now() - sharedSubsAt >= SHARED_SUBS_MINUTES * 60e3) syncSharedSubs().catch(() => {});
+  pingRelay().catch(() => {});
   if (Date.now() - subscribersAt >= (pageChanged ? 30e3 : SUBS_SCAN_MINUTES * 60e3)) runSubsScan();
 }
 

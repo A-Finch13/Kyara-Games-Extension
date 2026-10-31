@@ -822,6 +822,32 @@ a.slot:hover .kyx-ghost {
   margin-left: auto;
 }
 
+.kyx-s-progress {
+  max-width: 640px;
+}
+
+.kyx-s-users {
+  margin: 0;
+  color: var(--fg2, #a9a4b0);
+  font-size: 13px;
+}
+
+/* The "Mur de la Honte" is closed to subscribers. */
+html[data-kyx-sub] .kyx-subs-entry,
+html[data-kyx-sub] li:has(> .kyx-subs-entry) {
+  display: none !important;
+}
+
+.kyx-s-progress .kyx-b-bar small {
+  flex: 0 1 auto;
+  font-size: 13px;
+}
+
+.kyx-s-progress .kyx-b-bar i {
+  background: linear-gradient(90deg, #4fb3ff, #e9b93c);
+  transition: width 0.3s;
+}
+
 .kyx-s-list {
   display: flex;
   flex-wrap: wrap;
@@ -1862,4 +1888,103 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
     padding: 8px 0;
     text-align: center;
   }
+}
+
+/* Any name colour and gradient in the site's "Personnaliser" window */
+.kyx-pick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  color: var(--fg2, #a9a4b0);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.kyx-pick:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.kyx-pick input {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.kyx-sw-any {
+  background: conic-gradient(#ff4d6d, #ffd166, #3fcf9b, #38d6e0, #5cb8ff, #a98bff, #ff7eb6, #ff4d6d) !important;
+}
+
+.kyx-grad-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--fg2, #a9a4b0);
+  font-size: 13px;
+}
+
+.kyx-grad-pick input {
+  width: 34px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+
+/* No "Mur des soutiens" choice in the "Personnaliser" window */
+[data-kyx-hidden] {
+  display: none !important;
+}
+
+/* Showcase of 9 or 10 cards: two rows of five */
+@media (min-width: 721px) {
+  .cases:not(.st-spotlight):not(.solo):has(> .disp:nth-child(9)) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* Name gradient of a market seller */
+.kyx-grad-name {
+  background: var(--kyx-g) 0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  animation: kyx-grad-name 6s linear infinite;
+}
+
+@keyframes kyx-grad-name {
+  to {
+    background-position: 200% 0;
+  }
+}
+
+/* Badge of the players who use the extension (profile and chat) */
+.b-kyx-extension,
+.badge[title^="Kyara Games"] {
+  border: 1px solid #ff8a3d !important;
+  background: rgba(255, 138, 61, 0.12) !important;
+  color: #ffb070 !important;
+}
+
+.b-kyx-extension > span,
+.badge[title^="Kyara Games"] > * {
+  color: #ff8a3d !important;
+}
+
+/* Chat messages of the players who use the extension: a background of their colour */
+.msg.kyx-msg {
+  background: color-mix(in srgb, var(--kyx-ink) 22%, transparent);
+  box-shadow: inset 3px 0 0 var(--kyx-ink);
 }

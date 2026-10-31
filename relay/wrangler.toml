@@ -1,0 +1,15 @@
+name = "kyara-games-relay"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+REPO = "A-Finch13/Kyara-Games-Extension"
+
+# Filled by "npx wrangler kv namespace create KV" (see relay/LISEZMOI.md).
+[[kv_namespaces]]
+binding = "KV"
+id = "d8dcb7a8df104865a1e4804db4f02cd0"
+
+# Checks the queue of players sent by the extensions every 5 minutes.
+[triggers]
+crons = ["*/5 * * * *"]

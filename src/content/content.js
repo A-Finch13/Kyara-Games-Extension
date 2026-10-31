@@ -88,6 +88,7 @@
     if ('favSeries' in changes || 'collectionFav' in changes) scanCollectionChips();
     if ('favSeries' in changes || 'boardFav' in changes) scanTradeBoard();
     if ('subscribers' in changes) refreshSubs?.(changes.subscribers.newValue);
+    if ('subsExport' in changes) showExport?.(changes.subsExport.newValue);
     for (const k of ['settings', 'collection', 'catalog', 'partner']) if (k in changes) picked[k] = changes[k].newValue;
     if (!Object.keys(picked).length) return;
     applyStorage(picked);
@@ -114,6 +115,13 @@
   window.addEventListener('message', (e) => {
     if (e.origin !== location.origin || e.data?.__kyaraGames !== 1) return;
     const { kind, path, body } = e.data;
+    if (kind === 'names') {
+      marketNames = e.data.names ?? {};
+      chatMembers = e.data.members ?? {};
+      document.querySelectorAll('[data-kyx-msg]').forEach((el) => delete el.dataset.kyxMsg);
+      document.querySelectorAll('[data-kyx-name]').forEach((el) => (el.dataset.kyxName = ''));
+      return void scanMarketNames();
+    }
     if (kind === 'players') return void send({ type: 'subs-players', list: e.data.list, where: playersWhere(path, e.data.query) });
     if (kind === 'write') {
       if (/^\/market\//.test(path)) setTimeout(refreshFavMarket, 1500);
@@ -157,10 +165,10 @@
 
   // ---------- badges on every card image ----------
 
-  // True for a card inside the trade composer (the dialog with "Tu donnes" and "Tu reçois").
+  // True for a card inside the trade composer (the dialog or form with "Tu donnes" and "Tu reçois").
   const composers = new WeakSet();
   function inComposer(img) {
-    const dialog = img.closest('[role="dialog"]');
+    const dialog = img.closest('[role="dialog"]') ?? img.closest('form:has(.shelf)');
     if (!dialog) return false;
     if (composers.has(dialog)) return true;
     const text = dialog.textContent;
@@ -171,8 +179,14 @@
     return false;
   }
 
-  // Side of a card in a pending trade of "Mes échanges": 'give', 'get' or null.
+  // Side of a card in a trade to answer ("Mon activité", or a pending trade of "Mes échanges"): 'give', 'get' or null.
   function pendingTradeSide(img) {
+    const tray = !img.closest('form') && img.closest('section:has(> ul.slots)');
+    if (tray) {
+      const title = tray.querySelector(':scope > header h3')?.textContent ?? '';
+      if (/donnes/i.test(title)) return 'give';
+      if (/re[çc]ois/i.test(title)) return 'get';
+    }
     const item = img.closest('li.trade');
     if (!item?.querySelector('.st-pending')) return null;
     for (let el = img.parentElement; el && el !== item; el = el.parentElement) {
@@ -1756,6 +1770,7 @@
     delete document.documentElement.dataset.kyxView;
     refreshBoosters = null;
     refreshSubs = null;
+    showExport = null;
   }
 
   // The "Pack du jour" changes at midnight, French time: rankings are computed again then.
@@ -2033,6 +2048,7 @@
   ];
   const SUBS_EXPORTERS = ['e431c603-0a94-40d2-b45e-2fec48015a6e']; // Kyara ids of the accounts that see the "Exporter" button
   let refreshSubs = null; // shows the saved subscribers again while the page is open
+  let showExport = null; // shows a step of the export to GitHub
   let subsTier = 'all';
 
   // "24,99 €".
@@ -2104,7 +2120,7 @@
   }
 
   // Updates abonnes.json in the repository with a GitHub token (asked once), or downloads the file without one.
-  async function exportSubscribers(btn, note) {
+  async function exportSubscribers(btn, progress) {
     let { githubToken: token } = await chrome.storage.local.get('githubToken');
     if (!token) {
       token = prompt('Jeton GitHub pour mettre à jour abonnes.json dans le dépôt.\nLaisse vide pour seulement télécharger le fichier.')?.trim();
@@ -2120,15 +2136,34 @@
       return;
     }
     btn.disabled = true;
-    note('Mise à jour de abonnes.json…');
+    progress(0, 4, 'Préparation de l’export…');
     const res = await send({ type: 'subs-export', token });
     btn.disabled = false;
     if (res?.error === 'github_token') {
       await chrome.storage.local.remove('githubToken');
-      return note('Jeton GitHub refusé : il sera redemandé au prochain export.');
+      return progress(4, 4, '✖ Jeton GitHub refusé : il sera redemandé au prochain export.');
     }
-    if (!res || res.error) return note('abonnes.json n’a pas pu être mis à jour.');
-    note(res.added ? `abonnes.json mis à jour : ${res.added} nouveaux abonnés, ${res.count} en tout.` : `abonnes.json contient déjà tous tes abonnés (${res.count}).`);
+    if (!res || res.error) return progress(4, 4, `✖ abonnes.json n’a pas pu être mis à jour${res?.error ? ` (${res.error})` : ''}.`);
+    progress(4, 4, res.added ? `✔ abonnes.json mis à jour : ${res.added} nouveaux abonnés, ${res.count} en tout.` : `✔ abonnes.json contient déjà tous tes abonnés (${res.count}).`);
+  }
+
+  // Tier of the logged-in player's subscription (null without one), read from their profile at most once an hour;
+  // the page is closed to subscribers.
+  async function myTier() {
+    const { me, meSub } = await chrome.storage.local.get(['me', 'meSub']).catch(() => ({}));
+    if (!me?.id) return null;
+    let tier = meSub?.id === me.id ? meSub.tier : null;
+    if (meSub?.id !== me.id || Date.now() - meSub.at > 3600e3) {
+      const p = await siteApi(`/users/${encodeURIComponent(me.id)}`, { auth: false }).catch(() => null);
+      if (p) {
+        const ids = new Set((p.badges ?? []).map((b) => b?.id));
+        tier = [...subTiers].reverse().find((t) => ids.has(`membre-${t.id}`))?.id ?? null;
+        await chrome.storage.local.set({ meSub: { id: me.id, tier, at: Date.now() } });
+      }
+    }
+    if (tier) document.documentElement.dataset.kyxSub = tier;
+    else delete document.documentElement.dataset.kyxSub;
+    return tier;
   }
 
   // Builds the page and reads the site's lists again.
@@ -2144,6 +2179,7 @@
         </header>
         <div class="kyx-s-figures"></div>
         <p class="kyx-page-note" role="status"></p>
+        <div class="kyx-s-progress" hidden><span class="kyx-b-bar"><span><i></i></span><small></small></span></div>
         <div class="kyx-seg kyx-s-tiers" role="group" aria-label="Palier"></div>
         <div class="kyx-search-wrap">
           <label class="kyx-search">
@@ -2154,6 +2190,11 @@
         <ol class="kyx-s-list"></ol>`
     );
     if (!page) return;
+    if (await myTier()) {
+      page.querySelectorAll(':scope > :not(.kyx-page-head)').forEach((el) => el.remove());
+      page.querySelector('.kyx-page-head p').textContent = 'Le Mur de la Honte est réservé aux joueurs sans abonnement.';
+      return;
+    }
     const note = (text) => (page.querySelector('.kyx-page-note').textContent = text);
     let { subscribers: known = {}, me } = await chrome.storage.local.get(['subscribers', 'me']).catch(() => ({}));
     await loadSubTiers();
@@ -2166,7 +2207,26 @@
     refreshSubs = (next) => ((known = next ?? known), draw());
     page.querySelectorAll('.kyx-s-tiers [data-tier]').forEach((b) => b.addEventListener('click', () => ((subsTier = b.dataset.tier), draw())));
     page.querySelector('.kyx-search input').addEventListener('input', draw);
-    page.querySelector('.kyx-s-export')?.addEventListener('click', (e) => exportSubscribers(e.currentTarget, note));
+    page.querySelector('.kyx-s-export')?.addEventListener('click', (e) => exportSubscribers(e.currentTarget, progress));
+    if (SUBS_EXPORTERS.includes(me?.id)) {
+      send({ type: 'relay-stats' }).then((s) => {
+        if (!s?.month || !page.isConnected) return;
+        const line = Object.assign(document.createElement('p'), { className: 'kyx-s-users' });
+        line.textContent = `Extension utilisée par ${num(s.day)} personnes aujourd’hui · ${num(s.week)} cette semaine · ${num(s.month)} ce mois-ci`;
+        page.querySelector('.kyx-page-note').before(line);
+      });
+    }
+    // Bar and text of the export to GitHub; hidden again a few seconds after the last step.
+    let progressHide = 0;
+    const progress = (n, of, text) => {
+      const box = page.querySelector('.kyx-s-progress');
+      box.hidden = false;
+      box.querySelector('i').style.width = `${Math.round((n / of) * 100)}%`;
+      box.querySelector('small').textContent = `${n}/${of} · ${text}`;
+      clearTimeout(progressHide);
+      if (n >= of) progressHide = setTimeout(() => (box.hidden = true), 8000);
+    };
+    showExport = (s) => s && s.step < s.of && progress(s.step, s.of, s.text);
     draw();
 
     // Reads the site's lists again and saves what was found.
@@ -2198,6 +2258,130 @@
     if (path === '/feed') return 'Derniers tirages';
     if (path.startsWith('/membership/wall')) return 'Mur des soutiens';
     return 'Kyara';
+  }
+
+  // ---------- any name colour and gradient in the site's "Personnaliser" window ----------
+
+  const NAME_COLORS = 8; // colours of the site in the row, before the "perso" swatch added by inject.js
+  const NAME_GRADIENTS = 6;
+
+  // Name preview at the top of the window.
+  const namePreview = (from) => [...(from.closest('[role="dialog"]') ?? document).querySelectorAll('.nm')].find((el) => !el.closest('button'));
+
+  // CSS gradient of a name, looping like the site's.
+  const nameGradient = (colors) => `linear-gradient(90deg, ${[...colors, colors[0]].join(', ')})`;
+
+  // Colour pickers on the last swatch of the name colours and the last tile of the gradients ("perso", added by
+  // inject.js); inject.js reads the colours chosen when the window is saved.
+  function scanNamePickers() {
+    const root = document.documentElement;
+    if (!root.dataset.kyxPerks || root.dataset.kyxSub) return;
+
+    // Rows of colours: the name first, then the chat messages.
+    const rows = [...new Set([...document.querySelectorAll('button.sw')].map((b) => b.parentElement))].filter((p) => p.querySelectorAll(':scope > button.sw').length === NAME_COLORS + 2);
+    rows.slice(0, 2).forEach((row, i) => {
+      const swatch = row.querySelector(':scope > button.sw:last-of-type');
+      if (!swatch || row.querySelector('.kyx-pick')) return;
+      const key = i ? 'kyxChatColor' : 'kyxNameColor';
+      const pick = Object.assign(document.createElement('label'), { className: 'kyx-pick', title: 'Choisir la couleur' });
+      pick.innerHTML = `<input type="color" value="${root.dataset[key] || '#ffffff'}"><span>Choisir…</span>`;
+      const input = pick.querySelector('input');
+      swatch.title = 'Couleur au choix';
+      swatch.classList.toggle('kyx-sw-any', !root.dataset[key]);
+      if (root.dataset[key]) swatch.style.setProperty('--sw', root.dataset[key]);
+      input.addEventListener('input', () => {
+        root.dataset[key] = input.value;
+        swatch.classList.remove('kyx-sw-any');
+        swatch.style.setProperty('--sw', input.value);
+        if (swatch.getAttribute('aria-checked') !== 'true') swatch.click();
+        const nm = !i && namePreview(swatch);
+        if (nm) nm.style.color = input.value;
+      });
+      swatch.after(pick);
+    });
+
+    const tiles = [...document.querySelectorAll('button:has(.nm)')];
+    const grid = tiles.map((b) => b.parentElement).find((p) => p.querySelectorAll(':scope > button:has(.nm)').length === NAME_GRADIENTS + 2);
+    const tile = grid?.querySelector(':scope > button:has(.nm):last-of-type');
+    if (tile && !grid.nextElementSibling?.classList.contains('kyx-grad-pick')) {
+      const colors = (root.dataset.kyxNameGradient || '#ff4d6d,#ffd166,#38d6e0').split(',');
+      const box = Object.assign(document.createElement('div'), { className: 'kyx-grad-pick' });
+      box.innerHTML = '<span>Dégradé perso</span>' + colors.map((c) => `<input type="color" value="${c}">`).join('');
+      const label = [...tile.querySelectorAll('*')].find((el) => !el.children.length && !el.closest('.nm'));
+      if (label) label.textContent = 'Perso';
+      box.addEventListener('input', () => {
+        const picked = [...box.querySelectorAll('input')].map((i) => i.value);
+        root.dataset.kyxNameGradient = picked.join(',');
+        if (tile.getAttribute('aria-pressed') !== 'true' && tile.getAttribute('aria-checked') !== 'true') tile.click();
+        for (const nm of [tile.querySelector('.nm'), namePreview(tile)]) nm?.style.setProperty('--g', nameGradient(picked));
+      });
+      grid.after(box);
+    }
+  }
+
+  // ---------- no "Mur des soutiens" choice in the "Personnaliser" window ----------
+
+  // Hides the block of the window that shows or hides the player on the site's supporters wall.
+  function scanWallOption() {
+    const swatch = document.querySelector('button.sw');
+    if (!swatch) return;
+    const panel = swatch.closest('[role="dialog"], dialog') ?? document;
+    for (const el of panel.querySelectorAll('h2, h3, h4')) {
+      const own = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join('').trim();
+      if (!/^(Mur des soutiens|Supporters wall)$/i.test(own)) continue;
+      let block = el.parentElement;
+      while (block && block !== document.body && !block.querySelector('button')) block = block.parentElement;
+      if (block && block !== document.body) block.dataset.kyxHidden = '';
+    }
+  }
+
+  // ---------- name colours of the market's sellers ----------
+
+  let marketNames = {}; // name colour or gradient chosen by the other players through the extension, by Kyara id
+
+  // Colours the links to the profile of the players who chose a name colour or gradient, on the market's pages.
+  function scanMarketNames() {
+    if (!location.pathname.startsWith('/marche') || document.documentElement.dataset.kyxSub) return;
+    for (const a of document.querySelectorAll('a[href^="/profil/"]')) {
+      const id = decodeURIComponent(a.getAttribute('href').slice(8).split(/[?#/]/)[0]);
+      if (a.dataset.kyxName === id || a.matches('.nm') || a.querySelector('.nm, img') || a.textContent.trim().length < 2) continue;
+      paintName(a, id, marketNames[id]);
+    }
+    // Sellers written without a link, under the price of each offer.
+    const byPseudo = new Map(Object.values(marketNames).filter((n) => n.pseudo).map((n) => [n.pseudo, n]));
+    for (const el of document.querySelectorAll('main span.mono')) {
+      const text = el.textContent.trim();
+      if (el.children.length || el.dataset.kyxName === text || (!byPseudo.has(text) && el.dataset.kyxName === undefined)) continue;
+      paintName(el, text, byPseudo.get(text));
+    }
+  }
+
+  // Gives an element the name colour or gradient of a player (none: the site's own look again).
+  function paintName(el, key, name) {
+    el.dataset.kyxName = key;
+    el.classList.toggle('kyx-grad-name', !!name?.gradient);
+    el.style.setProperty('--kyx-g', name?.gradient ? `linear-gradient(90deg, ${[...name.gradient, name.gradient[0]].join(', ')})` : '');
+    el.style.color = name?.color ?? '';
+  }
+
+  // ---------- chat messages of the players who use the extension ----------
+
+  let chatMembers = {}; // colour of each player who uses the extension, by Kyara id
+
+  // Their messages keep a background of their colour, the size of the message (a message without the name
+  // belongs to the author of the one before).
+  function scanChatMessages() {
+    if (document.documentElement.dataset.kyxSub) return;
+    let author = null;
+    for (const msg of document.querySelectorAll('.msg:has(a.nm[href^="/profil/"]), .msg.compact')) {
+      const link = msg.querySelector('a.nm[href^="/profil/"]');
+      if (link) author = decodeURIComponent(link.getAttribute('href').slice(8));
+      const id = author;
+      if (!id || msg.dataset.kyxMsg === id) continue;
+      msg.dataset.kyxMsg = id;
+      msg.classList.toggle('kyx-msg', !!chatMembers[id]);
+      msg.style.setProperty('--kyx-ink', chatMembers[id] ?? '');
+    }
   }
 
   // ---------- guided tour and what's new ----------
@@ -2676,6 +2860,7 @@
     el.dataset.kind = kind;
   }
 
+
   // ---------- "Possédées" and "Manquantes" chips on the Collection page ----------
 
   // They drive the site's "Cartes" select (all / owned / missing…), right after its "Toutes" chip.
@@ -2942,6 +3127,7 @@
   // Keeps only the cards the partner holds twice or more; on by default, turning it off is remembered.
   // Next to it, "★ Favoris" keeps the cards of the favourite series, on both tabs.
   let composerMore = 0;
+  const partnerCopies = new Map(); // id -> most copies of the card the partner had to trade, read from the shelf ("×N dispo")
 
   // True when the partner holds the card twice or more, null when unknown.
   let dupeIndex = { of: null, spare: null, tradeable: null };
@@ -2956,11 +3142,12 @@
 
   // The chip, and the shelf of the trade composer filtered on it.
   function scanComposer() {
-    // Shelf of the trade composer (a form, unlike the market's "Proposer une carte" dialog).
-    const shelf = document.querySelector('[role="dialog"] form .shelf');
+    // Shelf of the trade composer, wherever it opens (a form, unlike the market's "Proposer une carte" dialog).
+    const shelf = [...document.querySelectorAll('form .shelf')].find((el) => el.querySelectorAll(':scope > .tabs [role="tab"]').length === 2);
     const chips = shelf?.querySelector('.filters .chips');
     if (!chips) {
       composerMore = 0;
+      partnerCopies.clear();
       return;
     }
     const tabs = shelf.querySelectorAll('.tabs [role="tab"]');
@@ -3026,7 +3213,10 @@
       const m = CARD_SRC.exec(li.querySelector('img')?.getAttribute('src') || '');
       const id = m ? Number(m[1]) : null;
       const series = id ? catalog?.get(id)?.s : null;
-      const hide = !!id && ((dupes && theirDupe(id) === false) || (favs && !!series && !favSeries.has(series)));
+      const copies = Number(/(\d+)/.exec(li.querySelector('.have')?.textContent ?? '')?.[1]);
+      if (theirs && id && copies) partnerCopies.set(id, Math.max(partnerCopies.get(id) ?? 0, copies));
+      const twice = partnerCopies.has(id) ? partnerCopies.get(id) >= 2 : theirDupe(id);
+      const hide = !!id && ((dupes && twice === false) || (favs && !!series && !favSeries.has(series)));
       if (hide) {
         if (li.dataset.kyxHidden !== '1') li.dataset.kyxHidden = '1';
       } else {
@@ -3080,6 +3270,10 @@
     scanRecycle();
     scanTutoMenu();
     scanConfirm();
+    scanNamePickers();
+    scanWallOption();
+    scanMarketNames();
+    scanChatMessages();
   }
 
   // Scans the whole page again.
@@ -3111,7 +3305,7 @@
     if (document.documentElement.dataset.kyxOwner === owner) delete document.documentElement.dataset.kyxOwner;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-favtrade, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-subs-entry, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket, .kyx-fav-pick, .kyx-coll-pick, .kyx-rec, .kyx-tuto-back, .kyx-tuto-entry, .kyx-spot, .kyx-bubble').forEach((el) => el.remove());
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-favtrade, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-subs-entry, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket, .kyx-fav-pick, .kyx-coll-pick, .kyx-rec, .kyx-tuto-back, .kyx-tuto-entry, .kyx-spot, .kyx-bubble, .kyx-pick, .kyx-grad-pick').forEach((el) => el.remove());
     delete document.documentElement.dataset.kyxView;
     delete document.documentElement.dataset.kyxBoardIds;
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched], [data-kyx-ghost]').forEach((el) => {
@@ -3159,6 +3353,7 @@
     window.addEventListener('hashchange', onViewHash);
     window.addEventListener('hashchange', onTutorialHash);
     syncAuth();
+    myTier();
     observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
     refreshAll();
     onTutorialHash();
