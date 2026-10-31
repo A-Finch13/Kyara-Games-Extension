@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-31T04:35:43.244Z",
-  "count": 263,
+  "updated": "2026-10-31T04:40:51.844Z",
+  "count": 265,
   "subscribers": {
     "12283747-4c5b-4687-9afd-cf0f63ffb471": {
       "id": "12283747-4c5b-4687-9afd-cf0f63ffb471",
@@ -149,6 +149,16 @@
       "owned": 411,
       "mythics": 18,
       "seen": 1793391401356
+    },
+    "b721ff7d-6e35-486e-86f4-83e3196b490e": {
+      "id": "b721ff7d-6e35-486e-86f4-83e3196b490e",
+      "pseudo": "ArceusTA7",
+      "avatar": "https://cdn.discordapp.com/avatars/994667927762649120/7e637730dc851f829b32c77759292e4c.webp?size=128",
+      "color": null,
+      "tier": "daimyo",
+      "owned": 2216,
+      "mythics": 20,
+      "seen": 1793421651844
     },
     "83bdee2a-0fa4-4e5b-a485-44f6cc001a38": {
       "id": "83bdee2a-0fa4-4e5b-a485-44f6cc001a38",
@@ -2261,6 +2271,16 @@
       "owned": 1668,
       "mythics": 2,
       "seen": 1793396114994
+    },
+    "2746c058-f923-466e-9a5b-51649084ce27": {
+      "id": "2746c058-f923-466e-9a5b-51649084ce27",
+      "pseudo": "Mohamed-15",
+      "avatar": "https://cdn.discordapp.com/avatars/788109412766056448/4d27b170daccdc0fa7c9ddfa85b551a1.webp?size=128",
+      "color": "#5cb8ff",
+      "tier": "nakama",
+      "owned": 3253,
+      "mythics": 7,
+      "seen": 1793421651753
     },
     "576da9a5-c300-4a3a-adc0-1cdbea03dab6": {
       "id": "576da9a5-c300-4a3a-adc0-1cdbea03dab6",
