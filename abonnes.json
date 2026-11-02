@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-01T20:27:36.158Z",
-  "count": 680,
+  "updated": "2026-11-02T14:54:42.287Z",
+  "count": 682,
   "subscribers": {
     "7cd5702f-a0f0-4260-988f-38e10033c3b0": {
       "id": "7cd5702f-a0f0-4260-988f-38e10033c3b0",
@@ -3624,6 +3624,16 @@
       "tier": "sensei",
       "seen": 1793223008703
     },
+    "b5fcb7c0-6064-4ce4-be98-b25eb43cf7ce": {
+      "id": "b5fcb7c0-6064-4ce4-be98-b25eb43cf7ce",
+      "pseudo": "Kryma",
+      "avatar": "https://cdn.discordapp.com/avatars/181459315108872192/a_4760b5e9360750d58b54490287dad7e9.webp?size=128&animated=true",
+      "color": "#a98bff",
+      "tier": "sensei",
+      "owned": 4901,
+      "mythics": 26,
+      "seen": 1793631281826
+    },
     "7291c28b-0750-4d39-805d-c4842c59b191": {
       "id": "7291c28b-0750-4d39-805d-c4842c59b191",
       "pseudo": "KS__1ConNu3",
@@ -4421,6 +4431,16 @@
       "owned": 2944,
       "mythics": 7,
       "seen": 1793440961421
+    },
+    "d7c0b924-9609-45ce-be38-308c3c62342c": {
+      "id": "d7c0b924-9609-45ce-be38-308c3c62342c",
+      "pseudo": "Xandro",
+      "avatar": "https://cdn.discordapp.com/avatars/710384553717399632/a_3aaeca51cffcd2297ed0e35271fbb214.webp?size=128&animated=true",
+      "color": "#ff7a45",
+      "tier": "sensei",
+      "owned": 4057,
+      "mythics": 32,
+      "seen": 1793631281827
     },
     "8f0f43cf-417e-41ef-ab0a-6c1806d09163": {
       "id": "8f0f43cf-417e-41ef-ab0a-6c1806d09163",
