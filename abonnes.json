@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-02T15:00:58.183Z",
-  "count": 682,
+  "updated": "2026-11-02T18:29:05.078Z",
+  "count": 684,
   "subscribers": {
     "7cd5702f-a0f0-4260-988f-38e10033c3b0": {
       "id": "7cd5702f-a0f0-4260-988f-38e10033c3b0",
@@ -47,6 +47,14 @@
       "color": null,
       "tier": "daimyo",
       "seen": 1793214786262
+    },
+    "428f0720-a823-47bc-8edb-12437ce19d56": {
+      "id": "428f0720-a823-47bc-8edb-12437ce19d56",
+      "pseudo": "_GinLeFou_",
+      "avatar": "https://cdn.discordapp.com/avatars/783808095406260276/af70079b701c491bdd9ada3ef1adce74.webp?size=128",
+      "color": null,
+      "tier": "daimyo",
+      "seen": 1793478326346
     },
     "8cf785c4-3914-4982-9ef2-64f7379e2388": {
       "id": "8cf785c4-3914-4982-9ef2-64f7379e2388",
@@ -1431,6 +1439,14 @@
       "owned": 1798,
       "mythics": 19,
       "seen": 1793288387492
+    },
+    "fe2e5735-0829-4cdc-a465-7f472ecd3b78": {
+      "id": "fe2e5735-0829-4cdc-a465-7f472ecd3b78",
+      "pseudo": "Lezart",
+      "avatar": "https://cdn.discordapp.com/avatars/242814152215756800/26c1bfc11db6b449c736a8d79410cb60.webp?size=128",
+      "color": null,
+      "tier": "daimyo",
+      "seen": 1793466338274
     },
     "06131479-f717-418b-9d82-796aa7e37378": {
       "id": "06131479-f717-418b-9d82-796aa7e37378",
