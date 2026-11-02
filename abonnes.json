@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-02T18:29:05.078Z",
-  "count": 684,
+  "updated": "2026-11-02T21:25:30.594Z",
+  "count": 685,
   "subscribers": {
     "7cd5702f-a0f0-4260-988f-38e10033c3b0": {
       "id": "7cd5702f-a0f0-4260-988f-38e10033c3b0",
@@ -5049,6 +5049,14 @@
       "owned": 2996,
       "mythics": 12,
       "seen": 1793424199268
+    },
+    "a7cf9ee0-1d6a-44de-b937-d54a6777f752": {
+      "id": "a7cf9ee0-1d6a-44de-b937-d54a6777f752",
+      "pseudo": "Gokyoz__Nico",
+      "avatar": "https://cdn.discordapp.com/avatars/239063742216798209/e763cc9318deb4bbeafcbca31cf44c4c.webp?size=128",
+      "color": null,
+      "tier": "senpai",
+      "seen": 1793644674004
     },
     "cfd9e435-e487-45cc-8bff-d3897b94e6e3": {
       "id": "cfd9e435-e487-45cc-8bff-d3897b94e6e3",
