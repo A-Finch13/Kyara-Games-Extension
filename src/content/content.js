@@ -2164,7 +2164,7 @@
     }
   }
 
-  // Window listing the players without a subscription who use the extension, as badges like the wall's, with a search.
+  // Window listing the players who use the extension, subscribers then the others, as badges like the wall's, with a search.
   async function openMembers() {
     document.querySelector('.kyx-modal-back')?.remove();
     const back = document.createElement('div');
@@ -2174,7 +2174,8 @@
         <div class="kyx-members-head"><b>Joueurs avec l’extension</b><span class="kyx-members-count"></span><button type="button" class="kyx-members-close" aria-label="Fermer">✕</button></div>
         <label class="kyx-search"><input type="search" placeholder="Chercher un joueur…" autocomplete="off" /></label>
         <p class="kyx-members-note" role="status">Chargement…</p>
-        <ol class="kyx-s-list"></ol>
+        <section class="kyx-members-group" data-group="sub" hidden><h3>Avec abonnement <span class="kyx-members-count"></span></h3><ol class="kyx-s-list"></ol></section>
+        <section class="kyx-members-group" data-group="free" hidden><h3>Sans abonnement <span class="kyx-members-count"></span></h3><ol class="kyx-s-list"></ol></section>
       </div>`;
     document.body.appendChild(back);
     const onKey = (e) => e.key === 'Escape' && close();
@@ -2191,17 +2192,28 @@
     const sort = () => members.sort((a, b) => (a.pseudo === '?') - (b.pseudo === '?') || a.pseudo.localeCompare(b.pseudo, 'fr'));
     sort();
     back.querySelector('.kyx-members-count').textContent = num(members.length);
-    const list = back.querySelector('.kyx-s-list');
     const input = back.querySelector('input');
     const draw = () => {
       const q = norm(input.value);
       const shown = members.filter((m) => !q || norm(m.pseudo).includes(q));
       note.textContent = shown.length ? '' : members.length ? 'Aucun joueur ne correspond.' : 'Personne pour l’instant.';
+      for (const group of back.querySelectorAll('.kyx-members-group')) {
+        const subs = group.dataset.group === 'sub';
+        drawGroup(group, shown.filter((m) => !!m.sub === subs), members.filter((m) => !!m.sub === subs).length);
+      }
+    };
+    // One group of badges, with its count (found / total while searching).
+    const drawGroup = (group, shown, total) => {
+      group.hidden = !shown.length;
+      group.querySelector('.kyx-members-count').textContent = shown.length === total ? num(total) : `${num(shown.length)} / ${num(total)}`;
+      const list = group.querySelector('.kyx-s-list');
       list.replaceChildren();
       for (const m of shown) {
         const li = document.createElement('li');
-        li.innerHTML = '<a data-tier="ext"><span class="kyx-s-av"></span><b></b></a>';
+        li.innerHTML = '<a><span class="kyx-s-av"></span><b></b></a>';
         const a = li.querySelector('a');
+        a.dataset.tier = m.sub ?? 'ext';
+        if (m.sub) a.title = subTiers.find((t) => t.id === m.sub)?.name ?? 'Abonné';
         a.href = `/profil/${encodeURIComponent(m.id)}`;
         a.addEventListener('click', () => (close(), closeView()));
         const av = li.querySelector('.kyx-s-av');

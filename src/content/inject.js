@@ -227,10 +227,10 @@
     const known = me?.id === u.id;
     me = { title: known ? me.title : null, id: u.id, sub: !!(u.membership?.tier || u.membership?.perks?.length) };
     if (!known && perksAt) shareNames();
-    if (!me.sub) tellMember();
+    tellMember();
   }
 
-  // Tells the relay every 10 minutes that the logged-in player uses the extension (their badge), with their session.
+  // Tells the relay every 10 minutes that the logged-in player uses the extension (their badge or tier), with their session.
   function tellMember() {
     const key = `kyx-member:${me.id}`;
     if (Date.now() - (local(key) ?? 0) < MEMBER_EVERY) return;
@@ -248,7 +248,7 @@
       .catch(() => local(key, 0));
   }
 
-  setInterval(() => me && !me.sub && tellMember(), 60e3);
+  setInterval(() => me && tellMember(), 60e3);
 
   // True for a player without a subscription, from their badges.
   const freePlayer = (p) => !(p.badges ?? []).some((b) => /^membre-/.test(b?.id ?? ''));
