@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyara Games
 // @namespace    https://github.com/A-Finch13/Kyara-Games-Extension
-// @version      1.9.2
+// @version      1.9.3
 // @description  Compagnon non officiel pour kyara.games : cartes manquantes en gris avec ordre d'achat, albums complets masqués, doublons pendant les échanges, booster le plus rentable, classement entre amis.
 // @author       A-Finch13
 // @license      MIT
@@ -46,7 +46,7 @@
 'use strict';
 if (window.__kyaraGamesUserscript) return;
 window.__kyaraGamesUserscript = true;
-const KYX_VERSION = '1.9.2';
+const KYX_VERSION = '1.9.3';
 
 // ---------- 1. src/userscript/shim.js : stockage et messages, à la place des fonctions d'extension ----------
 // Userscript: the extension APIs used by the page code, rebuilt in the page.
@@ -334,6 +334,71 @@ async function importCode(code) {
     tradeFav: data.tradeFav
   });
   return { favs: data.favSeries.length, locks: data.smartLock.length };
+}
+
+// ---------- same settings on every device of the account ----------
+
+const SYNC_KEYS = ['settings', 'favSeries', 'smartLock', 'marketFav', 'tradeFav'];
+const SYNC_PAGE_MINUTES = 1; // looked up again after a change of page of the site
+const SYNC_IDLE_MINUTES = 15; // looked up again without the site open
+let syncing = null;
+let syncSoon = 0;
+
+// What follows the account: the settings of the code, favourite series, "Bloquer sauf doublons" albums, "★ Favoris" filters.
+async function syncData() {
+  const { settings: saved, favSeries = [], smartLock = [], marketFav, tradeFav } = await chrome.storage.local.get(SYNC_KEYS);
+  const settings = { ...DEFAULT_SETTINGS, ...saved };
+  return {
+    settings: Object.fromEntries([...SYNC_FLAGS, 'pollMinutes'].map((key) => [key, settings[key]])),
+    favSeries,
+    smartLock,
+    marketFav: !!marketFav,
+    tradeFav: !!tradeFav
+  };
+}
+
+// Sends this device's settings to the relay when they changed, or takes the account's ones when another device changed them.
+function syncAccount() {
+  return (syncing ??= (async () => {
+    if (!RELAY) return;
+    const { auth, me, sync = {} } = await chrome.storage.local.get(['auth', 'me', 'sync']);
+    if (!auth?.token || !me?.id) return;
+    const data = await syncData();
+    const json = JSON.stringify(data);
+    const mine = sync.user === me.id;
+    await chrome.storage.local.set({ sync: { ...sync, triedAt: Date.now() } });
+    const res = await fetch(`${RELAY}/sync`, {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: JSON.stringify({ token: auth.token, device: auth.device, rev: mine ? sync.rev : 0, changed: mine && json !== sync.json, data })
+    }).then((r) => r.json()).catch(() => null);
+    if (!res?.ok || res.user !== me.id) return;
+    if (res.data) {
+      const d = res.data;
+      const { settings } = await chrome.storage.local.get('settings');
+      await chrome.storage.local.set({
+        settings: { ...settings, ...d.settings },
+        favSeries: Array.isArray(d.favSeries) ? d.favSeries : [],
+        smartLock: Array.isArray(d.smartLock) ? d.smartLock : [],
+        marketFav: !!d.marketFav,
+        tradeFav: !!d.tradeFav
+      });
+    }
+    await chrome.storage.local.set({ sync: { user: me.id, rev: res.rev, json: res.data ? JSON.stringify(await syncData()) : json, triedAt: Date.now() } });
+  })().finally(() => (syncing = null)));
+}
+
+// Looks the account's settings up a minute after the last time on a change of page, every 15 minutes otherwise.
+async function autoSync(pageChanged) {
+  const { sync } = await chrome.storage.local.get('sync');
+  if (Date.now() - (sync?.triedAt ?? 0) >= (pageChanged ? SYNC_PAGE_MINUTES : SYNC_IDLE_MINUTES) * 60e3) syncAccount().catch(() => {});
+}
+
+// Sends the settings a few seconds after a change made on this device.
+function syncOnChange(changes) {
+  if (!SYNC_KEYS.some((key) => key in changes) || 'sync' in changes) return;
+  clearTimeout(syncSoon);
+  syncSoon = setTimeout(() => syncAccount().catch(() => {}), 3000);
 }
 
 class ApiError extends Error {
@@ -648,6 +713,7 @@ async function exportSubs(token) {
 
 // Search every minute and on each change of page of the site (30 s apart at least, across tabs); the shared list every 5 minutes, the relay once a day.
 async function autoSubsScan(pageChanged) {
+  autoSync(pageChanged).catch(() => {});
   if (subsScan) return;
   const { subscribersAt = 0, sharedSubsAt = 0 } = await chrome.storage.local.get(['subscribersAt', 'sharedSubsAt']);
   if (Date.now() - sharedSubsAt >= SHARED_SUBS_MINUTES * 60e3) syncSharedSubs().catch(() => {});
@@ -754,6 +820,9 @@ async function checkUpdate() {
 // ---------- 3. src/userscript/bridge.js : le travail du service de fond, dans la page ----------
 // Userscript: the background worker's answers to the page code, done in the page.
 let refreshTimer = 0;
+
+// Sends the settings changed on this device to the other devices of the account.
+chrome.storage.onChanged.addListener((changes) => syncOnChange(changes));
 
 // Reads the session from the site until the page code hands it over.
 async function ensureAuth() {
@@ -3560,13 +3629,13 @@ const KYX_TOUR = [
     id: 'reglages',
     only: 'extension',
     title: 'Réglages et autre appareil',
-    text: 'Clique sur l’icône Kyara Games de ton navigateur : onglets Albums, Manquantes, Échange et Réglages. Dans Réglages, active ou coupe chaque fonction et les notifications, et « Autre appareil » te donne un code court pour retrouver tes réglages sur ton téléphone.'
+    text: 'Clique sur l’icône Kyara Games de ton navigateur : onglets Albums, Manquantes, Échange et Réglages. Dans Réglages, active ou coupe chaque fonction et les notifications, et tes réglages te suivent tout seuls sur ton téléphone dès que tu y es connecté au même compte Kyara.'
   },
   {
     id: 'reglages',
     only: 'script',
     title: 'Réglages et autre appareil',
-    text: 'Ici : active ou coupe chaque fonction, et « Autre appareil » te donne un code court pour retrouver tes réglages et tes favoris sur un autre appareil.',
+    text: 'Ici : active ou coupe chaque fonction, et tes réglages et tes favoris te suivent tout seuls sur tes autres appareils connectés au même compte Kyara.',
     prepare: 'menu',
     target: '#nav-more .kyx-settings-entry, #mobile-nav .kyx-settings-entry, [role="dialog"] > ul .kyx-settings-entry'
   },
@@ -3589,6 +3658,10 @@ const KYX_TOUR = [
 
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
+  {
+    version: '1.9.3',
+    items: [['Tes réglages et tes œuvres favorites suivent ton compte Kyara : tu retrouves les mêmes sur ton PC et ton téléphone, extension ou script, sans passer par le code.', 'reglages']]
+  },
   {
     version: '1.9.2',
     items: [
@@ -7299,7 +7372,7 @@ const KYX_CHANGES = [
         <div class="kyx-settings-list"></div>
         <div class="kyx-sync">
           <b>Autre appareil</b>
-          <p class="kyx-settings-note">Pour retrouver tes réglages et tes œuvres favorites sur un autre appareil (PC, téléphone, extension ou script) : copie ton code ici, puis colle-le sur l’autre appareil. Les verrous de cartes et les envies sont déjà gardés par Kyara sur ton compte.</p>
+          <p class="kyx-settings-note">Tes réglages et tes œuvres favorites suivent ton compte Kyara : connecte-toi au même compte sur ton PC et ton téléphone (extension ou script), tu les retrouves partout, à jour en quelques minutes. Les verrous de cartes et les envies sont déjà gardés par Kyara sur ton compte. Le code ci-dessous reste là pour un autre compte.</p>
           <div class="kyx-order-btns"><button type="button" class="kyx-sync-copy">Copier mon code</button></div>
           <textarea rows="2" placeholder="Tape ou colle ici le code de ton autre appareil (ex. 1A2B-3C4D-…)" spellcheck="false"></textarea>
           <div class="kyx-order-btns"><button type="button" class="kyx-sync-import">Importer ce code</button></div>

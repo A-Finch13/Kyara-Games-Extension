@@ -107,13 +107,13 @@ const KYX_TOUR = [
     id: 'reglages',
     only: 'extension',
     title: 'Réglages et autre appareil',
-    text: 'Clique sur l’icône Kyara Games de ton navigateur : onglets Albums, Manquantes, Échange et Réglages. Dans Réglages, active ou coupe chaque fonction et les notifications, et « Autre appareil » te donne un code court pour retrouver tes réglages sur ton téléphone.'
+    text: 'Clique sur l’icône Kyara Games de ton navigateur : onglets Albums, Manquantes, Échange et Réglages. Dans Réglages, active ou coupe chaque fonction et les notifications, et tes réglages te suivent tout seuls sur ton téléphone dès que tu y es connecté au même compte Kyara.'
   },
   {
     id: 'reglages',
     only: 'script',
     title: 'Réglages et autre appareil',
-    text: 'Ici : active ou coupe chaque fonction, et « Autre appareil » te donne un code court pour retrouver tes réglages et tes favoris sur un autre appareil.',
+    text: 'Ici : active ou coupe chaque fonction, et tes réglages et tes favoris te suivent tout seuls sur tes autres appareils connectés au même compte Kyara.',
     prepare: 'menu',
     target: '#nav-more .kyx-settings-entry, #mobile-nav .kyx-settings-entry, [role="dialog"] > ul .kyx-settings-entry'
   },
@@ -136,6 +136,10 @@ const KYX_TOUR = [
 
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
+  {
+    version: '1.9.3',
+    items: [['Tes réglages et tes œuvres favorites suivent ton compte Kyara : tu retrouves les mêmes sur ton PC et ton téléphone, extension ou script, sans passer par le code.', 'reglages']]
+  },
   {
     version: '1.9.2',
     items: [

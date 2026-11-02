@@ -1,4 +1,4 @@
-import { ORIGIN, REPO, api, checkUpdate, newer, getSettings, setSettings, loadCatalog, loadCollection, slimCollection, slimMe, runSubsScan, autoSubsScan, meetPlayers, exportSubs, relayStats, relayMembers } from './lib/kyara.js';
+import { ORIGIN, REPO, api, checkUpdate, newer, getSettings, setSettings, loadCatalog, loadCollection, slimCollection, slimMe, runSubsScan, autoSubsScan, meetPlayers, exportSubs, relayStats, relayMembers, syncOnChange } from './lib/kyara.js';
 
 const ALARM = 'kyara-poll';
 const UPDATE_ALARM = 'kyara-update';
@@ -133,6 +133,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes.settings && changes.settings.oldValue?.pollMinutes !== changes.settings.newValue?.pollMinutes) schedule();
   if (changes.me) updateBadge(changes.me.newValue);
   if (changes.authValid && changes.authValid.newValue === false) updateBadge(null, true);
+  syncOnChange(changes);
 });
 
 let polling = null;

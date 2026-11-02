@@ -24,7 +24,7 @@
         <div class="kyx-settings-list"></div>
         <div class="kyx-sync">
           <b>Autre appareil</b>
-          <p class="kyx-settings-note">Pour retrouver tes réglages et tes œuvres favorites sur un autre appareil (PC, téléphone, extension ou script) : copie ton code ici, puis colle-le sur l’autre appareil. Les verrous de cartes et les envies sont déjà gardés par Kyara sur ton compte.</p>
+          <p class="kyx-settings-note">Tes réglages et tes œuvres favorites suivent ton compte Kyara : connecte-toi au même compte sur ton PC et ton téléphone (extension ou script), tu les retrouves partout, à jour en quelques minutes. Les verrous de cartes et les envies sont déjà gardés par Kyara sur ton compte. Le code ci-dessous reste là pour un autre compte.</p>
           <div class="kyx-order-btns"><button type="button" class="kyx-sync-copy">Copier mon code</button></div>
           <textarea rows="2" placeholder="Tape ou colle ici le code de ton autre appareil (ex. 1A2B-3C4D-…)" spellcheck="false"></textarea>
           <div class="kyx-order-btns"><button type="button" class="kyx-sync-import">Importer ce code</button></div>

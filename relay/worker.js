@@ -1,7 +1,8 @@
 // Kyara Games relay (Cloudflare Worker): counts the active installs and adds the subscribers found by the
 // extensions to abonnes.json in the repository (a queue checked on kyara.games 44 players at a time, written by
 // groups of more than 10), and keeps the profile perks that players without a subscription chose through the
-// extension (name colour, banner, title, links…) and which of them use it (their badge).
+// extension (name colour, banner, title, links…) and which of them use it (their badge), and the settings each player
+// shares between their devices.
 // Bindings: KV (namespace), GITHUB_TOKEN (secret, Contents read and write on the repository), REPO (variable).
 
 const TIERS = ['nakama', 'senpai', 'sensei', 'daimyo'];
@@ -25,6 +26,7 @@ export default {
       if (req.method === 'GET' && pathname === '/profiles') return json(await profiles(env), 200, { 'cache-control': 'max-age=60' });
       if (req.method === 'POST' && pathname === '/profile') return json(await saveProfile(env, await req.json()));
       if (req.method === 'POST' && pathname === '/member') return json(await saveMember(env, await req.json()));
+      if (req.method === 'POST' && pathname === '/sync') return json(await syncSettings(env, await req.json()));
       return json({ error: 'not_found' }, 404);
     } catch (e) {
       return json({ error: String(e?.message ?? e) }, 500);
@@ -287,4 +289,39 @@ async function saveMember(env, body) {
   all[me.id] = { ...cur, pseudo, avatar, ext, sub, at: Date.now() };
   await env.KV.put('profiles', JSON.stringify(all));
   return { ok: true, ext };
+}
+
+// ---------- same settings on every device ----------
+
+const SYNC_MAX = 64 * 1024; // characters of a player's saved settings
+
+// The settings sent by a device, with only the expected kinds of values, or null.
+function cleanSync(d) {
+  if (!d || typeof d !== 'object') return null;
+  const settings = {};
+  for (const [k, v] of Object.entries(d.settings ?? {}).slice(0, 40)) {
+    if (/^[a-zA-Z]{1,30}$/.test(k) && (typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v)))) settings[k] = v;
+  }
+  const names = (list) => (Array.isArray(list) ? list.filter((n) => typeof n === 'string' && n.length <= 200).slice(0, 5000) : []);
+  const out = { settings, favSeries: names(d.favSeries), smartLock: names(d.smartLock), marketFav: !!d.marketFav, tradeFav: !!d.tradeFav };
+  return JSON.stringify(out).length <= SYNC_MAX ? out : null;
+}
+
+// Keeps the settings of the player whose session is given, shared by their devices: saves the ones of a device that
+// changed them (or the first ones), and sends back the saved ones to a device that has an older revision.
+async function syncSettings(env, body) {
+  const me = await sessionUser(body?.token, body?.device);
+  if (!me) return { error: 'session' };
+  const key = `sync:${me.id}`;
+  const saved = await env.KV.get(key, 'json');
+  if (!saved || body.changed) {
+    const data = cleanSync(body.data);
+    if (!data) return { error: 'bad_data' };
+    if (saved && JSON.stringify(saved.data) === JSON.stringify(data)) return { ok: true, user: me.id, rev: saved.rev };
+    const rev = (saved?.rev ?? 0) + 1;
+    await env.KV.put(key, JSON.stringify({ rev, data, at: Date.now() }));
+    return { ok: true, user: me.id, rev };
+  }
+  if (saved.rev === Number(body.rev)) return { ok: true, user: me.id, rev: saved.rev };
+  return { ok: true, user: me.id, rev: saved.rev, data: saved.data };
 }

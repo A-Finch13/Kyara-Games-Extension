@@ -1,6 +1,9 @@
 // Userscript: the background worker's answers to the page code, done in the page.
 let refreshTimer = 0;
 
+// Sends the settings changed on this device to the other devices of the account.
+chrome.storage.onChanged.addListener((changes) => syncOnChange(changes));
+
 // Reads the session from the site until the page code hands it over.
 async function ensureAuth() {
   if ((await chrome.storage.local.get('auth')).auth?.token) return;

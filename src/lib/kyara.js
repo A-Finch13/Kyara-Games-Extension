@@ -190,6 +190,71 @@ export async function importCode(code) {
   return { favs: data.favSeries.length, locks: data.smartLock.length };
 }
 
+// ---------- same settings on every device of the account ----------
+
+const SYNC_KEYS = ['settings', 'favSeries', 'smartLock', 'marketFav', 'tradeFav'];
+const SYNC_PAGE_MINUTES = 1; // looked up again after a change of page of the site
+const SYNC_IDLE_MINUTES = 15; // looked up again without the site open
+let syncing = null;
+let syncSoon = 0;
+
+// What follows the account: the settings of the code, favourite series, "Bloquer sauf doublons" albums, "★ Favoris" filters.
+async function syncData() {
+  const { settings: saved, favSeries = [], smartLock = [], marketFav, tradeFav } = await chrome.storage.local.get(SYNC_KEYS);
+  const settings = { ...DEFAULT_SETTINGS, ...saved };
+  return {
+    settings: Object.fromEntries([...SYNC_FLAGS, 'pollMinutes'].map((key) => [key, settings[key]])),
+    favSeries,
+    smartLock,
+    marketFav: !!marketFav,
+    tradeFav: !!tradeFav
+  };
+}
+
+// Sends this device's settings to the relay when they changed, or takes the account's ones when another device changed them.
+export function syncAccount() {
+  return (syncing ??= (async () => {
+    if (!RELAY) return;
+    const { auth, me, sync = {} } = await chrome.storage.local.get(['auth', 'me', 'sync']);
+    if (!auth?.token || !me?.id) return;
+    const data = await syncData();
+    const json = JSON.stringify(data);
+    const mine = sync.user === me.id;
+    await chrome.storage.local.set({ sync: { ...sync, triedAt: Date.now() } });
+    const res = await fetch(`${RELAY}/sync`, {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: JSON.stringify({ token: auth.token, device: auth.device, rev: mine ? sync.rev : 0, changed: mine && json !== sync.json, data })
+    }).then((r) => r.json()).catch(() => null);
+    if (!res?.ok || res.user !== me.id) return;
+    if (res.data) {
+      const d = res.data;
+      const { settings } = await chrome.storage.local.get('settings');
+      await chrome.storage.local.set({
+        settings: { ...settings, ...d.settings },
+        favSeries: Array.isArray(d.favSeries) ? d.favSeries : [],
+        smartLock: Array.isArray(d.smartLock) ? d.smartLock : [],
+        marketFav: !!d.marketFav,
+        tradeFav: !!d.tradeFav
+      });
+    }
+    await chrome.storage.local.set({ sync: { user: me.id, rev: res.rev, json: res.data ? JSON.stringify(await syncData()) : json, triedAt: Date.now() } });
+  })().finally(() => (syncing = null)));
+}
+
+// Looks the account's settings up a minute after the last time on a change of page, every 15 minutes otherwise.
+export async function autoSync(pageChanged) {
+  const { sync } = await chrome.storage.local.get('sync');
+  if (Date.now() - (sync?.triedAt ?? 0) >= (pageChanged ? SYNC_PAGE_MINUTES : SYNC_IDLE_MINUTES) * 60e3) syncAccount().catch(() => {});
+}
+
+// Sends the settings a few seconds after a change made on this device.
+export function syncOnChange(changes) {
+  if (!SYNC_KEYS.some((key) => key in changes) || 'sync' in changes) return;
+  clearTimeout(syncSoon);
+  syncSoon = setTimeout(() => syncAccount().catch(() => {}), 3000);
+}
+
 export class ApiError extends Error {
   constructor(status, code) {
     super(code);
@@ -502,6 +567,7 @@ export async function exportSubs(token) {
 
 // Search every minute and on each change of page of the site (30 s apart at least, across tabs); the shared list every 5 minutes, the relay once a day.
 export async function autoSubsScan(pageChanged) {
+  autoSync(pageChanged).catch(() => {});
   if (subsScan) return;
   const { subscribersAt = 0, sharedSubsAt = 0 } = await chrome.storage.local.get(['subscribersAt', 'sharedSubsAt']);
   if (Date.now() - sharedSubsAt >= SHARED_SUBS_MINUTES * 60e3) syncSharedSubs().catch(() => {});
