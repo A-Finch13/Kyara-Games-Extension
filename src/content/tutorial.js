@@ -137,6 +137,13 @@ const KYX_TOUR = [
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
   {
+    version: '1.9.2',
+    items: [
+      ['Profil : le nombre de doublons du joueur s’affiche à côté de ses mythiques et de ses boosters.'],
+      ['Classement : le filtre « 友 Amis » suit les nouveaux onglets Renommée et Renaissance et les paliers « Renaissance 1 » / « Sans Renaissance » (avec le nombre de tes amis à chacun), et la pastille R1, R2… de tes amis qui ont fait une Renaissance.', 'amis']
+    ]
+  },
+  {
     version: '1.9.1',
     items: [['Le badge 拡 Kyara Games, les couleurs et les fonds des messages des autres joueurs se mettent à jour en 10 minutes au plus.']]
   },

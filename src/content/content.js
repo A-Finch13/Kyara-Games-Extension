@@ -1310,12 +1310,14 @@
     collection: { main: (r) => r.owned, unit: (n) => plural(n, 'carte', 'cartes'), side: (r) => `${num(r.mythics ?? 0)} ${plural(r.mythics ?? 0, 'mythique', 'mythiques')}` },
     prestige: { main: (r) => r.points, unit: () => 'points', side: (r) => `${num(r.owned ?? 0)} cartes` },
     mythics: { main: (r) => r.mythics, unit: (n) => plural(n, 'mythique', 'mythiques'), side: (r) => `${num(r.points ?? 0)} pts` },
+    renaissance: { main: (r) => r.renaissance ?? 0, unit: (n) => plural(n, 'Renaissance', 'Renaissances'), side: (r) => `${num(r.points ?? 0)} pts de Renommée` },
     series: { main: (r) => r.series, unit: (n) => plural(n, 'série', 'séries'), side: (r) => `${num(r.owned ?? 0)} cartes` },
     achievements: { main: (r) => r.achievements, unit: () => 'succès', side: (r) => `${num(r.points ?? 0)} pts` }
   };
   const ladderCache = new Map(); // `${by}|${id}` -> { at, row }
   let friendsOnly = false;
   let friendsShown = '';
+  let friendLevels = null; // Renaissance level -> number of friends (and you) at it
 
   // One player's row of a ranking, kept 5 minutes.
   async function ladderRow(by, id) {
@@ -1333,6 +1335,34 @@
     const res = await siteApi('/me/friends');
     const list = Array.isArray(res) ? res : res?.friends ?? res?.items ?? [];
     return list.map((f) => (f.user ?? f.friend ?? f).id ?? f.userId).filter((id) => id != null);
+  }
+
+  // Renaissance level of a level button under the ranking tabs (0 for "Sans Renaissance").
+  function chipLevel(chip) {
+    const label = [...chip.childNodes].filter((n) => n.nodeName !== 'SMALL').map((n) => n.textContent).join('');
+    return Number(/\d+/.exec(label)?.[0] ?? 0);
+  }
+
+  // Renaissance level picked under the ranking tabs, null without the levels.
+  function ladderLeague(head) {
+    const chip = head.querySelector('.leagues [aria-pressed="true"]');
+    return chip ? chipLevel(chip) : null;
+  }
+
+  // Number of friends on each level button while the filter is on, the site's numbers otherwise.
+  function scanLeagueCounts(head) {
+    for (const chip of head.querySelectorAll('.leagues button')) {
+      const text = chip.querySelector('small')?.firstChild;
+      if (!text) continue;
+      if (friendsOnly && friendLevels) {
+        chip.dataset.kyxCount ??= text.nodeValue;
+        const n = String(friendLevels.get(chipLevel(chip)) ?? 0);
+        if (text.nodeValue !== n) text.nodeValue = n;
+      } else if (chip.dataset.kyxCount != null) {
+        text.nodeValue = chip.dataset.kyxCount;
+        delete chip.dataset.kyxCount;
+      }
+    }
   }
 
   // "Amis" button among the ranking tabs, and the friends ranking.
@@ -1361,13 +1391,14 @@
     }
     btn.classList.toggle('on', friendsOnly);
     btn.setAttribute('aria-pressed', String(friendsOnly));
-    const by = LADDER[new URLSearchParams(location.search).get('par')] ? new URLSearchParams(location.search).get('par') : 'collection';
+    const by = LADDER[new URLSearchParams(location.search).get('par')] ? new URLSearchParams(location.search).get('par') : 'prestige';
     // Hides the site's podium and lists while the filter is on.
     for (const el of head.parentElement.children) {
       if (el === head || el.classList.contains('kyx-friends')) continue;
       if (friendsOnly && el.dataset.kyxHidden !== '1') el.dataset.kyxHidden = '1';
       else if (!friendsOnly && el.dataset.kyxHidden) delete el.dataset.kyxHidden;
     }
+    scanLeagueCounts(head);
     let board = head.parentElement.querySelector(':scope > .kyx-friends');
     if (!friendsOnly) return void board?.remove();
     if (!board) {
@@ -1375,9 +1406,11 @@
       board.className = 'kyx-friends wrap body';
       head.after(board);
     }
-    if (friendsShown === by) return;
-    friendsShown = by;
-    renderFriends(board, by);
+    const league = by === 'renaissance' ? null : ladderLeague(head);
+    const shown = `${by}|${league}`;
+    if (friendsShown === shown) return;
+    friendsShown = shown;
+    renderFriends(head, board, by, league, shown);
   }
 
   // Style class (svelte-xxxx) of an element of the site, read from the page.
@@ -1429,8 +1462,8 @@
       .map((b) => `<span class="bd ${b.frame === 'gold' && !String(b.id).startsWith('membre-') ? 'gold' : ''} ${b.frame === 'staff' ? 'staff' : ''} ${sc}" title="${esc(b.label)}">${esc(b.kanji)}</span>`)
       .join('');
 
-  // Friends ranking: podium then list, in the site's markup.
-  async function renderFriends(board, by) {
+  // Friends ranking (only those at the picked Renaissance level): podium then list, in the site's markup.
+  async function renderFriends(head, board, by, league, shown) {
     const def = LADDER[by];
     board.innerHTML = '<p class="kyx-friends-note">Chargement du classement de tes amis…</p>';
     let ids;
@@ -1441,21 +1474,32 @@
       return;
     }
     const { me } = await chrome.storage.local.get('me').catch(() => ({}));
+    const lonely = !ids.some((id) => id !== me?.id);
     if (me?.id && !ids.includes(me.id)) ids.push(me.id);
-    const rows = [];
+    const all = [];
     let next = 0;
     await Promise.all(
       Array.from({ length: Math.min(4, ids.length) }, async () => {
         while (next < ids.length) {
           const row = await ladderRow(by, ids[next++]);
-          if (row) rows.push(row);
+          if (row) all.push(row);
         }
       })
     );
-    if (friendsShown !== by || !board.isConnected) return;
+    if (friendsShown !== shown || !board.isConnected) return;
+    if (by !== 'renaissance') {
+      friendLevels = new Map();
+      for (const r of all) friendLevels.set(r.renaissance ?? 0, (friendLevels.get(r.renaissance ?? 0) ?? 0) + 1);
+      scanLeagueCounts(head);
+    }
+    const rows = league == null ? all : all.filter((r) => (r.renaissance ?? 0) === league);
     rows.sort((a, b) => (def.main(b) ?? 0) - (def.main(a) ?? 0) || (a.pos ?? 0) - (b.pos ?? 0));
-    if (rows.length <= (me?.id ? 1 : 0)) {
+    if (lonely) {
       board.innerHTML = '<p class="kyx-friends-note">Tu n’as pas encore d’amis sur Kyara. Ajoute-en depuis la page <a href="/amis">Amis</a>.</p>';
+      return;
+    }
+    if (!rows.length) {
+      board.innerHTML = `<p class="kyx-friends-note">${by === 'renaissance' ? 'Personne parmi tes amis n’a encore fait de Renaissance.' : league != null ? 'Aucun de tes amis n’est à ce palier.' : 'Impossible de charger le classement de tes amis.'}</p>`;
       return;
     }
 
@@ -1468,6 +1512,7 @@
     const unit = (r) => def.unit(def.main(r) ?? 0);
     const isMe = (r) => r.id === me?.id;
     const general = (r) => `#${num(r.pos ?? 0)} au général`;
+    const rebirth = (r) => (r.renaissance ? `<span class="rn ${sc}" title="Renaissance ${num(r.renaissance)}">R${num(r.renaissance)}</span>` : '');
     const MEDALS = ['#F5C518', '#C9C5CE', '#D08A4E'];
 
     // Podium: 2nd, 1st, 3rd, like the site.
@@ -1479,7 +1524,7 @@
         const title = `<span class="pod-title ${sc}">${esc(r.title ? `${r.title} · ${general(r)}` : general(r))}</span>`;
         const badges = r.badges?.length ? `<span class="bdg ${sc}">${badgesHtml(r, 4, sc)}</span>` : '';
         return `<li class="pod p${i + 1} ${isMe(r) ? 'me' : ''} ${sc}" style="--medal:${MEDALS[i]}">
-          <a class="pod-who ${sc}" href="/profil/${encodeURIComponent(r.id)}">${avatarHtml(r, size, av)} <span class="pod-name ${sc}"${r.nameColor ? ` style="color:${esc(r.nameColor)}"` : ''}>${esc(r.pseudo)}</span> ${title}</a>
+          <a class="pod-who ${sc}" href="/profil/${encodeURIComponent(r.id)}">${avatarHtml(r, size, av)} <span class="pod-name ${sc}"${r.nameColor ? ` style="color:${esc(r.nameColor)}"` : ''}>${esc(r.pseudo)}</span> ${rebirth(r)} ${title}</a>
           <span class="pod-rank ${sc}">${rankHtml(r.rank, 'md', 'side', rk)}</span> ${badges}
           <span class="plinth ${sc}"><span class="pos ${sc}">${i + 1}</span> <span class="pv ${sc}">${value(r)}</span> <span class="pk ${sc}">${unit(r)}</span></span>
         </li>`;
@@ -1492,7 +1537,7 @@
         const pct = total && r.owned != null ? Math.min(100, (r.owned / total) * 100) : 0;
         return `<li class="${isMe(r) ? 'me' : ''} ${sc}">
           <span class="rank mono ${sc}">${j + 4}</span> ${avatarHtml(r, 44, av)}
-          <span class="who ${sc}"><span class="line ${sc}"><a class="${sc}" href="/profil/${encodeURIComponent(r.id)}"${r.nameColor ? ` style="color:${esc(r.nameColor)}"` : ''}>${esc(r.pseudo)}</a> ${isMe(r) ? `<span class="you ${sc}">toi</span>` : ''} ${badgesHtml(r, 3, sc)}</span>
+          <span class="who ${sc}"><span class="line ${sc}"><a class="${sc}" href="/profil/${encodeURIComponent(r.id)}"${r.nameColor ? ` style="color:${esc(r.nameColor)}"` : ''}>${esc(r.pseudo)}</a> ${isMe(r) ? `<span class="you ${sc}">toi</span>` : ''} ${rebirth(r)} ${badgesHtml(r, 3, sc)}</span>
           <span class="sub ${sc}"><span class="ttl ${sc}">${esc(r.title ? `${r.title} · ${general(r)}` : general(r))}</span> <span class="bar ${sc}" title="${Math.round(pct)} % du catalogue"><i class="${sc}" style="width:${pct}%"></i></span></span></span>
           <span class="row-rank ${sc}">${rankHtml(r.rank, 'sm', 'below', rk)}</span>
           <span class="stat ${sc}"><span class="v ${sc}">${value(r)}</span> <span class="k ${sc}">${unit(r)}</span></span>
@@ -2457,6 +2502,40 @@
     }
   }
 
+  // ---------- duplicates count on a profile ----------
+
+  let dupesFor = ''; // player whose duplicates count is loaded (or loading)
+  let dupesCount = null; // their number of cards held more than once, null while unknown or private
+
+  // "Doublons" figure in the free cell of the profile's stats, after "Mythiques" and "Boosters".
+  function scanProfileDupes() {
+    const id = /^\/profil\/([^/]+)$/.exec(location.pathname)?.[1];
+    const kpis = id ? document.querySelector('.kpis') : null;
+    if (!kpis) return void (dupesFor = '');
+    const who = decodeURIComponent(id);
+    let cell = kpis.querySelector(':scope > .kyx-dupes');
+    if (cell?.dataset.id === who) return;
+    cell?.remove();
+    if (dupesFor !== who) {
+      dupesFor = who;
+      dupesCount = null;
+      siteApi(`/users/${encodeURIComponent(who)}`, { auth: false })
+        .then((p) => dupesFor === who && (dupesCount = p?.doublesCount ?? null) !== null && scanProfileDupes())
+        .catch(() => {});
+      return;
+    }
+    const plain = kpis.querySelectorAll(':scope > .kpi:not(.coll):not(.rank)');
+    if (dupesCount === null || !plain.length || plain.length >= 3) return;
+    cell = plain[plain.length - 1].cloneNode(true);
+    cell.classList.add('kyx-dupes');
+    cell.dataset.id = who;
+    cell.title = 'Cartes différentes en plusieurs exemplaires';
+    cell.querySelector('.kv').classList.remove('m', 'hrt');
+    cell.querySelector('.kv').textContent = num(dupesCount);
+    cell.querySelector('.kl').textContent = plural(dupesCount, 'Doublon', 'Doublons');
+    plain[plain.length - 1].after(cell);
+  }
+
   // ---------- guided tour and what's new ----------
 
   const TUTO_HASH = '#kyx-tutoriel';
@@ -3347,6 +3426,7 @@
     scanWallOption();
     scanMarketNames();
     scanChatMessages();
+    scanProfileDupes();
   }
 
   // Scans the whole page again.
@@ -3378,7 +3458,7 @@
     if (document.documentElement.dataset.kyxOwner === owner) delete document.documentElement.dataset.kyxOwner;
     clearInterval(ticker);
     observer.disconnect();
-    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-favtrade, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-subs-entry, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket, .kyx-fav-pick, .kyx-coll-pick, .kyx-rec, .kyx-tuto-back, .kyx-tuto-entry, .kyx-spot, .kyx-bubble, .kyx-pick, .kyx-grad-pick').forEach((el) => el.remove());
+    document.querySelectorAll('.kyx-badge, .kyx-toggle, .kyx-only, .kyx-favtrade, .kyx-chip, .kyx-series, .kyx-price, .kyx-balance, .kyx-ghost, .kyx-ghost-name, .kyx-order, .kyx-modal-back, .kyx-smart, .kyx-smart-msg, .kyx-count, .kyx-more, .kyx-subs-entry, .kyx-view, .kyx-friends, .kyx-friends-tab, .kyx-fav, .kyx-favmarket, .kyx-fav-pick, .kyx-coll-pick, .kyx-rec, .kyx-tuto-back, .kyx-tuto-entry, .kyx-spot, .kyx-bubble, .kyx-pick, .kyx-grad-pick, .kyx-dupes').forEach((el) => el.remove());
     delete document.documentElement.dataset.kyxView;
     delete document.documentElement.dataset.kyxBoardIds;
     document.querySelectorAll('[data-kyx-hidden], [data-kyx-pos], [data-kyx-watched], [data-kyx-ghost]').forEach((el) => {

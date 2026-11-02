@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-31T17:53:18.580Z",
-  "count": 679,
+  "updated": "2026-11-01T20:27:36.158Z",
+  "count": 680,
   "subscribers": {
     "7cd5702f-a0f0-4260-988f-38e10033c3b0": {
       "id": "7cd5702f-a0f0-4260-988f-38e10033c3b0",
@@ -3135,6 +3135,16 @@
       "color": null,
       "tier": "sensei",
       "seen": 1793284385531
+    },
+    "326ebff8-96f3-4853-bf37-bc56f4486ce0": {
+      "id": "326ebff8-96f3-4853-bf37-bc56f4486ce0",
+      "pseudo": "chatteux",
+      "avatar": "https://cdn.discordapp.com/avatars/336202107621343233/3dddbadcf3adaa0b4a813e4b6a9639f3.webp?size=128",
+      "color": "#38d6e0",
+      "tier": "sensei",
+      "owned": 5351,
+      "mythics": 16,
+      "seen": 1793564855674
     },
     "700e2efb-a988-4570-a107-6a714a4a756b": {
       "id": "700e2efb-a988-4570-a107-6a714a4a756b",
