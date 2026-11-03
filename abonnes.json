@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-02T21:25:30.594Z",
-  "count": 685,
+  "updated": "2026-11-03T09:08:37.764Z",
+  "count": 689,
   "subscribers": {
     "7cd5702f-a0f0-4260-988f-38e10033c3b0": {
       "id": "7cd5702f-a0f0-4260-988f-38e10033c3b0",
@@ -375,6 +375,26 @@
       "owned": 2142,
       "mythics": 4,
       "seen": 1793445921395
+    },
+    "a5154915-fb27-4ba0-aefa-400ef3999cb7": {
+      "id": "a5154915-fb27-4ba0-aefa-400ef3999cb7",
+      "pseudo": "Beubeuh-2",
+      "avatar": "https://cdn.discordapp.com/avatars/712703650107228170/1767e7332e1a9b55c04211401e582882.webp?size=128",
+      "color": null,
+      "tier": "daimyo",
+      "owned": 670,
+      "mythics": 11,
+      "seen": 1793591630775
+    },
+    "0b5600bd-e5f5-4733-bb56-6d5e5af0a1d9": {
+      "id": "0b5600bd-e5f5-4733-bb56-6d5e5af0a1d9",
+      "pseudo": "BiBou-7",
+      "avatar": "https://cdn.discordapp.com/avatars/333578937173278720/4f3d21f1c8b8144b898534a5402562c2.webp?size=128",
+      "color": null,
+      "tier": "daimyo",
+      "owned": 4240,
+      "mythics": 15,
+      "seen": 1793483813599
     },
     "302bdcac-8dd7-4f9f-9ffa-691ae02751da": {
       "id": "302bdcac-8dd7-4f9f-9ffa-691ae02751da",
@@ -1457,6 +1477,16 @@
       "owned": 2451,
       "mythics": 7,
       "seen": 1793424199628
+    },
+    "4fb20740-29f7-4824-b85b-73e3a3e299a0": {
+      "id": "4fb20740-29f7-4824-b85b-73e3a3e299a0",
+      "pseudo": "Lookyr727-2",
+      "avatar": "https://cdn.discordapp.com/avatars/663341661103063043/f79adbf9b1061972042ec57e461b46b1.webp?size=128",
+      "color": null,
+      "tier": "daimyo",
+      "owned": 3442,
+      "mythics": 13,
+      "seen": 1793473256286
     },
     "3d8a8310-a9cd-468c-b980-4b421a9ba5e2": {
       "id": "3d8a8310-a9cd-468c-b980-4b421a9ba5e2",
@@ -4097,6 +4127,16 @@
       "owned": 3171,
       "mythics": 8,
       "seen": 1793423424841
+    },
+    "ff1466f9-0b58-49b1-8db1-3d5117b95875": {
+      "id": "ff1466f9-0b58-49b1-8db1-3d5117b95875",
+      "pseudo": "Pyro",
+      "avatar": "https://cdn.discordapp.com/avatars/308627046937133057/a_1bc6f66860e474e11dd6ef87e10a667b.webp?size=128&animated=true",
+      "color": null,
+      "tier": "sensei",
+      "owned": 0,
+      "mythics": 0,
+      "seen": 1793696916922
     },
     "0a5ccf37-8fb0-4608-ab62-ec7eb3080a05": {
       "id": "0a5ccf37-8fb0-4608-ab62-ec7eb3080a05",
