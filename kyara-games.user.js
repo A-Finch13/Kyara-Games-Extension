@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyara Games
 // @namespace    https://github.com/A-Finch13/Kyara-Games-Extension
-// @version      1.9.3
+// @version      1.9.4
 // @description  Compagnon non officiel pour kyara.games : cartes manquantes en gris avec ordre d'achat, albums complets masqués, doublons pendant les échanges, booster le plus rentable, classement entre amis.
 // @author       A-Finch13
 // @license      MIT
@@ -46,7 +46,7 @@
 'use strict';
 if (window.__kyaraGamesUserscript) return;
 window.__kyaraGamesUserscript = true;
-const KYX_VERSION = '1.9.3';
+const KYX_VERSION = '1.9.4';
 
 // ---------- 1. src/userscript/shim.js : stockage et messages, à la place des fonctions d'extension ----------
 // Userscript: the extension APIs used by the page code, rebuilt in the page.
@@ -3590,7 +3590,7 @@ const KYX_TOUR = [
   {
     id: 'echanges',
     title: 'Échanger sans te tromper',
-    text: 'Pendant un échange : badges ×N (doublon) et « Unique » (ton dernier exemplaire) sur tes cartes, « Possédée » ou « Manquante » sur les cartes qu’on te propose, filtres « Ses doublons » et « ★ Favoris » (les cartes de tes œuvres favorites), et à la confirmation la série, le prix de chaque carte et l’écart de valeur entre les deux côtés.'
+    text: 'Pendant un échange : badges ×N (doublon) et « Unique » (ton dernier exemplaire) sur tes cartes, « Possédée » ou « Manquante » sur les cartes qu’on te propose, filtres « Ses doublons » et « ★ Favoris » (les cartes de tes œuvres favorites), « Mes doubles » et « Il lui manque » ensemble, et à la confirmation la série, le prix de chaque carte et l’écart de valeur entre les deux côtés.'
   },
   {
     id: 'boosters',
@@ -3658,6 +3658,10 @@ const KYX_TOUR = [
 
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
+  {
+    version: '1.9.4',
+    items: [['Proposer un échange : « Mes doubles » et « Il lui manque » s’activent ensemble, pour ne voir que tes doublons qui manquent à l’autre joueur.', 'echanges']]
+  },
   {
     version: '1.9.3',
     items: [['Tes réglages et tes œuvres favorites suivent ton compte Kyara : tu retrouves les mêmes sur ton PC et ton téléphone, extension ou script, sans passer par le code.', 'reglages']]
@@ -7103,6 +7107,8 @@ const KYX_CHANGES = [
   // Keeps only the cards the partner holds twice or more; on by default, turning it off is remembered.
   // Next to it, "★ Favoris" keeps the cards of the favourite series, on both tabs.
   let composerMore = 0;
+  let mineBoth = false; // "Mes doubles" kept on along with the site's "Il lui manque"
+  let mineBypass = false; // lets a click of the extension through to the site's "Mes doubles"
   const partnerCopies = new Map(); // id -> most copies of the card the partner had to trade, read from the shelf ("×N dispo")
 
   // True when the partner holds the card twice or more, null when unknown.
@@ -7182,6 +7188,45 @@ const KYX_CHANGES = [
       ? `Seulement les cartes de tes ${favSeries.size} œuvre${favSeries.size > 1 ? 's' : ''} favorite${favSeries.size > 1 ? 's' : ''}`
       : 'Aucune œuvre en favori : mets-en avec l’étoile ☆ des albums, page Collection';
 
+    // "Mes doubles" together with "Il lui manque": the site keeps one of them, the extension adds "Mes doubles" on top.
+    const siteChips = [...chips.querySelectorAll(':scope > button.only:not([class*="kyx-"])')];
+    const mineChip = !theirs && siteChips.find((el) => el.textContent.trim() === 'Mes doubles');
+    const lacksChip = !theirs && siteChips.find((el) => /lui manque/.test(el.textContent));
+    const lacksOn = !!lacksChip && lacksChip.getAttribute('aria-pressed') === 'true';
+    if (!lacksOn) mineBoth = false;
+    if (mineChip && lacksChip) {
+      if (!mineChip.dataset.kyxBoth) {
+        mineChip.dataset.kyxBoth = '1';
+        mineChip.addEventListener('click', (e) => {
+          if (mineBypass || lacksChip.getAttribute('aria-pressed') !== 'true') return;
+          e.stopImmediatePropagation();
+          composerMore = 0;
+          mineBoth = !mineBoth;
+          scanComposer();
+        }, true);
+        lacksChip.addEventListener('click', (e) => {
+          const on = lacksChip.getAttribute('aria-pressed') === 'true';
+          if (!on && mineChip.getAttribute('aria-pressed') === 'true') {
+            // The site swaps "Mes doubles" for "Il lui manque": keep "Mes doubles" through the extension.
+            mineBoth = true;
+          } else if (on && mineBoth) {
+            // Turning "Il lui manque" off leaves the site's own "Mes doubles" on.
+            e.stopImmediatePropagation();
+            mineBoth = false;
+            mineBypass = true;
+            mineChip.click();
+            mineBypass = false;
+          }
+          composerMore = 0;
+        }, true);
+      }
+      if (lacksOn) {
+        mineChip.classList.toggle('on', mineBoth);
+        mineChip.setAttribute('aria-pressed', String(mineBoth));
+      }
+    }
+    const bothOn = lacksOn && mineBoth;
+
     const grid = shelf.querySelector('ul.grid');
     if (!grid) return;
     let visible = 0;
@@ -7192,7 +7237,7 @@ const KYX_CHANGES = [
       const copies = Number(/(\d+)/.exec(li.querySelector('.have')?.textContent ?? '')?.[1]);
       if (theirs && id && copies) partnerCopies.set(id, Math.max(partnerCopies.get(id) ?? 0, copies));
       const twice = partnerCopies.has(id) ? partnerCopies.get(id) >= 2 : theirDupe(id);
-      const hide = !!id && ((dupes && twice === false) || (favs && !!series && !favSeries.has(series)));
+      const hide = !!id && ((dupes && twice === false) || (bothOn && !!coll && qty(id) < 2) || (favs && !!series && !favSeries.has(series)));
       if (hide) {
         if (li.dataset.kyxHidden !== '1') li.dataset.kyxHidden = '1';
       } else {
@@ -7202,7 +7247,7 @@ const KYX_CHANGES = [
     }
     // Loads the site's next cards until a full page of matching cards shows.
     const more = grid.parentElement?.querySelector(':scope > button.more');
-    if (active && visible < PAGE && more && composerMore < 40) {
+    if ((active || bothOn) && visible < PAGE && more && composerMore < 40) {
       composerMore++;
       more.click();
     } else if (!more || visible >= PAGE) {

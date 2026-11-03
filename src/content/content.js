@@ -3291,6 +3291,8 @@
   // Keeps only the cards the partner holds twice or more; on by default, turning it off is remembered.
   // Next to it, "★ Favoris" keeps the cards of the favourite series, on both tabs.
   let composerMore = 0;
+  let mineBoth = false; // "Mes doubles" kept on along with the site's "Il lui manque"
+  let mineBypass = false; // lets a click of the extension through to the site's "Mes doubles"
   const partnerCopies = new Map(); // id -> most copies of the card the partner had to trade, read from the shelf ("×N dispo")
 
   // True when the partner holds the card twice or more, null when unknown.
@@ -3370,6 +3372,45 @@
       ? `Seulement les cartes de tes ${favSeries.size} œuvre${favSeries.size > 1 ? 's' : ''} favorite${favSeries.size > 1 ? 's' : ''}`
       : 'Aucune œuvre en favori : mets-en avec l’étoile ☆ des albums, page Collection';
 
+    // "Mes doubles" together with "Il lui manque": the site keeps one of them, the extension adds "Mes doubles" on top.
+    const siteChips = [...chips.querySelectorAll(':scope > button.only:not([class*="kyx-"])')];
+    const mineChip = !theirs && siteChips.find((el) => el.textContent.trim() === 'Mes doubles');
+    const lacksChip = !theirs && siteChips.find((el) => /lui manque/.test(el.textContent));
+    const lacksOn = !!lacksChip && lacksChip.getAttribute('aria-pressed') === 'true';
+    if (!lacksOn) mineBoth = false;
+    if (mineChip && lacksChip) {
+      if (!mineChip.dataset.kyxBoth) {
+        mineChip.dataset.kyxBoth = '1';
+        mineChip.addEventListener('click', (e) => {
+          if (mineBypass || lacksChip.getAttribute('aria-pressed') !== 'true') return;
+          e.stopImmediatePropagation();
+          composerMore = 0;
+          mineBoth = !mineBoth;
+          scanComposer();
+        }, true);
+        lacksChip.addEventListener('click', (e) => {
+          const on = lacksChip.getAttribute('aria-pressed') === 'true';
+          if (!on && mineChip.getAttribute('aria-pressed') === 'true') {
+            // The site swaps "Mes doubles" for "Il lui manque": keep "Mes doubles" through the extension.
+            mineBoth = true;
+          } else if (on && mineBoth) {
+            // Turning "Il lui manque" off leaves the site's own "Mes doubles" on.
+            e.stopImmediatePropagation();
+            mineBoth = false;
+            mineBypass = true;
+            mineChip.click();
+            mineBypass = false;
+          }
+          composerMore = 0;
+        }, true);
+      }
+      if (lacksOn) {
+        mineChip.classList.toggle('on', mineBoth);
+        mineChip.setAttribute('aria-pressed', String(mineBoth));
+      }
+    }
+    const bothOn = lacksOn && mineBoth;
+
     const grid = shelf.querySelector('ul.grid');
     if (!grid) return;
     let visible = 0;
@@ -3380,7 +3421,7 @@
       const copies = Number(/(\d+)/.exec(li.querySelector('.have')?.textContent ?? '')?.[1]);
       if (theirs && id && copies) partnerCopies.set(id, Math.max(partnerCopies.get(id) ?? 0, copies));
       const twice = partnerCopies.has(id) ? partnerCopies.get(id) >= 2 : theirDupe(id);
-      const hide = !!id && ((dupes && twice === false) || (favs && !!series && !favSeries.has(series)));
+      const hide = !!id && ((dupes && twice === false) || (bothOn && !!coll && qty(id) < 2) || (favs && !!series && !favSeries.has(series)));
       if (hide) {
         if (li.dataset.kyxHidden !== '1') li.dataset.kyxHidden = '1';
       } else {
@@ -3390,7 +3431,7 @@
     }
     // Loads the site's next cards until a full page of matching cards shows.
     const more = grid.parentElement?.querySelector(':scope > button.more');
-    if (active && visible < PAGE && more && composerMore < 40) {
+    if ((active || bothOn) && visible < PAGE && more && composerMore < 40) {
       composerMore++;
       more.click();
     } else if (!more || visible >= PAGE) {

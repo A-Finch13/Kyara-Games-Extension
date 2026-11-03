@@ -68,7 +68,7 @@ const KYX_TOUR = [
   {
     id: 'echanges',
     title: 'Échanger sans te tromper',
-    text: 'Pendant un échange : badges ×N (doublon) et « Unique » (ton dernier exemplaire) sur tes cartes, « Possédée » ou « Manquante » sur les cartes qu’on te propose, filtres « Ses doublons » et « ★ Favoris » (les cartes de tes œuvres favorites), et à la confirmation la série, le prix de chaque carte et l’écart de valeur entre les deux côtés.'
+    text: 'Pendant un échange : badges ×N (doublon) et « Unique » (ton dernier exemplaire) sur tes cartes, « Possédée » ou « Manquante » sur les cartes qu’on te propose, filtres « Ses doublons » et « ★ Favoris » (les cartes de tes œuvres favorites), « Mes doubles » et « Il lui manque » ensemble, et à la confirmation la série, le prix de chaque carte et l’écart de valeur entre les deux côtés.'
   },
   {
     id: 'boosters',
@@ -136,6 +136,10 @@ const KYX_TOUR = [
 
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
+  {
+    version: '1.9.4',
+    items: [['Proposer un échange : « Mes doubles » et « Il lui manque » s’activent ensemble, pour ne voir que tes doublons qui manquent à l’autre joueur.', 'echanges']]
+  },
   {
     version: '1.9.3',
     items: [['Tes réglages et tes œuvres favorites suivent ton compte Kyara : tu retrouves les mêmes sur ton PC et ton téléphone, extension ou script, sans passer par le code.', 'reglages']]
