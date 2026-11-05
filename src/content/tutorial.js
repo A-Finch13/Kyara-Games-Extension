@@ -78,9 +78,9 @@ const KYX_TOUR = [
     target: '#nav-more .kyx-more, #mobile-nav .kyx-more, [role="dialog"] > ul .kyx-more'
   },
   {
-    id: 'mur-honte',
-    title: 'Le Mur de la Honte',
-    text: 'Cher utilisateur de l’extension, j’ai l’immense honneur de vous présenter le nouveau « Mur de la Honte » créé par Sayko, qui aura pour but de mettre en lumière les abos du site au fur et à mesure de votre navigation dans le site. Que le divertissement commence !',
+    id: 'mur-soutiens',
+    title: 'Le Mur des Soutiens',
+    text: 'Dans le menu : le « Mur des Soutiens » met en lumière les abonnés du site, repérés au fil de ta navigation, avec leur palier. Ouvert à tous les joueurs qui ont l’extension, abonnés compris.',
     prepare: 'menu',
     target: '#nav-more .kyx-subs-entry, #mobile-nav .kyx-subs-entry, [role="dialog"] > ul .kyx-subs-entry'
   },
@@ -137,6 +137,10 @@ const KYX_TOUR = [
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
   {
+    version: '1.9.5',
+    items: [['Le Mur de la Honte devient le « Mur des Soutiens » et s’ouvre à tous les joueurs qui ont l’extension, abonnés compris.', 'mur-soutiens']]
+  },
+  {
     version: '1.9.4',
     items: [['Proposer un échange : « Mes doubles » et « Il lui manque » s’activent ensemble, pour ne voir que tes doublons qui manquent à l’autre joueur.', 'echanges']]
   },
@@ -171,17 +175,17 @@ const KYX_CHANGES = [
   {
     version: '1.8.2',
     items: [
-      ['Mur de la Honte : les abonnés déjà repérés arrivent tout de suite dans ta liste, grâce à une liste partagée mise à jour à chaque version.', 'mur-honte'],
-      ['Mur de la Honte : une barre de recherche pour trouver un joueur.', 'mur-honte']
+      ['Mur de la Honte : les abonnés déjà repérés arrivent tout de suite dans ta liste, grâce à une liste partagée mise à jour à chaque version.', 'mur-soutiens'],
+      ['Mur de la Honte : une barre de recherche pour trouver un joueur.', 'mur-soutiens']
     ]
   },
   {
     version: '1.8.1',
-    items: [['Mur de la Honte : un clic sur un badge ouvre le profil du joueur.', 'mur-honte']]
+    items: [['Mur de la Honte : un clic sur un badge ouvre le profil du joueur.', 'mur-soutiens']]
   },
   {
     version: '1.8.0',
-    items: [['Cher utilisateur de l’extension, j’ai l’immense honneur de vous présenter le nouveau « Mur de la Honte » créé par Sayko, qui aura pour but de mettre en lumière les abos du site au fur et à mesure de votre navigation dans le site. Que le divertissement commence !', 'mur-honte']]
+    items: [['Cher utilisateur de l’extension, j’ai l’immense honneur de vous présenter le nouveau « Mur de la Honte » créé par Sayko, qui aura pour but de mettre en lumière les abos du site au fur et à mesure de votre navigation dans le site. Que le divertissement commence !', 'mur-soutiens']]
   },
   {
     version: '1.7.7',

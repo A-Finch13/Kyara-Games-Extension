@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyara Games
 // @namespace    https://github.com/A-Finch13/Kyara-Games-Extension
-// @version      1.9.4
+// @version      1.9.5
 // @description  Compagnon non officiel pour kyara.games : cartes manquantes en gris avec ordre d'achat, albums complets masqués, doublons pendant les échanges, booster le plus rentable, classement entre amis.
 // @author       A-Finch13
 // @license      MIT
@@ -46,7 +46,7 @@
 'use strict';
 if (window.__kyaraGamesUserscript) return;
 window.__kyaraGamesUserscript = true;
-const KYX_VERSION = '1.9.4';
+const KYX_VERSION = '1.9.5';
 
 // ---------- 1. src/userscript/shim.js : stockage et messages, à la place des fonctions d'extension ----------
 // Userscript: the extension APIs used by the page code, rebuilt in the page.
@@ -518,7 +518,7 @@ const asList = (x, ...keys) => {
   return [];
 };
 
-// ---------- subscribers of the site, for the "Mur de la Honte" page ----------
+// ---------- subscribers of the site, for the "Mur des Soutiens" page ----------
 
 // Rankings read for the badges of their top 100.
 const SUB_LADDERS = [
@@ -910,7 +910,7 @@ async function handle(msg) {
   // Writes after which the collection is no longer what the extension has cached.
   const WRITE = /^\/(packs\/[^/]+\/open(-many)?|trades(\/.*)?|market\/.*|me\/collection\/.*|me\/progress\/claim|me\/alt\/settle)$/;
 
-  // Answers that show other players (market, auctions, trades, chat, rankings, profiles), read for the "Mur de la Honte" page.
+  // Answers that show other players (market, auctions, trades, chat, rankings, profiles), read for the "Mur des Soutiens" page.
   const PLAYERS = /^\/(market\/(listings|chat|buy-orders)|trades\/|eveil\/market|me\/(trades|market|friends)|leaderboard\/|feed$|users\/[^/]+$|membership\/wall)/;
 
   const original = window.fetch;
@@ -2284,12 +2284,6 @@ a.slot:hover .kyx-ghost {
   font-size: 13px;
 }
 
-/* The "Mur de la Honte" is closed to subscribers. */
-html[data-kyx-sub] .kyx-subs-entry,
-html[data-kyx-sub] li:has(> .kyx-subs-entry) {
-  display: none !important;
-}
-
 .kyx-s-progress .kyx-b-bar small {
   flex: 0 1 auto;
   font-size: 13px;
@@ -3441,7 +3435,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   box-shadow: inset 3px 0 0 var(--kyx-ink);
 }
 
-/* Window of the players who use the extension (Mur de la Honte, owner only) */
+/* Window of the players who use the extension (Mur des Soutiens, owner only) */
 .kyx-s-who {
   margin-left: 6px;
   padding: 3px 10px;
@@ -3600,9 +3594,9 @@ const KYX_TOUR = [
     target: '#nav-more .kyx-more, #mobile-nav .kyx-more, [role="dialog"] > ul .kyx-more'
   },
   {
-    id: 'mur-honte',
-    title: 'Le Mur de la Honte',
-    text: 'Cher utilisateur de l’extension, j’ai l’immense honneur de vous présenter le nouveau « Mur de la Honte » créé par Sayko, qui aura pour but de mettre en lumière les abos du site au fur et à mesure de votre navigation dans le site. Que le divertissement commence !',
+    id: 'mur-soutiens',
+    title: 'Le Mur des Soutiens',
+    text: 'Dans le menu : le « Mur des Soutiens » met en lumière les abonnés du site, repérés au fil de ta navigation, avec leur palier. Ouvert à tous les joueurs qui ont l’extension, abonnés compris.',
     prepare: 'menu',
     target: '#nav-more .kyx-subs-entry, #mobile-nav .kyx-subs-entry, [role="dialog"] > ul .kyx-subs-entry'
   },
@@ -3659,6 +3653,10 @@ const KYX_TOUR = [
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
   {
+    version: '1.9.5',
+    items: [['Le Mur de la Honte devient le « Mur des Soutiens » et s’ouvre à tous les joueurs qui ont l’extension, abonnés compris.', 'mur-soutiens']]
+  },
+  {
     version: '1.9.4',
     items: [['Proposer un échange : « Mes doubles » et « Il lui manque » s’activent ensemble, pour ne voir que tes doublons qui manquent à l’autre joueur.', 'echanges']]
   },
@@ -3693,17 +3691,17 @@ const KYX_CHANGES = [
   {
     version: '1.8.2',
     items: [
-      ['Mur de la Honte : les abonnés déjà repérés arrivent tout de suite dans ta liste, grâce à une liste partagée mise à jour à chaque version.', 'mur-honte'],
-      ['Mur de la Honte : une barre de recherche pour trouver un joueur.', 'mur-honte']
+      ['Mur de la Honte : les abonnés déjà repérés arrivent tout de suite dans ta liste, grâce à une liste partagée mise à jour à chaque version.', 'mur-soutiens'],
+      ['Mur de la Honte : une barre de recherche pour trouver un joueur.', 'mur-soutiens']
     ]
   },
   {
     version: '1.8.1',
-    items: [['Mur de la Honte : un clic sur un badge ouvre le profil du joueur.', 'mur-honte']]
+    items: [['Mur de la Honte : un clic sur un badge ouvre le profil du joueur.', 'mur-soutiens']]
   },
   {
     version: '1.8.0',
-    items: [['Cher utilisateur de l’extension, j’ai l’immense honneur de vous présenter le nouveau « Mur de la Honte » créé par Sayko, qui aura pour but de mettre en lumière les abos du site au fur et à mesure de votre navigation dans le site. Que le divertissement commence !', 'mur-honte']]
+    items: [['Cher utilisateur de l’extension, j’ai l’immense honneur de vous présenter le nouveau « Mur de la Honte » créé par Sayko, qui aura pour but de mettre en lumière les abos du site au fur et à mesure de votre navigation dans le site. Que le divertissement commence !', 'mur-soutiens']]
   },
   {
     version: '1.7.7',
@@ -5377,7 +5375,7 @@ const KYX_CHANGES = [
   // Pages shown in place of the site's content: address, view name, menu entry (class, kanji, title, hint).
   const VIEWS = [
     { hash: BOOSTERS_HASH, view: 'boosters', cls: 'kyx-more', kanji: '得', title: 'Boosters rentables', hint: 'Le meilleur booster pour une carte', open: () => openBoosters() },
-    { hash: SUBS_HASH, view: 'abonnes', cls: 'kyx-subs-entry', kanji: '恥', title: 'Mur de la Honte', hint: 'Les abos du site', open: () => openSubscribers() }
+    { hash: SUBS_HASH, view: 'abonnes', cls: 'kyx-subs-entry', kanji: '援', title: 'Mur des Soutiens', hint: 'Les abonnés du site', open: () => openSubscribers() }
   ];
   const VIEW_ENTRIES = VIEWS.map((v) => `.${v.cls}`).join(', ');
   // True while the page of v is shown.
@@ -5898,7 +5896,7 @@ const KYX_CHANGES = [
     forRarity('M');
   }
 
-  // ---------- "Mur de la Honte" page: the players who have a subscription ----------
+  // ---------- "Mur des Soutiens" page: the players who have a subscription ----------
 
   // Subscription tiers from the cheapest, replaced by the site's offer once loaded.
   let subTiers = [
@@ -6090,8 +6088,7 @@ const KYX_CHANGES = [
     progress(4, 4, res.added ? `✔ abonnes.json mis à jour : ${res.added} nouveaux abonnés, ${res.count} en tout.` : `✔ abonnes.json contient déjà tous tes abonnés (${res.count}).`);
   }
 
-  // Tier of the logged-in player's subscription (null without one), read from their profile at most once an hour;
-  // the page is closed to subscribers.
+  // Tier of the logged-in player's subscription (null without one), read from their profile at most once an hour.
   async function myTier() {
     const { me, meSub } = await chrome.storage.local.get(['me', 'meSub']).catch(() => ({}));
     if (!me?.id) return null;
@@ -6116,7 +6113,7 @@ const KYX_CHANGES = [
       'abonnes',
       `
         <header class="kyx-page-head">
-          <div><small>Mur de la Honte · 恥</small><h1 id="kyx-view-t">Mur de la Honte</h1>
+          <div><small>Mur des Soutiens · 援</small><h1 id="kyx-view-t">Mur des Soutiens</h1>
           <p>Les joueurs abonnés (Nakama, Senpai, Sensei ou Daimyō), repérés grâce à leur badge.</p></div>
           <button type="button" class="kyx-page-close">← Retour</button>
         </header>
@@ -6133,11 +6130,6 @@ const KYX_CHANGES = [
         <ol class="kyx-s-list"></ol>`
     );
     if (!page) return;
-    if (await myTier()) {
-      page.querySelectorAll(':scope > :not(.kyx-page-head)').forEach((el) => el.remove());
-      page.querySelector('.kyx-page-head p').textContent = 'Le Mur de la Honte est réservé aux joueurs sans abonnement.';
-      return;
-    }
     const note = (text) => (page.querySelector('.kyx-page-note').textContent = text);
     let { subscribers: known = {}, me } = await chrome.storage.local.get(['subscribers', 'me']).catch(() => ({}));
     await loadSubTiers();
@@ -6188,7 +6180,7 @@ const KYX_CHANGES = [
     scan();
   }
 
-  // ---------- players met while browsing, handed to the background worker for the "Mur de la Honte" page ----------
+  // ---------- players met while browsing, handed to the background worker for the "Mur des Soutiens" page ----------
 
   // Where players were met, from the address of the answer that showed them.
   function playersWhere(path, query = '') {

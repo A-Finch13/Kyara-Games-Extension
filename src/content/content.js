@@ -1561,7 +1561,7 @@
   // Pages shown in place of the site's content: address, view name, menu entry (class, kanji, title, hint).
   const VIEWS = [
     { hash: BOOSTERS_HASH, view: 'boosters', cls: 'kyx-more', kanji: '得', title: 'Boosters rentables', hint: 'Le meilleur booster pour une carte', open: () => openBoosters() },
-    { hash: SUBS_HASH, view: 'abonnes', cls: 'kyx-subs-entry', kanji: '恥', title: 'Mur de la Honte', hint: 'Les abos du site', open: () => openSubscribers() }
+    { hash: SUBS_HASH, view: 'abonnes', cls: 'kyx-subs-entry', kanji: '援', title: 'Mur des Soutiens', hint: 'Les abonnés du site', open: () => openSubscribers() }
   ];
   const VIEW_ENTRIES = VIEWS.map((v) => `.${v.cls}`).join(', ');
   // True while the page of v is shown.
@@ -2082,7 +2082,7 @@
     forRarity('M');
   }
 
-  // ---------- "Mur de la Honte" page: the players who have a subscription ----------
+  // ---------- "Mur des Soutiens" page: the players who have a subscription ----------
 
   // Subscription tiers from the cheapest, replaced by the site's offer once loaded.
   let subTiers = [
@@ -2274,8 +2274,7 @@
     progress(4, 4, res.added ? `✔ abonnes.json mis à jour : ${res.added} nouveaux abonnés, ${res.count} en tout.` : `✔ abonnes.json contient déjà tous tes abonnés (${res.count}).`);
   }
 
-  // Tier of the logged-in player's subscription (null without one), read from their profile at most once an hour;
-  // the page is closed to subscribers.
+  // Tier of the logged-in player's subscription (null without one), read from their profile at most once an hour.
   async function myTier() {
     const { me, meSub } = await chrome.storage.local.get(['me', 'meSub']).catch(() => ({}));
     if (!me?.id) return null;
@@ -2300,7 +2299,7 @@
       'abonnes',
       `
         <header class="kyx-page-head">
-          <div><small>Mur de la Honte · 恥</small><h1 id="kyx-view-t">Mur de la Honte</h1>
+          <div><small>Mur des Soutiens · 援</small><h1 id="kyx-view-t">Mur des Soutiens</h1>
           <p>Les joueurs abonnés (Nakama, Senpai, Sensei ou Daimyō), repérés grâce à leur badge.</p></div>
           <button type="button" class="kyx-page-close">← Retour</button>
         </header>
@@ -2317,11 +2316,6 @@
         <ol class="kyx-s-list"></ol>`
     );
     if (!page) return;
-    if (await myTier()) {
-      page.querySelectorAll(':scope > :not(.kyx-page-head)').forEach((el) => el.remove());
-      page.querySelector('.kyx-page-head p').textContent = 'Le Mur de la Honte est réservé aux joueurs sans abonnement.';
-      return;
-    }
     const note = (text) => (page.querySelector('.kyx-page-note').textContent = text);
     let { subscribers: known = {}, me } = await chrome.storage.local.get(['subscribers', 'me']).catch(() => ({}));
     await loadSubTiers();
@@ -2372,7 +2366,7 @@
     scan();
   }
 
-  // ---------- players met while browsing, handed to the background worker for the "Mur de la Honte" page ----------
+  // ---------- players met while browsing, handed to the background worker for the "Mur des Soutiens" page ----------
 
   // Where players were met, from the address of the answer that showed them.
   function playersWhere(path, query = '') {

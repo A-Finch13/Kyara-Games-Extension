@@ -16,7 +16,7 @@
   // Writes after which the collection is no longer what the extension has cached.
   const WRITE = /^\/(packs\/[^/]+\/open(-many)?|trades(\/.*)?|market\/.*|me\/collection\/.*|me\/progress\/claim|me\/alt\/settle)$/;
 
-  // Answers that show other players (market, auctions, trades, chat, rankings, profiles), read for the "Mur de la Honte" page.
+  // Answers that show other players (market, auctions, trades, chat, rankings, profiles), read for the "Mur des Soutiens" page.
   const PLAYERS = /^\/(market\/(listings|chat|buy-orders)|trades\/|eveil\/market|me\/(trades|market|friends)|leaderboard\/|feed$|users\/[^/]+$|membership\/wall)/;
 
   const original = window.fetch;

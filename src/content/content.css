@@ -832,12 +832,6 @@ a.slot:hover .kyx-ghost {
   font-size: 13px;
 }
 
-/* The "Mur de la Honte" is closed to subscribers. */
-html[data-kyx-sub] .kyx-subs-entry,
-html[data-kyx-sub] li:has(> .kyx-subs-entry) {
-  display: none !important;
-}
-
 .kyx-s-progress .kyx-b-bar small {
   flex: 0 1 auto;
   font-size: 13px;
@@ -1989,7 +1983,7 @@ html[data-kyx-view] .hdr .navlink[aria-controls="nav-more"]::after {
   box-shadow: inset 3px 0 0 var(--kyx-ink);
 }
 
-/* Window of the players who use the extension (Mur de la Honte, owner only) */
+/* Window of the players who use the extension (Mur des Soutiens, owner only) */
 .kyx-s-who {
   margin-left: 6px;
   padding: 3px 10px;

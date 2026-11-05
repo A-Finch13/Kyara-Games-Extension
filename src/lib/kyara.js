@@ -372,7 +372,7 @@ export const asList = (x, ...keys) => {
   return [];
 };
 
-// ---------- subscribers of the site, for the "Mur de la Honte" page ----------
+// ---------- subscribers of the site, for the "Mur des Soutiens" page ----------
 
 // Rankings read for the badges of their top 100.
 const SUB_LADDERS = [
