@@ -98,12 +98,12 @@
   // "Kyara Games" entry at the end of a menu of the site; closer: the button that closes that menu.
   function addEntry(menu, closer) {
     if (!menu || menu.querySelector(':scope > .kyx-settings-entry')) return;
-    const model = menu.querySelector(':scope > a:not(.kyx-more):not(.kyx-subs-entry)');
+    const model = menu.querySelector(':scope > a:not(.narrow-only):not(.kyx-more):not(.kyx-subs-entry):not(.kyx-tuto-entry)');
     const kanji = model?.querySelector('.dk, .tk');
     const title = model?.querySelector('.dt b, .tl');
     if (!kanji || !title) return;
     const entry = model.cloneNode(true);
-    entry.classList.remove('on');
+    entry.classList.remove('on', 'narrow-only');
     entry.classList.add('kyx-settings-entry');
     entry.removeAttribute('aria-current');
     entry.href = '#';

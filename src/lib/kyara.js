@@ -224,7 +224,7 @@ export function syncAccount() {
     const res = await fetch(`${RELAY}/sync`, {
       method: 'POST',
       headers: { 'content-type': 'text/plain' },
-      body: JSON.stringify({ token: auth.token, device: auth.device, rev: mine ? sync.rev : 0, changed: mine && json !== sync.json, data })
+      body: JSON.stringify({ token: auth.token, device: auth.device, user: { id: me.id, pseudo: me.pseudo }, rev: mine ? sync.rev : 0, changed: mine && json !== sync.json, data })
     }).then((r) => r.json()).catch(() => null);
     if (!res?.ok || res.user !== me.id) return;
     if (res.data) {

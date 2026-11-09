@@ -105,7 +105,7 @@
   const WISHES = 500;
   const PERKS_KEEP = 10 * 60e3; // the players' perks are read from the relay every 10 minutes
 
-  let me = null; // logged-in player: { id, sub, title }
+  let me = null; // logged-in player: { id, sub, title, user } (user: what the relay is told about them)
   let perks = {}; // perks chosen by the players, by Kyara id, read from the relay
   const pseudos = {}; // pseudo of those players, by Kyara id, seen in the site's answers
   let perksAt = 0;
@@ -225,7 +225,9 @@
   function learnMe(u) {
     if (typeof u?.id !== 'string') return;
     const known = me?.id === u.id;
-    me = { title: known ? me.title : null, id: u.id, sub: !!(u.membership?.tier || u.membership?.perks?.length) };
+    const sub = !!(u.membership?.tier || u.membership?.perks?.length);
+    const user = { id: u.id, pseudo: u.pseudo ?? null, avatar: u.avatar ?? null, membership: sub ? { tier: u.membership.tier ?? null } : null };
+    me = { title: known ? me.title : null, id: u.id, sub, user };
     if (!known && perksAt) shareNames();
     tellMember();
   }
@@ -238,7 +240,7 @@
     const { token, device } = sessionOf('', {});
     if (!token) return;
     original
-      .call(window, `${RELAY}/member`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ token, device }) })
+      .call(window, `${RELAY}/member`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ token, device, user: me.user }) })
       .then((r) => r.json())
       .then((data) => {
         if (!data?.ok) return local(key, 0);
@@ -388,7 +390,7 @@
       const res = await original.call(window, `${RELAY}/profile`, {
         method: 'POST',
         headers: { 'content-type': 'text/plain' },
-        body: JSON.stringify({ token: session.token, device: session.device, profile })
+        body: JSON.stringify({ token: session.token, device: session.device, user: me.user, profile })
       });
       const data = await res.json();
       if (!res.ok || data?.error) return data?.error ?? `relay_${res.status}`;

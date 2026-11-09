@@ -89,10 +89,11 @@ function subsJson(subscribers) {
   return JSON.stringify({ updated: new Date().toISOString(), count: list.length, subscribers: Object.fromEntries(list.map(keep)) }, null, 2) + '\n';
 }
 
-// Kyara profile of a player, or null.
+// Kyara profile of a player, null when there is none, undefined when kyara.games can't be read.
 async function profile(id) {
-  const res = await fetch(`https://kyara.games/api/users/${encodeURIComponent(id)}`, { headers: { accept: 'application/json' } });
-  return res.ok ? res.json() : null;
+  const res = await fetch(`https://kyara.games/api/users/${encodeURIComponent(id)}`, { headers: { accept: 'application/json' } }).catch(() => null);
+  if (res?.status === 404) return null;
+  return res?.ok ? res.json() : undefined;
 }
 
 // Puts the new ids in the queue of players to check, then checks some of them; returns where the queue is.
@@ -118,9 +119,13 @@ async function checkQueue(env) {
   if (fresh) await readSubsFile(env, known);
   if (!queue.length) return { left: 0, waiting: Object.keys(waiting).length, written: 0 };
   const batch = queue.splice(0, CHECKS);
-  for (const id of batch) {
+  for (const [i, id] of batch.entries()) {
     if (known.has(id) || waiting[id]) continue;
-    const p = await profile(id).catch(() => null);
+    const p = await profile(id).catch(() => undefined);
+    if (p === undefined) {
+      queue.unshift(...batch.slice(i)); // kyara.games refuses the relay: checked on a later call
+      break;
+    }
     const tier = tierOf(p?.badges);
     if (tier) waiting[id] = { id, pseudo: p.pseudo ?? '?', avatar: p.avatar ?? null, color: p.nameColor ?? null, tier, owned: p.owned, mythics: p.mythics, seen: Date.now() };
   }
@@ -187,23 +192,34 @@ async function profiles(env) {
   return (await env.KV.get('profiles', 'json')) ?? {};
 }
 
-// The player behind a Kyara session (their token, never kept), or null.
-async function sessionUser(token, device) {
+// The player behind a Kyara session (their token, never kept), or null; when kyara.games refuses the relay, the
+// player the extension read with that session.
+async function sessionUser(body) {
+  const { token, device } = body ?? {};
   if (typeof token !== 'string' || !token) return null;
   const headers = { accept: 'application/json', authorization: `Bearer ${token}` };
   if (typeof device === 'string' && device) headers['x-device-id'] = device;
-  const res = await fetch('https://kyara.games/api/me', { headers });
-  if (!res.ok) return null;
-  const me = await res.json();
-  return typeof me?.id === 'string' ? me : null;
+  const res = await fetch('https://kyara.games/api/me', { headers }).catch(() => null);
+  if (res?.ok) {
+    const me = await res.json();
+    return typeof me?.id === 'string' ? me : null;
+  }
+  return res?.status === 401 ? null : claimedUser(body.user);
 }
 
-// Ids of the cards a player owns, read with their session.
+// The player sent by the extension: id, pseudo, profile picture and subscription, or null.
+function claimedUser(u) {
+  if (!u || typeof u.id !== 'string' || !/^[0-9a-f-]{36}$/.test(u.id)) return null;
+  const tier = u.membership && typeof u.membership === 'object' ? pick(u.membership.tier, TIERS) ?? 'membre' : null;
+  return { id: u.id, pseudo: text(u.pseudo, 40), avatar: typeof u.avatar === 'string' ? u.avatar : null, membership: tier ? { tier } : null };
+}
+
+// Ids of the cards a player owns, read with their session, or null when kyara.games refuses the relay.
 async function ownedIds(token, device) {
   const headers = { accept: 'application/json', authorization: `Bearer ${token}` };
   if (device) headers['x-device-id'] = device;
-  const res = await fetch('https://kyara.games/api/me/collection?lean=1', { headers });
-  if (!res.ok) return new Set();
+  const res = await fetch('https://kyara.games/api/me/collection?lean=1', { headers }).catch(() => null);
+  if (!res?.ok) return res?.status === 401 ? new Set() : null;
   const list = await res.json();
   return new Set((Array.isArray(list) ? list : list?.items ?? []).filter((x) => (x?.qty ?? 1) > 0).map((x) => Number(x.characterId ?? x.id)));
 }
@@ -239,7 +255,7 @@ function cleanCard(c) {
 
 // Saves the perks of the player whose session is given, after checking they have no subscription; returns { ok }.
 async function saveProfile(env, body) {
-  const me = await sessionUser(body?.token, body?.device);
+  const me = await sessionUser(body);
   if (!me) return { error: 'session' };
   const pub = await profile(me.id).catch(() => null);
   if (me.membership || tierOf(pub?.badges)) return { error: 'subscriber' };
@@ -251,7 +267,7 @@ async function saveProfile(env, body) {
   let best = (Array.isArray(p.best) ? p.best : []).map(cleanCard).filter(Boolean).slice(0, EXTRA_CARDS);
   if (best.length) {
     const owned = await ownedIds(body.token, body.device);
-    best = best.filter((c) => owned.has(c.id));
+    if (owned) best = best.filter((c) => owned.has(c.id));
   }
   const rec = {
     nameColor: color(p.nameColor),
@@ -277,7 +293,7 @@ const who = (me, pub) => ({ pseudo: text(pub?.pseudo ?? me.pseudo, 40) ?? '?', a
 
 // Marks the player whose session is given as using the extension: its badge without a subscription, their tier with one.
 async function saveMember(env, body) {
-  const me = await sessionUser(body?.token, body?.device);
+  const me = await sessionUser(body);
   if (!me) return { error: 'session' };
   const pub = await profile(me.id).catch(() => null);
   const sub = tierOf(pub?.badges) ?? (me.membership ? pick(me.membership.tier, TIERS) ?? 'membre' : null);
@@ -310,7 +326,7 @@ function cleanSync(d) {
 // Keeps the settings of the player whose session is given, shared by their devices: saves the ones of a device that
 // changed them (or the first ones), and sends back the saved ones to a device that has an older revision.
 async function syncSettings(env, body) {
-  const me = await sessionUser(body?.token, body?.device);
+  const me = await sessionUser(body);
   if (!me) return { error: 'session' };
   const key = `sync:${me.id}`;
   const saved = await env.KV.get(key, 'json');

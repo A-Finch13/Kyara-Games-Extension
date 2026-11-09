@@ -137,6 +137,13 @@ const KYX_TOUR = [
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
   {
+    version: '1.9.6',
+    items: [
+      ['Menu « Plus » sur ordinateur : « Boosters rentables », « Mur des Soutiens » et « Tutoriel » sont de retour après le changement du site.', 'mur-soutiens'],
+      ['« Personnaliser mon profil » sans abonnement s’enregistre de nouveau (couleurs, titre, bannière, liens…), malgré la nouvelle vérification anti-robot du site.']
+    ]
+  },
+  {
     version: '1.9.5',
     items: [['Le Mur de la Honte devient le « Mur des Soutiens » et s’ouvre à tous les joueurs qui ont l’extension, abonnés compris.', 'mur-soutiens']]
   },

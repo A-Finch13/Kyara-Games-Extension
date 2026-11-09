@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Kyara Games
 // @namespace    https://github.com/A-Finch13/Kyara-Games-Extension
-// @version      1.9.5
+// @version      1.9.6
 // @description  Compagnon non officiel pour kyara.games : cartes manquantes en gris avec ordre d'achat, albums complets masqués, doublons pendant les échanges, booster le plus rentable, classement entre amis.
 // @author       A-Finch13
 // @license      MIT
@@ -46,7 +46,7 @@
 'use strict';
 if (window.__kyaraGamesUserscript) return;
 window.__kyaraGamesUserscript = true;
-const KYX_VERSION = '1.9.5';
+const KYX_VERSION = '1.9.6';
 
 // ---------- 1. src/userscript/shim.js : stockage et messages, à la place des fonctions d'extension ----------
 // Userscript: the extension APIs used by the page code, rebuilt in the page.
@@ -370,7 +370,7 @@ function syncAccount() {
     const res = await fetch(`${RELAY}/sync`, {
       method: 'POST',
       headers: { 'content-type': 'text/plain' },
-      body: JSON.stringify({ token: auth.token, device: auth.device, rev: mine ? sync.rev : 0, changed: mine && json !== sync.json, data })
+      body: JSON.stringify({ token: auth.token, device: auth.device, user: { id: me.id, pseudo: me.pseudo }, rev: mine ? sync.rev : 0, changed: mine && json !== sync.json, data })
     }).then((r) => r.json()).catch(() => null);
     if (!res?.ok || res.user !== me.id) return;
     if (res.data) {
@@ -999,7 +999,7 @@ async function handle(msg) {
   const WISHES = 500;
   const PERKS_KEEP = 10 * 60e3; // the players' perks are read from the relay every 10 minutes
 
-  let me = null; // logged-in player: { id, sub, title }
+  let me = null; // logged-in player: { id, sub, title, user } (user: what the relay is told about them)
   let perks = {}; // perks chosen by the players, by Kyara id, read from the relay
   const pseudos = {}; // pseudo of those players, by Kyara id, seen in the site's answers
   let perksAt = 0;
@@ -1119,7 +1119,9 @@ async function handle(msg) {
   function learnMe(u) {
     if (typeof u?.id !== 'string') return;
     const known = me?.id === u.id;
-    me = { title: known ? me.title : null, id: u.id, sub: !!(u.membership?.tier || u.membership?.perks?.length) };
+    const sub = !!(u.membership?.tier || u.membership?.perks?.length);
+    const user = { id: u.id, pseudo: u.pseudo ?? null, avatar: u.avatar ?? null, membership: sub ? { tier: u.membership.tier ?? null } : null };
+    me = { title: known ? me.title : null, id: u.id, sub, user };
     if (!known && perksAt) shareNames();
     tellMember();
   }
@@ -1132,7 +1134,7 @@ async function handle(msg) {
     const { token, device } = sessionOf('', {});
     if (!token) return;
     original
-      .call(window, `${RELAY}/member`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ token, device }) })
+      .call(window, `${RELAY}/member`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ token, device, user: me.user }) })
       .then((r) => r.json())
       .then((data) => {
         if (!data?.ok) return local(key, 0);
@@ -1282,7 +1284,7 @@ async function handle(msg) {
       const res = await original.call(window, `${RELAY}/profile`, {
         method: 'POST',
         headers: { 'content-type': 'text/plain' },
-        body: JSON.stringify({ token: session.token, device: session.device, profile })
+        body: JSON.stringify({ token: session.token, device: session.device, user: me.user, profile })
       });
       const data = await res.json();
       if (!res.ok || data?.error) return data?.error ?? `relay_${res.status}`;
@@ -3653,6 +3655,13 @@ const KYX_TOUR = [
 // What's new in each version, the latest first. An item can be [text, id of the tour step that shows it].
 const KYX_CHANGES = [
   {
+    version: '1.9.6',
+    items: [
+      ['Menu « Plus » sur ordinateur : « Boosters rentables », « Mur des Soutiens » et « Tutoriel » sont de retour après le changement du site.', 'mur-soutiens'],
+      ['« Personnaliser mon profil » sans abonnement s’enregistre de nouveau (couleurs, titre, bannière, liens…), malgré la nouvelle vérification anti-robot du site.']
+    ]
+  },
+  {
     version: '1.9.5',
     items: [['Le Mur de la Honte devient le « Mur des Soutiens » et s’ouvre à tous les joueurs qui ont l’extension, abonnés compris.', 'mur-soutiens']]
   },
@@ -5387,12 +5396,13 @@ const KYX_CHANGES = [
     if (!menu) return;
     // Marks the entry of the open page as the current one.
     if (VIEWS.some(viewOpen)) menu.querySelectorAll(`:scope > a.on:not(${VIEW_ENTRIES})`).forEach((a) => a.classList.remove('on'));
-    const model = menu.querySelector(':scope > a');
+    const model = menu.querySelector(':scope > a:not(.narrow-only)'); // an entry shown on every screen width
     for (const v of VIEWS) {
       let item = menu.querySelector(`:scope > .${v.cls}`);
       if (!item) {
         if (!model?.querySelector('.dk') || !model.querySelector('.dt b') || model.matches(VIEW_ENTRIES)) return;
         item = model.cloneNode(true);
+        item.classList.remove('on', 'narrow-only');
         item.classList.add(v.cls);
         item.removeAttribute('aria-current');
         item.href = v.hash;
@@ -6721,10 +6731,10 @@ const KYX_CHANGES = [
   function scanTutoMenu() {
     const add = (menu, kanjiSel, titleSel, closer) => {
       if (!menu || menu.querySelector(':scope > .kyx-tuto-entry')) return;
-      const model = menu.querySelector(':scope > a:not(.kyx-more):not(.kyx-subs-entry):not(.kyx-settings-entry)');
+      const model = menu.querySelector(':scope > a:not(.narrow-only):not(.kyx-more):not(.kyx-subs-entry):not(.kyx-settings-entry)');
       if (!model?.querySelector(kanjiSel) || !model.querySelector(titleSel)) return;
       const item = model.cloneNode(true);
-      item.classList.remove('on');
+      item.classList.remove('on', 'narrow-only');
       item.classList.add('kyx-tuto-entry');
       item.removeAttribute('aria-current');
       item.href = TUTO_HASH;
@@ -7483,12 +7493,12 @@ const KYX_CHANGES = [
   // "Kyara Games" entry at the end of a menu of the site; closer: the button that closes that menu.
   function addEntry(menu, closer) {
     if (!menu || menu.querySelector(':scope > .kyx-settings-entry')) return;
-    const model = menu.querySelector(':scope > a:not(.kyx-more):not(.kyx-subs-entry)');
+    const model = menu.querySelector(':scope > a:not(.narrow-only):not(.kyx-more):not(.kyx-subs-entry):not(.kyx-tuto-entry)');
     const kanji = model?.querySelector('.dk, .tk');
     const title = model?.querySelector('.dt b, .tl');
     if (!kanji || !title) return;
     const entry = model.cloneNode(true);
-    entry.classList.remove('on');
+    entry.classList.remove('on', 'narrow-only');
     entry.classList.add('kyx-settings-entry');
     entry.removeAttribute('aria-current');
     entry.href = '#';

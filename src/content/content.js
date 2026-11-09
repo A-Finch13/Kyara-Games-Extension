@@ -1573,12 +1573,13 @@
     if (!menu) return;
     // Marks the entry of the open page as the current one.
     if (VIEWS.some(viewOpen)) menu.querySelectorAll(`:scope > a.on:not(${VIEW_ENTRIES})`).forEach((a) => a.classList.remove('on'));
-    const model = menu.querySelector(':scope > a');
+    const model = menu.querySelector(':scope > a:not(.narrow-only)'); // an entry shown on every screen width
     for (const v of VIEWS) {
       let item = menu.querySelector(`:scope > .${v.cls}`);
       if (!item) {
         if (!model?.querySelector('.dk') || !model.querySelector('.dt b') || model.matches(VIEW_ENTRIES)) return;
         item = model.cloneNode(true);
+        item.classList.remove('on', 'narrow-only');
         item.classList.add(v.cls);
         item.removeAttribute('aria-current');
         item.href = v.hash;
@@ -2907,10 +2908,10 @@
   function scanTutoMenu() {
     const add = (menu, kanjiSel, titleSel, closer) => {
       if (!menu || menu.querySelector(':scope > .kyx-tuto-entry')) return;
-      const model = menu.querySelector(':scope > a:not(.kyx-more):not(.kyx-subs-entry):not(.kyx-settings-entry)');
+      const model = menu.querySelector(':scope > a:not(.narrow-only):not(.kyx-more):not(.kyx-subs-entry):not(.kyx-settings-entry)');
       if (!model?.querySelector(kanjiSel) || !model.querySelector(titleSel)) return;
       const item = model.cloneNode(true);
-      item.classList.remove('on');
+      item.classList.remove('on', 'narrow-only');
       item.classList.add('kyx-tuto-entry');
       item.removeAttribute('aria-current');
       item.href = TUTO_HASH;
